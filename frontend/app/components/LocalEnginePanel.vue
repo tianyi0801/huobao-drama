@@ -115,7 +115,7 @@
           </span>
           <span v-else class="le-slot-name muted">{{ t('settings.localEngine.notBoundHint') }}</span>
           <div class="le-slot-actions">
-            <select class="input le-select" :value="''" @change="onApplyPreset(slot.kind, $event)">
+            <select class="input le-select" :value="currentPresetId(slot.kind)" @change="onApplyPreset(slot.kind, $event)">
               <option value="">{{ t('settings.localEngine.usePreset') }}</option>
               <option v-for="p in presetsOf(slot.kind)" :key="p.id" :value="p.id" :disabled="!p.available">
                 {{ p.label }}{{ p.available ? '' : ` (${t('settings.localEngine.presetMissing')})` }}
@@ -342,6 +342,17 @@ function templateOf(kind: string) {
   return report.value?.templates?.[kind] || null
 }
 
+/**
+ * 当前槽位绑定的预设 id，用于让下拉框回显已选中的预设。
+ * 之前写死 value=""，模板明明已绑定却一直显示「选择预设…」，看起来像没检测到工作流。
+ */
+function currentPresetId(kind: string) {
+  const name = templateOf(kind)?.summary?.name
+  if (!name) return ''
+  const hit = presetsOf(kind).find(p => p.label === name)
+  return hit?.id || ''
+}
+
 function presetsOf(kind: string) {
   return (report.value?.presets || []).filter((p: any) => p.slot === kind)
 }
@@ -499,7 +510,8 @@ onMounted(load)
 .le-ok { margin: 0; font: 600 11.5px var(--font-body); color: var(--success-text, var(--text-1)); }
 /* 高级设置折叠区：首屏只留状态与地址，模板/可调项收起来 */
 .le-advanced { border-top: 1px solid var(--border); padding-top: 8px; }
-.le-advanced > summary {
+.le-advanced > summary,
+.le-import > summary {
   cursor: pointer;
   font: 600 11.5px var(--font-body);
   color: var(--text-2);

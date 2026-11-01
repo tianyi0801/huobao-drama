@@ -800,7 +800,7 @@ const huobaoQuickConfigs = computed(() => {
   ]
 })
 
-function byType(t) { return cfgs.value.filter(c => c.service_type === t) }
+function byType(t) { return (Array.isArray(cfgs.value) ? cfgs.value : []).filter(c => c.service_type === t) }
 
 // 文本模型是唯一的必配项：剧本改写/提取/分镜/提示词都依赖它
 const textModelReady = computed(() => byType('text').some(c => c.is_active))
@@ -820,7 +820,14 @@ function applyProviderPreset(type, provider) {
   cfgForm.name = `${preset.label}-${type}`
 }
 
-async function loadCfgs() { try { cfgs.value = await aiConfigAPI.list() } catch (e) { toastError(e) } }
+async function loadCfgs() {
+  try {
+    const rows = await aiConfigAPI.list()
+    // 接口异常时可能拿到非数组，而 cfgs 被下游 computed（textModelReady 等）直接 .filter，
+    // 一旦不是数组整个页面会渲染崩溃成白屏，这里强制兜底
+    cfgs.value = Array.isArray(rows) ? rows : []
+  } catch (e) { toastError(e) }
+}
 
 // ===== 默认模型选择 =====
 // 默认解析规则与工作台/后端一致：启用配置中优先级最高者的模型列表首位

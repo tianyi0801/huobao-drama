@@ -71,3 +71,6 @@ desktop/resources/
 宣传片/**/public/audio/
 宣传片/**/audio-src/
 宣传片/**/out/
+# 字体子集由 scripts/fonts.py 从系统字体抽取（fonts.json 保留配方），不入库
+宣传片/**/public/fonts/*.woff2
+宣传片/**/public/fonts/*.ttf

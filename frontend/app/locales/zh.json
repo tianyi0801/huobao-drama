@@ -493,7 +493,7 @@
       "remove": "移除模板",
       "options": "可调项",
       "allGood": "本地算力已就绪，图片与视频将使用本机生成。",
-      "importTitle": "导入自己的工作流（API 格式）",
+      "importTitle": "导入自己的工作流 JSON（API 格式 · 点此展开）",
       "importHint": "在 ComfyUI 中通过「Workflow → Export (API)」导出 JSON；先选择槽位与沿用其字段绑定的预设，再选择文件导入。",
       "importPresetHint": "先选择一个预设作为字段绑定模板",
       "importPick": "选择 JSON 文件",

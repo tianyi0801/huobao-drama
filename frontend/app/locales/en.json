@@ -493,7 +493,7 @@
       "remove": "Remove template",
       "options": "Options",
       "allGood": "Local compute is ready; images and videos will be generated on this machine.",
-      "importTitle": "Import your own workflow (API format)",
+      "importTitle": "Import your own workflow JSON (API format · click to expand)",
       "importHint": "Export JSON from ComfyUI via Workflow → Export (API). Choose the slot and the preset whose field bindings you keep, then pick the file.",
       "importPresetHint": "Choose a preset as the binding template first",
       "importPick": "Choose JSON file",

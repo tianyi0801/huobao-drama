@@ -468,7 +468,8 @@
     },
     "localEngine": {
       "continuity": "컷 연속성",
-      "continuityHint": "같은 장면의 연속 컷은 이전 컷의 마지막 프레임을 참조하여 카메라와 공간 배치를 유지합니다 (로컬 엔진 전용)"
+      "continuityHint": "같은 장면의 연속 컷은 이전 컷의 마지막 프레임을 참조하여 카메라와 공간 배치를 유지합니다 (로컬 엔진 전용)",
+      "importTitle": "내 워크플로 JSON 가져오기 (API 형식 · 클릭하여 펼치기)"
     }
   },
   "episode": {
