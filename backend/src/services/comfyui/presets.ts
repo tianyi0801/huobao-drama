@@ -45,6 +45,7 @@ export interface ComfyPresetDefinition {
 export interface ComfyPresetSummary {
   id: string
   label: string
+  templateName: string
   kind: 'image' | 'video'
   slot: ComfyTemplateSlot
   description: string
@@ -179,6 +180,7 @@ export function listComfyPresets(): ComfyPresetSummary[] {
     return {
       id: preset.id,
       label: preset.label,
+      templateName: preset.template.name || preset.label,
       kind: preset.kind,
       slot: preset.slot,
       description: preset.description || '',

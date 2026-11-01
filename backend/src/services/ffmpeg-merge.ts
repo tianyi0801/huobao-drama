@@ -134,15 +134,15 @@ async function doMerge(mergeId: number, episodeId: number, videos: string[]) {
   // 成片海报帧（导出页封面用）
   await extractVideoPoster(mergedRelative)
 
-  // 更新 merge 记录
-  await db.update(schema.videoMerges)
-    .set({ status: 'completed', mergedUrl: mergedRelative, duration, completedAt: now() })
-    .where(eq(schema.videoMerges.id, mergeId))
-
-  // 更新 episode
-  await db.update(schema.episodes)
-    .set({ videoUrl: mergedRelative, updatedAt: now() })
-    .where(eq(schema.episodes.id, episodeId))
+  // 成品就绪与剧集引用同步提交，避免删除夹在两次更新之间。
+  db.transaction((tx) => {
+    tx.update(schema.videoMerges)
+      .set({ status: 'completed', mergedUrl: mergedRelative, duration, completedAt: now() })
+      .where(eq(schema.videoMerges.id, mergeId)).run()
+    tx.update(schema.episodes)
+      .set({ videoUrl: mergedRelative, updatedAt: now() })
+      .where(eq(schema.episodes.id, episodeId)).run()
+  })
 
   logTaskSuccess('MergeTask', 'episode-merge', { mergeId, episodeId, output: mergedRelative, duration, clips: videos.length })
 }

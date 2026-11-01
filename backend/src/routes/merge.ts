@@ -1,8 +1,9 @@
 import { Hono } from 'hono'
-import { and, eq, isNull } from 'drizzle-orm'
+import { and, desc, eq, isNull } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
-import { success, badRequest } from '../utils/response.js'
+import { success, badRequest, serverError } from '../utils/response.js'
 import { mergeEpisodeVideos } from '../services/ffmpeg-merge.js'
+import { deleteEpisodeMerge, MergeDeleteError } from '../services/merge-delete.js'
 import { toSnakeCase } from '../utils/transform.js'
 import { logTaskError, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 
@@ -36,11 +37,9 @@ app.post('/episodes/:id/merge', async (c) => {
 // GET /episodes/:id/merge — 查询最新拼接状态
 app.get('/episodes/:id/merge', async (c) => {
   const episodeId = Number(c.req.param('id'))
-  const merges = await db.select().from(schema.videoMerges)
-    .where(eq(schema.videoMerges.episodeId, episodeId))
-
-
-  const latest = merges[merges.length - 1]
+  const [latest] = await db.select().from(schema.videoMerges)
+    .where(and(eq(schema.videoMerges.episodeId, episodeId), isNull(schema.videoMerges.deletedAt)))
+    .orderBy(desc(schema.videoMerges.id)).limit(1)
   if (!latest) return success(c, null)
 
   return success(c, toSnakeCase(latest))
@@ -53,6 +52,22 @@ app.get('/episodes/:id/merges', async (c) => {
     .where(and(eq(schema.videoMerges.episodeId, episodeId), isNull(schema.videoMerges.deletedAt)))
   merges.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
   return success(c, merges.slice(0, 30).map(toSnakeCase))
+})
+
+// DELETE /episodes/:id/merges/:mergeId — 删除成品及其本地文件
+app.delete('/episodes/:id/merges/:mergeId', (c) => {
+  const episodeId = Number(c.req.param('id'))
+  const mergeId = Number(c.req.param('mergeId'))
+  if (!Number.isSafeInteger(episodeId) || episodeId <= 0 || !Number.isSafeInteger(mergeId) || mergeId <= 0) {
+    return badRequest(c, '剧集或导出记录 ID 不合法')
+  }
+  try {
+    return success(c, deleteEpisodeMerge(episodeId, mergeId))
+  } catch (error) {
+    if (error instanceof MergeDeleteError) return c.json({ code: error.status, message: error.message }, error.status)
+    logTaskError('MergeAPI', 'delete-merge', { episodeId, mergeId, error: (error as Error).message })
+    return serverError(c, '本地成品清理失败，请关闭视频占用后重试；导出记录已保留')
+  }
 })
 
 export default app

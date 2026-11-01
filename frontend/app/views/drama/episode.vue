@@ -938,10 +938,23 @@
                       download
                       class="btn btn-sm"
                       @click.stop
+                      @keydown.enter.stop
                     >
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                       {{ t('common.download') }}
                     </a>
+                    <button
+                      type="button"
+                      class="btn btn-danger btn-sm merge-delete-btn"
+                      :disabled="!['completed', 'failed'].includes(m.status) || mergeDelete.loading"
+                      :title="['completed', 'failed'].includes(m.status) ? t('episode.export.deleteTitle') : t('episode.export.deleteRunning')"
+                      :aria-label="t('episode.export.deleteTitle')"
+                      @click.stop="askDeleteMerge(m)"
+                      @keydown.enter.stop
+                      @keydown.space.stop
+                    >
+                      <Trash2 :size="12" />
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1455,6 +1468,14 @@
         @confirm="confirmDeleteAsset"
         @cancel="assetDelete.open = false"
       />
+      <ConfirmDialog
+        :open="mergeDelete.open"
+        :title="t('episode.export.deleteTitle')"
+        :message="t('episode.export.deleteMessage', { time: formatHistoryTime(mergeDelete.item?.created_at) })"
+        :loading="mergeDelete.loading"
+        @confirm="confirmDeleteMerge"
+        @cancel="!mergeDelete.loading && (mergeDelete.open = false)"
+      />
     </main>
     </div>
   </div>
@@ -1465,7 +1486,7 @@ import { toast } from 'vue-sonner'
 import { useI18n } from 'vue-i18n'
 import {
   Users, FileText, FolderKanban, Clapperboard, Download, Loader2,
-  Plus, X, ListTodo, CircleHelp, Clock,
+  Plus, X, ListTodo, CircleHelp, Clock, Trash2,
 } from 'lucide-vue-next'
 import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, aiConfigAPI, uploadAPI } from '~/composables/useApi'
 import { startTour, autoTour } from '~/composables/useTour'
@@ -1534,9 +1555,41 @@ function toggleSelectAllExport() {
   exportSelectedIds.value = exportSelectedReadyIds.value.length === exportReadyIds.value.length ? [] : [...exportReadyIds.value]
 }
 
+const mergeDelete = ref({ open: false, item: null, loading: false })
+const deletedMergeIds = new Set()
+
+function askDeleteMerge(item) {
+  if (mergeDelete.value.loading || !['completed', 'failed'].includes(item.status)) return
+  mergeDelete.value = { open: true, item, loading: false }
+}
+
+async function confirmDeleteMerge() {
+  const { item } = mergeDelete.value
+  if (!item || mergeDelete.value.loading) return
+  mergeDelete.value.loading = true
+  try {
+    if (activeMerge.value?.id === item.id) activeMerge.value = null
+    await nextTick()
+    await mergeAPI.del(epId.value, item.id)
+    deletedMergeIds.add(item.id)
+    exportMerges.value = exportMerges.value.filter(m => m.id !== item.id)
+    genMerges.value = genMerges.value.filter(m => m.id !== item.id)
+    if (mergeData.value?.id === item.id) mergeData.value = null
+    mergeDelete.value.open = false
+    toast.success(t('episode.export.deleted'))
+    await refresh()
+  } catch (error) {
+    toastError(error, { fallback: 'common.deleteFailed' })
+  } finally {
+    mergeDelete.value.loading = false
+  }
+}
+
 async function loadExportMerges() {
   if (!epId.value) return
-  try { exportMerges.value = await mergeAPI.list(epId.value) || [] } catch { /* 静默 */ }
+  try {
+    exportMerges.value = (await mergeAPI.list(epId.value) || []).filter(m => !deletedMergeIds.has(m.id))
+  } catch { /* 静默 */ }
 }
 
 const scriptStep = ref(storedPanel ? (storedPanel.scriptStep === 0 ? 0 : 1) : 0)
@@ -2387,7 +2440,7 @@ async function loadGenTasks() {
   try {
     const data = await taskAPI.listByEpisode(epId.value)
     genTasks.value = data?.tasks || []
-    genMerges.value = data?.merges || []
+    genMerges.value = (data?.merges || []).filter(m => !deletedMergeIds.has(m.id))
 
     // 生成中/失败状态只存在内存里,页面刷新后丢失;从 sys_task 记录按分镜恢复,
     // 否则已失败的镜头刷新后会退化成"待生成"
@@ -5971,7 +6024,8 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
 }
 .merge-card-pending.is-failed { color: var(--error); background: var(--error-bg); }
 .merge-card-meta { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-3); min-width: 0; }
-.merge-card-meta .btn { margin-left: auto; }
+.merge-card-meta .btn { margin-left: auto; flex-shrink: 0; }
+.merge-card-meta .btn + .merge-delete-btn { margin-left: 0; }
 .merge-card.playable { cursor: pointer; }
 .merge-card.playable:hover { border-color: var(--border-strong); box-shadow: var(--shadow-card); }
 .merge-card-thumb { position: relative; }

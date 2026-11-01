@@ -225,7 +225,8 @@
   --scrollbar-thumb: rgba(148,163,184,0.25);
   --scrollbar-thumb-hover: rgba(148,163,184,0.40);
   --border-hover: rgba(148,163,184,0.40);
-  --switch-bg: #1f2a38;
+  /* 关闭态轨道：原来 #1f2a38 与卡片背景几乎同色，暗色下只看得到白色滑块 */
+  --switch-bg: #33445c;
   --action-danger-bg-hover: rgba(248,113,113,0.22);
   --warn-text: #fbbf24;
   --warn-bg: rgba(251,191,36,0.12);

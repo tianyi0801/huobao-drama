@@ -96,7 +96,7 @@
     </p>
 
     <!-- 高级设置：工作流模板 / 可调项 / 内置工作流导入（未就绪时默认展开） -->
-    <details class="le-advanced" :open="!report?.ready">
+    <details class="le-advanced" :open="advancedOpen">
       <summary>{{ t('settings.localEngine.advanced') }}</summary>
 
     <!-- 工作流模板槽位 -->
@@ -144,8 +144,8 @@
       <div v-for="opt in optionList" :key="opt.id" class="le-option">
         <span class="le-option-label" :title="opt.hint || ''">{{ opt.label }}</span>
         <label v-if="opt.type === 'boolean'" class="config-switch">
-          <input type="checkbox" class="sr-only" :checked="optionValues[opt.id] === true" @change="onOptionChange(opt.id, !(optionValues[opt.id] === true))" />
-          <span class="switch" :class="{ on: optionValues[opt.id] === true }"></span>
+          <input type="checkbox" class="sr-only" :checked="booleanOptionOn(opt)" @change="onOptionChange(opt.id, ($event.target as HTMLInputElement).checked)" />
+          <span class="switch" :class="{ on: booleanOptionOn(opt) }"></span>
         </label>
         <select
           v-else-if="opt.type === 'select'"
@@ -291,6 +291,11 @@ const optionList = computed(() => {
   return list
 })
 
+function booleanOptionOn(opt: { id: string; default?: unknown }) {
+  const saved = optionValues.value
+  return (Object.prototype.hasOwnProperty.call(saved, opt.id) ? saved[opt.id] : opt.default) === true
+}
+
 const pixelBudget = computed(() => Number(report.value?.imagePixelBudget) || 4194304)
 const continuityOn = computed(() => report.value?.continuityReference !== false)
 
@@ -349,7 +354,7 @@ function templateOf(kind: string) {
 function currentPresetId(kind: string) {
   const name = templateOf(kind)?.summary?.name
   if (!name) return ''
-  const hit = presetsOf(kind).find(p => p.label === name)
+  const hit = presetsOf(kind).find(p => p.templateName === name || p.label === name)
   return hit?.id || ''
 }
 
@@ -357,11 +362,24 @@ function presetsOf(kind: string) {
   return (report.value?.presets || []).filter((p: any) => p.slot === kind)
 }
 
+/**
+ * 「高级设置」的展开状态。
+ * 不能直接绑 `:open="!report?.ready"`：那样每次检测都会重置折叠状态，
+ * 点击「启用本地生成」后 ready 翻转，details 会被强制收起，看起来像内容凭空消失。
+ * 这里只在首次加载时按就绪状态给一次默认值，之后完全交给用户控制。
+ */
+const advancedOpen = ref(true)
+let advancedInitialized = false
+
 function applyReport(data: any) {
   report.value = data
   form.url = data?.comfyui?.url || form.url
   form.enabled = data?.enabled === true
   optionValues.value = { ...(data?.optionValues || {}) }
+  if (!advancedInitialized) {
+    advancedInitialized = true
+    advancedOpen.value = data?.ready !== true
+  }
 }
 
 async function load() {
@@ -476,7 +494,14 @@ onMounted(load)
 .le-panel { display: flex; flex-direction: column; gap: 12px; }
 .le-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .le-url { flex: 1 1 240px; min-width: 200px; }
-.le-switch { display: inline-flex; align-items: center; gap: 6px; }
+.le-switch { position: relative; display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; cursor: pointer; }
+.config-switch { position: relative; display: inline-flex; align-items: center; flex-shrink: 0; cursor: pointer; }
+.le-switch > input.sr-only,
+.config-switch > input.sr-only { top: 0; left: 0; margin: 0; }
+.le-switch input:focus-visible + .switch,
+.config-switch input:focus-visible + .switch { box-shadow: 0 0 0 3.5px var(--button-focus); }
+.le-row > .switch,
+.le-row > .config-switch { flex: 0 0 auto; }
 .le-switch-text { font: 500 11.5px var(--font-body); color: var(--text-2); }
 .le-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; }
 .le-item { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; background: var(--surface-sunken); border-radius: var(--radius-md); }

@@ -264,7 +264,9 @@ app.get('/:id/pipeline-status', async (c) => {
   const chars = await db.select().from(schema.characters).where(eq(schema.characters.dramaId, ep.dramaId))
   const scenes = await db.select().from(schema.scenes).where(eq(schema.scenes.dramaId, ep.dramaId))
   const sbs = await db.select().from(schema.storyboards).where(eq(schema.storyboards.episodeId, episodeId))
-  const merges = await db.select().from(schema.videoMerges).where(eq(schema.videoMerges.episodeId, episodeId))
+  const merges = await db.select().from(schema.videoMerges)
+    .where(and(eq(schema.videoMerges.episodeId, episodeId), isNull(schema.videoMerges.deletedAt)))
+    .orderBy(schema.videoMerges.id)
 
   const sbsWithImage = sbs.filter(s => s.composedImage)
   const sbsWithVideo = sbs.filter(s => s.videoUrl)
