@@ -31,7 +31,15 @@ async function boot(mode = 'pending', options = {}) {
       ? callback(null, options.shortPath, '')
       : callback(new Error('short path unavailable'), '', ''))
   } }
-  const filesystem = { existsSync: p => !/storage-config|template-version|startup.log/.test(p), mkdirSync() {}, cpSync() {}, writeFileSync() {}, appendFileSync: (_p, s) => logs.push(s) }
+  const copies = []
+  const filesystem = {
+    existsSync: p => (options.templateVersion && /template-version/.test(p)) || !/storage-config|template-version|startup.log/.test(p),
+    readFileSync: p => (/template-version/.test(p) ? options.templateVersion : ''),
+    mkdirSync() {},
+    cpSync: (from, to, opts) => copies.push({ from, to, force: opts?.force === true }),
+    writeFileSync() {},
+    appendFileSync: (_p, s) => logs.push(s),
+  }
   const fakeProcess = new EventEmitter()
   Object.assign(fakeProcess, { platform: 'win32', arch: 'x64', env: {}, versions: { electron: '37.10.3' }, pid: 123, resourcesPath: options.resourcesPath || '/mock/resources', stdout: new EventEmitter(), stderr: new EventEmitter() })
   fakeProcess.stdout.write = fakeProcess.stderr.write = () => true
@@ -51,7 +59,7 @@ async function boot(mode = 'pending', options = {}) {
   vm.runInContext(code, context)
   async function flush() { for(let i=0;i<50;i++) await Promise.resolve() }
   await flush()
-  return { windows, errors, logs, app, child, requests: () => requests, forks: () => forks, forkArgs: () => forkArgs, flush,
+  return { windows, errors, logs, copies, app, child, requests: () => requests, forks: () => forks, forkArgs: () => forkArgs, flush,
     async expireHealth() { now=60_001; for(const t of [...timers.values()]) if(t.at <= now && t.at <= 1000) {timers.delete(t.id);t.fn()} await flush() } }
 }
 
@@ -90,6 +98,24 @@ test('non-ASCII Windows install resources use one short path for backend and med
   assert.ok(p.forkArgs()[2].env.FRONTEND_DIST.startsWith(shortPath))
   assert.equal(p.errors.length, 0)
 })
+test('内置 ComfyUI 预设即使模板版本一致也会覆盖同步到用户目录', async () => {
+  const p = await boot('healthy', { templateVersion: '5' })
+  const comfyCopy = p.copies.find(item => /workspace-template[\\/]comfyui$/.test(item.from))
+  assert.ok(comfyCopy, '未同步内置工作流目录')
+  assert.match(comfyCopy.to, /workspace[\\/]comfyui$/)
+  assert.equal(comfyCopy.force, true)
+  // 版本一致时仍不应覆盖 skills：只跳过整目录补缺失文件
+  assert.equal(p.copies.some(item => /workspace-template$/.test(item.from)), false)
+  assert.equal(p.errors.length, 0)
+})
+
+test('旧模板版本升级时补齐 workspace 并强制同步内置工作流', async () => {
+  const p = await boot('healthy', { templateVersion: '4' })
+  assert.ok(p.copies.some(item => /workspace-template$/.test(item.from) && item.force === false))
+  assert.ok(p.copies.some(item => /workspace-template[\\/]prompts$/.test(item.from) && item.force === true))
+  assert.ok(p.copies.some(item => /workspace-template[\\/]comfyui$/.test(item.from) && item.force === true))
+})
+
 test('closing while backend starts cancels silently', async () => {
   const p=await boot(); p.app.quit(); await p.expireHealth(); assert.equal(p.errors.length,0)
 })

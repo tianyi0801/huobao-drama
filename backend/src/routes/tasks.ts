@@ -4,7 +4,7 @@ import { db, schema } from '../db/index.js'
 import { success, created, badRequest } from '../utils/response.js'
 import { generateImage, generateVideo, recoverVideoTask } from '../services/generation.js'
 import { safeTaskError } from '../services/video-download.js'
-import { getActiveConfig, getConfigById } from '../services/ai.js'
+import { getActiveConfig, getConfigById, resolveGenerationConfigId } from '../services/ai.js'
 import { getComfyConfig } from '../services/comfyui/config.js'
 import { buildContinuityPromptSuffix, resolvePreviousShotFrame } from '../services/storyboard-continuity.js'
 import { getDramaStylePrompt } from '../services/style-preset.js'
@@ -158,7 +158,8 @@ app.post('/', async (c) => {
       if (sb) {
         const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, sb.episodeId))
         const locked = type === 'image' ? ep?.imageConfigId : ep?.videoConfigId
-        if (locked != null && configId == null) configId = locked
+        // 本地算力就绪时忽略历史写入的云端锁定配置，避免配好 ComfyUI 仍请求外部厂商
+        configId = resolveGenerationConfigId(body.config_id, locked, type)
         if (type === 'video' && ep?.resolution) episodeResolution = ep.resolution
         storyboardDramaId = ep?.dramaId ?? undefined
       }

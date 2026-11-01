@@ -4,6 +4,7 @@ import { db, getInsertId, schema } from '../db/index.js'
 import { success, created, badRequest, now } from '../utils/response.js'
 import { toSnakeCase } from '../utils/transform.js'
 import { generateImage } from '../services/generation.js'
+import { resolveGenerationConfigId } from '../services/ai.js'
 import { computeImageSize } from '../services/image-size.js'
 import { getDramaStylePrompt } from '../services/style-preset.js'
 import { ensurePropFinalPrompt } from '../services/final-prompt.js'
@@ -117,7 +118,7 @@ app.post('/:id/generate-image', async (c) => {
   const prompt = finalPrompt || propImagePrompt(prop, stylePrompt)
   try {
     logTaskStart('PropImage', 'generate', { propId: id, episodeId: ep.id, dramaId: prop.dramaId })
-    const genId = await generateImage({ propId: id, dramaId: prop.dramaId, prompt, model: body.model, size: computeImageSize(PROP_ASPECT_RATIO, ep.resolution), configId: body.config_id ?? ep.imageConfigId ?? undefined })
+    const genId = await generateImage({ propId: id, dramaId: prop.dramaId, prompt, model: body.model, size: computeImageSize(PROP_ASPECT_RATIO, ep.resolution), configId: resolveGenerationConfigId(body.config_id, ep.imageConfigId, 'image') })
     logTaskSuccess('PropImage', 'generate', { propId: id, generationId: genId })
     return success(c, { image_generation_id: genId })
   } catch (err: any) {

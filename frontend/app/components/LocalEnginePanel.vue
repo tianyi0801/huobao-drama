@@ -343,8 +343,14 @@ async function onPixelBudgetChange(event: Event) {
   }
 }
 
+/*
+ * 后端对未绑定的槽位也返回 { present: false, summary: null } 的报告对象。
+ * 直接判空会让「未绑定」被当成已绑定：卡片显示绿色 tag 但节点数和名称为空，
+ * 还会多出一个删除按钮。这里统一按 present 判定，未绑定就是 null。
+ */
 function templateOf(kind: string) {
-  return report.value?.templates?.[kind] || null
+  const slotReport = report.value?.templates?.[kind]
+  return slotReport?.present ? slotReport : null
 }
 
 /**

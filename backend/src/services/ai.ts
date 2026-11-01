@@ -88,6 +88,32 @@ export function getTextProviderBaseUrl(config: AIConfig) {
 const lastLoggedActiveConfigKey = new Map<string, string>()
 const lastLoggedConfigByIdKey = new Map<number, string>()
 
+/**
+ * 生成请求实际使用的配置 id。
+ *
+ * 优先级：请求显式指定（含本地虚拟 id -1）> 本地算力就绪（返回 undefined，交给
+ * getActiveConfig 走 ComfyUI）> 集里锁定的配置。
+ *
+ * 历史剧集在本地算力接入前把 image_config_id / video_config_id 锁成了云端配置，
+ * 若继续让锁定值优先，用户配好 ComfyUI 后请求仍会打到外部厂商并产生费用。
+ */
+export function resolveGenerationConfigId(
+  explicit: unknown,
+  locked: unknown,
+  kind: 'image' | 'video',
+): number | undefined {
+  const explicitId = asConfigId(explicit)
+  if (explicitId !== undefined) return explicitId
+  if (isComfyReadyFor(kind)) return undefined
+  return asConfigId(locked)
+}
+
+function asConfigId(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === '') return undefined
+  const id = Number(value)
+  return Number.isSafeInteger(id) && id !== 0 ? id : undefined
+}
+
 export async function getActiveConfig(serviceType: ServiceType): Promise<AIConfig | null> {
   // 图片/视频优先走本地 ComfyUI；未启用本地算力时才回落到云端配置
   const local = comfyConfig(serviceType)

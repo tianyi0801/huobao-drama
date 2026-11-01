@@ -8,6 +8,7 @@ import { AUDIO_MAX_BYTES, AudioUploadError, saveAudioUpload } from '../utils/aud
 import { getAbsolutePath } from '../utils/storage.js'
 import { toSnakeCase } from '../utils/transform.js'
 import { generateImage } from '../services/generation.js'
+import { resolveGenerationConfigId } from '../services/ai.js'
 import { getDramaStylePrompt } from '../services/style-preset.js'
 import { ensureCharacterFinalPrompt } from '../services/final-prompt.js'
 import { computeImageSize } from '../services/image-size.js'
@@ -141,7 +142,7 @@ app.post('/:id/generate-image', async (c) => {
   const prompt = finalPrompt || characterImagePrompt(char, stylePrompt)
   try {
     logTaskStart('CharacterImage', 'generate', { characterId: id, episodeId: ep.id, dramaId: char.dramaId })
-    const genId = await generateImage({ characterId: id, dramaId: char.dramaId, prompt, model: body.model, size: computeImageSize(CHARACTER_ASPECT_RATIO, ep.resolution), configId: body.config_id ?? ep.imageConfigId ?? undefined })
+    const genId = await generateImage({ characterId: id, dramaId: char.dramaId, prompt, model: body.model, size: computeImageSize(CHARACTER_ASPECT_RATIO, ep.resolution), configId: resolveGenerationConfigId(body.config_id, ep.imageConfigId, 'image') })
     logTaskSuccess('CharacterImage', 'generate', { characterId: id, generationId: genId })
     return success(c, { image_generation_id: genId })
   } catch (err: any) {
@@ -186,7 +187,7 @@ app.post('/batch-generate-images', async (c) => {
     const finalPrompt = await ensureCharacterFinalPrompt(char, ep.id, false, { model: body.text_model, configId: body.text_config_id ?? undefined })
     const prompt = finalPrompt || characterImagePrompt(char, stylePrompt)
     try {
-      const genId = await generateImage({ characterId: cid, dramaId: char.dramaId, prompt, model: body.model, size: computeImageSize(CHARACTER_ASPECT_RATIO, ep.resolution), configId: body.config_id ?? ep.imageConfigId ?? undefined })
+      const genId = await generateImage({ characterId: cid, dramaId: char.dramaId, prompt, model: body.model, size: computeImageSize(CHARACTER_ASPECT_RATIO, ep.resolution), configId: resolveGenerationConfigId(body.config_id, ep.imageConfigId, 'image') })
       results.push(genId)
     } catch {}
   }

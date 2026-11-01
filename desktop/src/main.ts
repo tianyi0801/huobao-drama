@@ -30,7 +30,7 @@ let backendBundle = BACKEND_BUNDLE
 let runtimeResourcesDir = ''
 
 /** workspace 模板版本：内置模板更新时递增，触发向用户目录补缺失文件 */
-const TEMPLATE_VERSION = '4'
+const TEMPLATE_VERSION = '5'
 const STORAGE_CONFIG_FILE = 'storage-config.json'
 
 let mainWindow: BrowserWindow | null = null
@@ -164,13 +164,23 @@ export function normCase(p: string): string {
  * - 版本一致 → 跳过
  * 例外：prompts/ 随版本升级强制覆盖——prompt 与代码内 DEFAULT_PROMPTS 同源迭代
  * （设置页有「恢复默认」，且编辑场景少）；skills/ 保持只增不覆盖（可能有用户新建）
+ * comfyui/ 为随包只读资产，每次启动强制覆盖（见下方说明）
  */
 function syncWorkspaceTemplate(templateDir: string, destDir: string) {
   const marker = path.join(destDir, '.template-version')
-  if (fs.existsSync(marker) && fs.readFileSync(marker, 'utf8').trim() === TEMPLATE_VERSION) return
-  fs.cpSync(templateDir, destDir, { recursive: true, force: false, errorOnExist: false })
-  fs.cpSync(path.join(templateDir, 'prompts'), path.join(destDir, 'prompts'), { recursive: true, force: true })
-  fs.writeFileSync(marker, TEMPLATE_VERSION)
+  const upToDate = fs.existsSync(marker) && fs.readFileSync(marker, 'utf8').trim() === TEMPLATE_VERSION
+  if (!upToDate) {
+    fs.cpSync(templateDir, destDir, { recursive: true, force: false, errorOnExist: false })
+    fs.cpSync(path.join(templateDir, 'prompts'), path.join(destDir, 'prompts'), { recursive: true, force: true })
+    fs.writeFileSync(marker, TEMPLATE_VERSION)
+  }
+
+  // 内置 ComfyUI 预设/API 图/UI 工作流是随包发布的只读资产（用户自定义模板存在数据库里），
+  // 每次启动强制覆盖：旧版本残留或文件缺失时无需用户手动拷贝，升级后设置页立刻能看到预设。
+  const bundledComfy = path.join(templateDir, 'comfyui')
+  if (fs.existsSync(bundledComfy)) {
+    fs.cpSync(bundledComfy, path.join(destDir, 'comfyui'), { recursive: true, force: true })
+  }
 }
 
 function resolveResourceDir(): string {
