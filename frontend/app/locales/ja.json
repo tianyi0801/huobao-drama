@@ -186,7 +186,7 @@
     },
     "ep": {
       "statusTitle": "クリックしてこの話の状態を設定",
-      "resTitle": "クリックしてこの話の動画解像度を変更",
+      "resTitle": "クリックしてこの話の画質を変更",
       "deleteTitle": "この話を削除",
       "enter": "制作を開く",
       "scriptReady": "脚本入力済み",
@@ -196,9 +196,10 @@
       "addNextTitle": "第 {n} 話を追加",
       "addNextText": "第 {n} 話を追加",
       "episodeN": "第 {n} 話",
-      "res720": "720p · 高画質",
-      "res480": "480p · スムーズ",
-      "resSwitched": "この話の動画解像度を {res} に変更しました"
+      "res720": "720p · 高画質（完成 720P）",
+      "res480": "480p · スムーズ（完成 480P）",
+      "resSwitched": "この話の動画解像度を {res} に変更しました",
+      "res1080": "1080p · 超高画質（完成 1080P）"
     },
     "epCreate": {
       "title": "新しい話を作成",
@@ -206,9 +207,9 @@
       "titlePlaceholder": "話数で自動命名",
       "titleHint": "空欄の場合は話数で自動命名されます（例：「{example}」）。",
       "example": "第 {n} 話",
-      "resolution": "動画解像度",
-      "resolutionPlaceholder": "解像度を選択",
-      "resolutionHint": "作成後、この話の動画はこの解像度で生成されます。後から話カードでも変更できます。",
+      "resolution": "動画画質（完成）",
+      "resolutionPlaceholder": "画質を選択",
+      "resolutionHint": "ここで選ぶのは最終的な完成解像度です。ローカルエンジンは二次パスの倍率から一次パスの段階を逆算します。",
       "lockCopy": "作成時に現在有効な画像・動画生成能力がロックされます。",
       "creating": "作成中...",
       "create": "作成",
@@ -464,6 +465,10 @@
     "skillDelete": {
       "title": "Skill を削除",
       "message": "Skill「{id}」を削除しますか？対応する Agent は組み込みのデフォルトプロンプトに戻ります。"
+    },
+    "localEngine": {
+      "continuity": "カット連続性",
+      "continuityHint": "同じシーンの連続カットでは前カットの最終フレームを参照し、カメラと空間配置を保ちます（ローカルエンジンのみ）"
     }
   },
   "episode": {
@@ -783,7 +788,10 @@
       "confirmNote": "上記の設定でショットごとに生成を開始します。失敗したタスクは後で「失敗を再試行」からまとめて再実行できます。",
       "confirmStart": "生成開始 ({n})",
       "selectMissing": "未生成を選択",
-      "aspectRatio": "アスペクト比"
+      "aspectRatio": "アスペクト比",
+      "stillRunning": "生成に時間がかかっています。自動待機を停止しました。右上のタスク一覧で進捗を確認できます",
+      "confirmEta": "所要時間の目安",
+      "queued": "待機中"
     },
     "inspector": {
       "videoPromptPlaceholder": "{'@'}名前で画像、#名前で音声を参照。セリフ、話者、カメラの動きを記述…",
@@ -798,11 +806,12 @@
       "refAudioHint": "参照音声には参照画像または動画が 1 つ以上必要です",
       "params": "生成パラメータ",
       "duration": "分镜の長さ",
-      "durationUnit": "秒（2-30）",
+      "durationUnit": "秒（2-8）",
       "durationHint": "変更すると分镜に即時保存され、リストとバッチ生成にも反映されます",
       "effective": "{model} · {res} · {dur}秒",
       "boundRefs": "绑定参照画像",
-      "noBoundRefs": "绑定された素材なし（中央の「参照素材」で绑定）"
+      "noBoundRefs": "绑定された素材なし（中央の「参照素材」で绑定）",
+      "estimate": "約 {time}"
     },
     "tasks": {
       "title": "生成タスク一覧",
@@ -848,7 +857,8 @@
       "batchGeneratingProp": "小道具画像を一括生成中",
       "allCharsDone": "すべてのキャラクター画像が生成済みです",
       "allScenesDone": "すべてのシーン画像が生成済みです",
-      "allPropsDone": "すべての小道具画像が生成済みです"
+      "allPropsDone": "すべての小道具画像が生成済みです",
+      "stillRunning": "生成に時間がかかっています。自動待機を停止しました。後でページを更新して確認してください"
     },
     "extract": {
       "done": "{type}の抽出が完了しました",
@@ -876,9 +886,9 @@
       "todo": "未生成"
     },
     "resolution": {
-      "smooth": "標準",
-      "hd": "高画質",
-      "uhd": "超高画質"
+      "smooth": "スムーズ（完成 480P）",
+      "hd": "高画質（完成 720P）",
+      "uhd": "超高画質（完成 1080P）"
     },
     "recovery": {
       "remotePreview": "動画は生成済みですが、まだローカルに保存されていません。オンライン再生または下のリンクをご利用ください。ダウンロード後はローカル動画に切り替わります。",
@@ -897,6 +907,16 @@
       "transferring": "動画生成済み・転送中",
       "awaitingDelivery": "動画生成済み・配信待ち",
       "restoreHint": "既存のタスクを復旧し、重複生成を避けます"
+    },
+    "eta": {
+      "seconds": "{n} 秒",
+      "minutes": "約 {n} 分",
+      "hours": "約 {h} 時間",
+      "hoursMinutes": "約 {h} 時間 {m} 分",
+      "running": "経過 {elapsed} · 完了予定 {finish}",
+      "overtime": "経過 {elapsed}、まだ生成中",
+      "runningNoEta": "生成中…",
+      "queued": "待機中：同じシーンの前のカットの完了を待っています"
     }
   },
   "errors": {

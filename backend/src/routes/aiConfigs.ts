@@ -137,6 +137,10 @@ app.post('/', async (c) => {
   if (!isOfficialProvider(body.service_type, body.provider)) {
     return badRequest(c, '不支持的 service_type/provider')
   }
+  // 图片/视频已改为本地 ComfyUI 工作流，不再接受新增云端配置（历史记录仍可编辑与删除）
+  if (body.service_type === 'image' || body.service_type === 'video') {
+    return badRequest(c, '图片与视频已改为本地 ComfyUI 工作流生成，请到「设置 → 本地算力」配置工作流模板')
+  }
 
   let temperature: number | null = null
   if ('temperature' in body) {

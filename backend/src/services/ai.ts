@@ -5,8 +5,34 @@ import { db, schema } from '../db/index.js'
 import { eq } from 'drizzle-orm'
 import { logTaskProgress, logTaskWarn } from '../utils/task-logger.js'
 import { joinProviderUrl } from './adapters/url.js'
+import { getComfyConfig, isComfyReadyFor } from './comfyui/config.js'
 
 export type ServiceType = 'text' | 'image' | 'video'
+
+/**
+ * 本地 ComfyUI 的虚拟配置 id。
+ * 图片/视频不再读取 ai_service_configs，但 sys_task 需要记录来源配置以便恢复，
+ * 因此统一用一个固定负数作为「本机引擎」的标识。
+ */
+export const COMFY_VIRTUAL_CONFIG_ID = -1
+
+/** 本地引擎配置：仅图片/视频且有可用模板时返回 */
+function comfyConfig(serviceType: ServiceType): AIConfig | null {
+  if (serviceType === 'text') return null
+  const comfy = getComfyConfig()
+  if (!comfy.enabled) return null
+  if (!isComfyReadyFor(serviceType)) {
+    logTaskWarn('AIConfig', 'comfy-template-missing', { serviceType })
+    return null
+  }
+  return {
+    id: COMFY_VIRTUAL_CONFIG_ID,
+    provider: 'comfyui',
+    baseUrl: comfy.url,
+    apiKey: '',
+    model: 'local',
+  }
+}
 
 export interface AIConfig {
   id?: number
@@ -63,6 +89,22 @@ const lastLoggedActiveConfigKey = new Map<string, string>()
 const lastLoggedConfigByIdKey = new Map<number, string>()
 
 export async function getActiveConfig(serviceType: ServiceType): Promise<AIConfig | null> {
+  // 图片/视频优先走本地 ComfyUI；未启用本地算力时才回落到云端配置
+  const local = comfyConfig(serviceType)
+  if (local) {
+    const key = `comfyui:${serviceType}:${local.baseUrl}`
+    if (lastLoggedActiveConfigKey.get(serviceType) !== key) {
+      lastLoggedActiveConfigKey.set(serviceType, key)
+      logTaskProgress('AIConfig', 'local-engine-selected', { serviceType, url: local.baseUrl })
+    }
+    return local
+  }
+  if (serviceType !== 'text' && getComfyConfig().enabled) {
+    // 已启用本地算力但模板缺失：不再回落到云端，避免误产生云端费用
+    logTaskWarn('AIConfig', 'local-engine-not-ready', { serviceType })
+    return null
+  }
+
   const rows = (await db.select().from(schema.aiServiceConfigs)
     .where(eq(schema.aiServiceConfigs.serviceType, serviceType))
   )
@@ -107,6 +149,9 @@ export async function getTextConfig(): Promise<AIConfig> {
  * 取某服务类型当前启用且优先级最高的官方配置 ID（创建集时自动锁定用）
  */
 export async function getActiveConfigId(serviceType: ServiceType): Promise<number | null> {
+  // 本地引擎固定返回虚拟 id（集创建时写入 image_config_id / video_config_id）
+  const local = comfyConfig(serviceType)
+  if (local) return COMFY_VIRTUAL_CONFIG_ID
   const rows = (await db.select().from(schema.aiServiceConfigs)
     .where(eq(schema.aiServiceConfigs.serviceType, serviceType))
   )
@@ -116,6 +161,12 @@ export async function getActiveConfigId(serviceType: ServiceType): Promise<numbe
 }
 
 export async function getConfigById(id: number): Promise<AIConfig | null> {
+  // 本地 ComfyUI 的虚拟配置：地址可能随用户改动变化，恢复任务时按当前地址重新给出
+  if (id === COMFY_VIRTUAL_CONFIG_ID) {
+    const comfy = getComfyConfig()
+    if (!comfy.enabled) return null
+    return { id, provider: 'comfyui', baseUrl: comfy.url, apiKey: '', model: 'local' }
+  }
   const [row] = await db.select().from(schema.aiServiceConfigs)
     .where(eq(schema.aiServiceConfigs.id, id))
   if (!row || !row.isActive) {

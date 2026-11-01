@@ -23,8 +23,11 @@ import props from './routes/props.js'
 import settings from './routes/settings.js'
 import storage from './routes/storage.js'
 import serverUpdate from './routes/serverUpdate.js'
+import localEnv from './routes/localEnv.js'
+import workflows from './routes/workflows.js'
 import { requestLogger, errorHandler } from './middleware/logger.js'
 import { resumeInterruptedTasks } from './services/generation.js'
+import { seedComfyDefaultsIfMissing } from './services/comfyui/bootstrap.js'
 import { DATA_ROOT } from './utils/paths.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -67,6 +70,8 @@ api.route('/props', props)
 api.route('/storage', storage)
 api.route('/settings', settings)
 api.route('/server-update', serverUpdate)
+api.route('/local-env', localEnv)
+api.route('/workflows', workflows)
 
 app.route('/api/v1', api)
 
@@ -86,6 +91,8 @@ app.get('*', serveStatic({ root: distPath, path: 'index.html' }))
 const port = Number(process.env.PORT || 5679)
 console.log(`🚀 Huobao Drama TS server on http://localhost:${port}`)
 
+// 首次启动预置本地 ComfyUI 工作流模板（已有配置时不覆盖）
+seedComfyDefaultsIfMissing()
 await resumeInterruptedTasks()
 
 serve({ fetch: app.fetch, port })

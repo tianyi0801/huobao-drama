@@ -3,9 +3,21 @@
  */
 import { Hono } from 'hono'
 import { getContentLanguage, setContentLanguage, getToursSeen, setToursSeen, CONTENT_LANGUAGES, type ContentLanguage } from '../services/app-settings.js'
+import { getComfyConfig, isComfyReadyFor } from '../services/comfyui/config.js'
 import { success, badRequest } from '../utils/response.js'
 
 const app = new Hono()
+
+// GET /local-engine — 本地算力是否就绪（首页未配置引导用，不发起网络探测）
+app.get('/local-engine', async (c) => {
+  const config = getComfyConfig()
+  return success(c, {
+    enabled: config.enabled,
+    url: config.url,
+    imageReady: isComfyReadyFor('image'),
+    videoReady: isComfyReadyFor('video'),
+  })
+})
 
 // GET /content-language — 当前 AI 内容语言
 app.get('/content-language', async (c) => {

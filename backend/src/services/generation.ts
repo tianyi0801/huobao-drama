@@ -9,6 +9,7 @@ import { getAbsolutePath } from '../utils/storage.js'
 import { downloadVideo, safeTaskError } from './video-download.js'
 import { prepareReferenceAudio, resolveReferenceAudioUrls } from './reference-audio.js'
 import { getActiveConfig, getConfigById } from './ai.js'
+import { waitForScenePredecessor } from './storyboard-continuity.js'
 import { now } from '../utils/response.js'
 import { downloadFile, fetchImageAsCompressedDataUrl, generateImageThumb, readImageAsCompressedDataUrl, readImageAsDataUrl, saveBase64Image } from '../utils/storage.js'
 import { extractVideoPoster } from '../utils/video-poster.js'
@@ -28,9 +29,10 @@ function runBackground(id: number, job: () => Promise<void>) {
 
 const taskLabel = (type: TaskType) => (type === 'image' ? 'ImageTask' : 'VideoTask')
 
-// 轮询节奏：图片 5s×120（上限 10 分钟）；视频 10s×300
+// 轮询节奏：图片 2.5s×240（上限 10 分钟）；视频 10s×300
+// 图片任务多在 20-60 秒内完成，5 秒间隔会带来最多 5 秒的感知延迟，这里收紧到 2.5 秒
 const POLL_PROFILES: Record<TaskType, { attempts: number; intervalMs: number; maxDurationMs: number | null }> = {
-  image: { attempts: 120, intervalMs: 5000, maxDurationMs: 600_000 },
+  image: { attempts: 240, intervalMs: 2500, maxDurationMs: 600_000 },
   video: { attempts: 300, intervalMs: 10_000, maxDurationMs: null },
 }
 
@@ -223,6 +225,28 @@ async function processTask(id: number, config: AIConfig) {
     const type = record.type as TaskType
     const label = taskLabel(type)
     const params = parseTaskParams(record.params)
+
+    // 视频：同场景必须逐段放行。批量提交时若同时把 N 个任务交给 ComfyUI，
+    // 提交图在提交那一刻就固定了，后面的镜头拿不到上一段尾帧，衔接会失效。
+    // 放到这里（后端）串行，前端批量/手动逐个点都能保证顺序，关页面也不影响。
+    if (type === 'video') {
+      await db.update(schema.sysTask)
+        .set({ stage: 'queued', updatedAt: now() })
+        .where(eq(schema.sysTask.id, id))
+      const wait = await waitForScenePredecessor(id, record.storyboardId)
+      await db.update(schema.sysTask)
+        .set({ stage: 'submitting', updatedAt: now() })
+        .where(eq(schema.sysTask.id, id))
+      if (wait.waitedMs > 3000) {
+        logTaskProgress(label, 'predecessor-settled', {
+          id,
+          storyboardId: record.storyboardId,
+          waitedMs: wait.waitedMs,
+          timedOut: wait.timedOut,
+        })
+      }
+    }
+
     logTaskProgress(label, 'build-request', {
       id,
       provider: config.provider,
@@ -236,7 +260,7 @@ async function processTask(id: number, config: AIConfig) {
     if (type === 'image') {
       const adapter = getImageAdapter(config.provider)
       const resolvedReferenceImages = await normalizeReferenceImages(params.referenceImages)
-      ;({ url, method, headers, body } = adapter.buildGenerateRequest(config, {
+      ;({ url, method, headers, body } = await adapter.buildGenerateRequest(config, {
         id: record.id,
         model: record.model,
         prompt: record.prompt,
@@ -250,11 +274,17 @@ async function processTask(id: number, config: AIConfig) {
       const resolvedFirstFrameUrl = await normalizeVideoReferenceUrl(params.firstFrameUrl)
       const resolvedLastFrameUrl = await normalizeVideoReferenceUrl(params.lastFrameUrl)
       const resolvedReferenceImageUrls = await normalizeVideoReferenceUrls(params.referenceImageUrls)
+      // 本地 ComfyUI 引擎自己把素材上传进 input 目录，不需要公网可达地址
+      const localEngine = config.provider === 'comfyui'
       // 视频使用公网地址；短音色按厂商能力使用 data URL 或公网地址。
-      const resolvedReferenceVideoUrls = resolvePublicMediaUrls(params.referenceVideoUrls, 'video')
+      const resolvedReferenceVideoUrls = localEngine
+        ? dedupeMediaList(params.referenceVideoUrls)
+        : resolvePublicMediaUrls(params.referenceVideoUrls, 'video')
       const resolvedReferenceAudioUrls = await resolveReferenceAudioUrls(params.referenceAudioUrls, config.provider)
-      const resolvedReferenceFileUrl = resolvePublicMediaUrl(params.referenceFileUrl, 'file')
-      ;({ url, method, headers, body } = adapter.buildGenerateRequest(config, {
+      const resolvedReferenceFileUrl = localEngine
+        ? (String(params.referenceFileUrl || '').trim() || null)
+        : resolvePublicMediaUrl(params.referenceFileUrl, 'file')
+      ;({ url, method, headers, body } = await adapter.buildGenerateRequest(config, {
         id: record.id,
         model: record.model,
         prompt: record.prompt,
@@ -464,7 +494,7 @@ async function handleImageComplete(record: SysTaskRecord, imageUrl: string) {
   await generateImageThumb(localPath)
 
   await db.update(schema.sysTask)
-    .set({ resultUrl: imageUrl, localPath, status: 'completed', completedAt: now(), updatedAt: now() })
+    .set({ resultUrl: imageUrl, localPath, status: 'completed', stage: 'completed', completedAt: now(), updatedAt: now() })
     .where(eq(schema.sysTask.id, record.id))
 
   logTaskSuccess('ImageTask', 'downloaded', { id: record.id, provider: record.provider, localPath })
@@ -477,7 +507,7 @@ async function handleImageCompleteBase64(record: SysTaskRecord, base64Data: stri
   await generateImageThumb(localPath)
 
   await db.update(schema.sysTask)
-    .set({ localPath, status: 'completed', completedAt: now(), updatedAt: now() })
+    .set({ localPath, status: 'completed', stage: 'completed', completedAt: now(), updatedAt: now() })
     .where(eq(schema.sysTask.id, record.id))
 
   logTaskSuccess('ImageTask', 'saved-base64', { id: record.id, provider: record.provider, mimeType, localPath })
@@ -535,7 +565,9 @@ async function handleVideoComplete(record: SysTaskRecord, videoUrl: string, dura
 async function recoveryConfig(record: SysTaskRecord): Promise<AIConfig> {
   if (record.configId) {
     const config = await getConfigById(record.configId)
-    if (config && config.provider === record.provider && config.baseUrl === record.configBaseUrl) return config
+    // 本地 ComfyUI 的地址可由用户随时改动，恢复时不因地址变化而拒绝
+    if (config && config.provider === record.provider
+      && (config.provider === 'comfyui' || config.baseUrl === record.configBaseUrl)) return config
     throw new Error('原视频服务配置已删除、停用或地址变更，请恢复原配置')
   }
   // 旧任务只在同厂商唯一配置时恢复，绝不任意换服务商查询。
@@ -585,6 +617,18 @@ export async function recoverVideoTask(id: number): Promise<void> {
 export async function resumeInterruptedTasks() {
   const tasks = await db.select().from(schema.sysTask).where(eq(schema.sysTask.status, 'processing')).orderBy(desc(schema.sysTask.id))
   for (const task of tasks) {
+    // 排队中的任务（等前一个镜头出片）从未提交给上游，重启后重新入队即可，
+    // 不能按「提交状态未知」判失败
+    if (task.stage === 'queued') {
+      const config = task.configId
+        ? (await getConfigById(task.configId)) ?? await getActiveConfig('video')
+        : await getActiveConfig('video')
+      if (config) {
+        logTaskProgress(taskLabel(task.type as TaskType), 'requeue-after-restart', { id: task.id })
+        runBackground(task.id, () => processTask(task.id, config))
+        continue
+      }
+    }
     if (task.type === 'video' && (task.taskId || task.resultUrl)) {
       try { await recoverVideoTask(task.id) } catch (error) { await failTask(task.id, safeTaskError(error), 'recovery_failed') }
     } else {
@@ -694,6 +738,12 @@ function resolvePublicMediaUrls(refs: string[] | null | undefined, kind: 'video'
   if (!Array.isArray(refs) || !refs.length) return []
   const items = Array.from(new Set(refs.map((item) => String(item || '').trim()).filter(Boolean)))
   return items.map((item) => resolvePublicMediaUrl(item, kind)).filter((item): item is string => !!item)
+}
+
+/** 本地引擎用：原样去重（保留 static/ 本地路径与 data URL），不做公网地址转换 */
+function dedupeMediaList(refs: string[] | null | undefined): string[] {
+  if (!Array.isArray(refs)) return []
+  return Array.from(new Set(refs.map(item => String(item || '').trim()).filter(Boolean)))
 }
 
 function normalizeStoredVideoResolution(resolution: string | null | undefined): string | undefined {

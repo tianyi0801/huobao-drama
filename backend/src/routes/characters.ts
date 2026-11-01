@@ -10,10 +10,13 @@ import { toSnakeCase } from '../utils/transform.js'
 import { generateImage } from '../services/generation.js'
 import { getDramaStylePrompt } from '../services/style-preset.js'
 import { ensureCharacterFinalPrompt } from '../services/final-prompt.js'
+import { computeImageSize } from '../services/image-size.js'
 import { logTaskError, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 
 const app = new Hono()
-const CHARACTER_IMAGE_SIZE = '1920x1080'
+// 角色定妆照是「参考素材图」，固定 16:9 横版（三视图需要横向空间），不跟随成片比例；
+// 像素由该集的清晰度档（480p/720p/1080p）决定，避免硬编码 1920x1080 带来的固定耗时
+const CHARACTER_ASPECT_RATIO = '16:9'
 
 // 用户上传的角色音色样本独立于生图和 AI 提取，跨剧集复用同一个角色绑定。
 app.post('/:id/voice', bodyLimit({ maxSize: AUDIO_MAX_BYTES + 64 * 1024,
@@ -138,7 +141,7 @@ app.post('/:id/generate-image', async (c) => {
   const prompt = finalPrompt || characterImagePrompt(char, stylePrompt)
   try {
     logTaskStart('CharacterImage', 'generate', { characterId: id, episodeId: ep.id, dramaId: char.dramaId })
-    const genId = await generateImage({ characterId: id, dramaId: char.dramaId, prompt, model: body.model, size: CHARACTER_IMAGE_SIZE, configId: body.config_id ?? ep.imageConfigId ?? undefined })
+    const genId = await generateImage({ characterId: id, dramaId: char.dramaId, prompt, model: body.model, size: computeImageSize(CHARACTER_ASPECT_RATIO, ep.resolution), configId: body.config_id ?? ep.imageConfigId ?? undefined })
     logTaskSuccess('CharacterImage', 'generate', { characterId: id, generationId: genId })
     return success(c, { image_generation_id: genId })
   } catch (err: any) {
@@ -183,7 +186,7 @@ app.post('/batch-generate-images', async (c) => {
     const finalPrompt = await ensureCharacterFinalPrompt(char, ep.id, false, { model: body.text_model, configId: body.text_config_id ?? undefined })
     const prompt = finalPrompt || characterImagePrompt(char, stylePrompt)
     try {
-      const genId = await generateImage({ characterId: cid, dramaId: char.dramaId, prompt, model: body.model, size: CHARACTER_IMAGE_SIZE, configId: body.config_id ?? ep.imageConfigId ?? undefined })
+      const genId = await generateImage({ characterId: cid, dramaId: char.dramaId, prompt, model: body.model, size: computeImageSize(CHARACTER_ASPECT_RATIO, ep.resolution), configId: body.config_id ?? ep.imageConfigId ?? undefined })
       results.push(genId)
     } catch {}
   }

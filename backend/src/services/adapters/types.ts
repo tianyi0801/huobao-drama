@@ -7,10 +7,11 @@ export interface ImageProviderAdapter {
 
   /**
    * 构建图片生成请求
+   * 允许返回 Promise：本地 ComfyUI 需要先把参考图上传到 input 目录再提交
    * @param config AI 配置 { baseUrl, apiKey, model }
    * @param record 图片生成记录
    */
-  buildGenerateRequest(config: AIConfig, record: ImageGenerationRecord): ProviderRequest
+  buildGenerateRequest(config: AIConfig, record: ImageGenerationRecord): ProviderRequest | Promise<ProviderRequest>
 
   /**
    * 解析生成响应，判断是同步还是异步
@@ -48,7 +49,8 @@ export interface ImageProviderAdapter {
 export interface VideoProviderAdapter {
   provider: string
 
-  buildGenerateRequest(config: AIConfig, record: VideoGenerationRecord): ProviderRequest
+  /** 允许返回 Promise：本地 ComfyUI 需要先上传参考素材再提交 */
+  buildGenerateRequest(config: AIConfig, record: VideoGenerationRecord): ProviderRequest | Promise<ProviderRequest>
 
   parseGenerateResponse(result: any): VideoGenResponse
 
@@ -88,6 +90,8 @@ export interface ImageGenerationRecord {
   size?: string | null
   frameType?: string | null
   referenceImages?: string | null
+  /** 可选种子；为空时由适配器随机生成，避免重复生成出同一张图 */
+  seed?: number | null
   // ... 其他字段
 }
 

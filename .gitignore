@@ -3,6 +3,12 @@ node_modules/
 
 # Build output
 dist/
+# 本地符号链接（指向 frontend/.output/public，非目录故 dist/ 规则不生效）
+frontend/dist
+
+# Python 缓存
+__pycache__/
+*.pyc
 
 # IDE
 .idea/
@@ -58,3 +64,10 @@ desktop/build/
 desktop/dist/
 desktop/release/
 desktop/resources/
+
+# 宣传片工程：只跟踪源码，渲染产物与素材本地生成（避免几十 MB 二进制入库）
+宣传片/**/public/clip/
+宣传片/**/public/img/
+宣传片/**/public/audio/
+宣传片/**/audio-src/
+宣传片/**/out/

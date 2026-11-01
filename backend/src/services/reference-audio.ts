@@ -5,7 +5,8 @@ import { STORAGE_ROOT } from '../utils/paths.js'
 import { ffmpeg, checkFfmpegSuite } from '../utils/ffmpeg.js'
 
 const MAX_BYTES = 15 * 1024 * 1024
-const INLINE_PROVIDERS = new Set(['volcengine', 'minimax'])
+// comfyui 为本地引擎：音频由后端自行上传到 ComfyUI input，同样按内联处理
+const INLINE_PROVIDERS = new Set(['volcengine', 'minimax', 'comfyui'])
 
 function localAudioPath(url: string): string | null {
   if (!/^\/?static\//.test(url)) return null

@@ -78,6 +78,17 @@
             <h2 class="settings-title">{{ t('settings.ai.title') }}</h2>
             <p class="settings-desc">{{ t('settings.ai.desc') }}</p>
           </div>
+          <!-- ===== ① 文本模型（必配） ===== -->
+          <div class="ai-section-head">
+            <span class="ai-section-no">1</span>
+            <div class="ai-section-text">
+              <div class="ai-section-title">{{ t('settings.ai.sectionText') }}</div>
+              <div class="ai-section-desc">{{ t('settings.ai.sectionTextDesc') }}</div>
+            </div>
+            <span :class="['tag', textModelReady ? 'tag-success' : 'tag-error']">
+              {{ textModelReady ? t('settings.ai.ready') : t('settings.ai.notReady') }}
+            </span>
+          </div>
           <section class="card quick-card">
             <div class="quick-card-head">
               <div class="setup-title">{{ t('settings.ai.quickTitle') }}</div>
@@ -188,6 +199,16 @@
               <p v-if="!byType(st.type).length" class="config-empty">{{ t('settings.common.empty') }}</p>
             </section>
           </div>
+
+          <!-- ===== ② 图片与视频：本地算力 ===== -->
+          <div class="ai-section-head">
+            <span class="ai-section-no">2</span>
+            <div class="ai-section-text">
+              <div class="ai-section-title">{{ t('settings.ai.sectionLocal') }}</div>
+              <div class="ai-section-desc">{{ t('settings.ai.sectionLocalDesc') }}</div>
+            </div>
+          </div>
+          <LocalEnginePanel />
         </div>
 
         <!-- ===== 风格预设 ===== -->
@@ -744,10 +765,9 @@ function pinModelTop(i) {
   cfgForm.models.unshift(m)
 }
 // 服务类型 label/desc 渲染时求值（语言切换即时生效），type 为逻辑值
+// 图片/视频已改为本地 ComfyUI 工作流（见「本地算力」面板），此处只保留文本模型配置
 const serviceTypes = computed(() => [
   { type: 'text', label: t('common.serviceType.text') },
-  { type: 'image', label: t('common.serviceType.image') },
-  { type: 'video', label: t('common.serviceType.video') },
 ])
 const providers = ['gemini', 'openai', 'volcengine', 'minimax', 'aliyun']
 const providerSelectOptions = computed(() => providers.map(p => ({ label: p, value: p })))
@@ -776,15 +796,14 @@ const huobaoQuickConfigs = computed(() => {
   return [
     { service_type: 'text', provider: 'gemini', name: '火宝文本服务 · Gemini', base_url: base, model: ['gemini-3.8-flash', 'gemini-3.1-pro-preview', 'gemini-3-flash-preview'], priority: 101 },
     { service_type: 'text', provider: 'openai', name: '火宝文本服务 · OpenAI', base_url: base, model: ['deepseek-v4-pro', 'deepseek-v4-flash', 'gpt-5.6-terra'], priority: 100 },
-    { service_type: 'image', provider: 'openai', name: '火宝图片服务 · OpenAI', base_url: base, model: ['gpt-image-2'], priority: 99 },
-    { service_type: 'image', provider: 'gemini', name: '火宝图片服务 · Gemini', base_url: base, model: ['gemini-3-pro-image', 'gemini-3.1-flash-image'], priority: 97 },
-    { service_type: 'video', provider: 'aliyun', name: '火宝视频服务 · Wan 3.0', base_url: `${base}/qwen`, model: ['wan3.0-video', 'wan3.0-video-prime'], priority: 97 },
-    { service_type: 'video', provider: 'volcengine', name: '火宝视频服务 · Seedance', base_url: `${base}/volcengine`, model: ['doubao-seedance-2-0-mini-260615', 'doubao-seedance-2-0-fast-260128', 'doubao-seedance-2-0-260128'], priority: 96 },
-    { service_type: 'video', provider: 'minimax', name: '火宝视频服务 · MiniMax', base_url: `${base}/minimax`, model: ['MiniMax-H3'], priority: 98 },
+    // 图片/视频改由本地 ComfyUI 工作流生成，快捷配置不再写入云端图片/视频服务
   ]
 })
 
 function byType(t) { return cfgs.value.filter(c => c.service_type === t) }
+
+// 文本模型是唯一的必配项：剧本改写/提取/分镜/提示词都依赖它
+const textModelReady = computed(() => byType('text').some(c => c.is_active))
 function countActive(t) { return byType(t).filter(c => c.is_active).length }
 function fmtModel(m) { return Array.isArray(m) ? m.join(', ') : m || '—' }
 function presetsByType(type) {
@@ -1427,6 +1446,31 @@ onBeforeUnmount(stopUsagePoll)
 .settings-head { margin-bottom: 20px; }
 .settings-title { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
 .settings-desc { font-size: 13px; color: var(--text-2); margin-top: 6px; }
+
+/* AI 服务页分区标题（① 文本模型 / ② 图片与视频） */
+.ai-section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 28px 0 12px;
+  padding-top: 4px;
+}
+.ai-section-head:first-of-type { margin-top: 4px; }
+.ai-section-no {
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent, #fff);
+  font: 700 11px var(--font-body);
+}
+.ai-section-text { flex: 1 1 auto; min-width: 0; }
+.ai-section-title { font: 700 14px var(--font-body); color: var(--text-0); letter-spacing: -0.01em; }
+.ai-section-desc { font: 400 11.5px/1.5 var(--font-body); color: var(--text-3); margin-top: 2px; }
 
 /* 火宝快捷配置 */
 .quick-card {

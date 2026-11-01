@@ -1,6 +1,9 @@
 /**
  * Provider Adapter 注册表
  * 根据 provider 名称返回对应的 Adapter 实例
+ *
+ * comfyui 为本地引擎：图片/视频都调用本机 ComfyUI 工作流，
+ * 配置来自 app_settings（见 services/comfyui/config.ts），不读 ai_service_configs。
  */
 import { OpenAIImageAdapter } from './openai-image'
 import { GeminiImageAdapter } from './gemini-image'
@@ -8,6 +11,8 @@ import { VolcEngineImageAdapter } from './volcengine-image'
 import { VolcEngineVideoAdapter } from './volcengine-video'
 import { MiniMaxVideoAdapter } from './minimax-video'
 import { AliyunWanVideoAdapter } from './aliyun-wan-video'
+import { ComfyUiImageAdapter } from './comfyui-image'
+import { ComfyUiVideoAdapter } from './comfyui-video'
 import type { ImageProviderAdapter, VideoProviderAdapter } from './types'
 
 // 图片 Adapter 注册表
@@ -15,6 +20,7 @@ export const imageAdapters: Record<string, ImageProviderAdapter> = {
   openai: new OpenAIImageAdapter(),
   gemini: new GeminiImageAdapter(),
   volcengine: new VolcEngineImageAdapter(),
+  comfyui: new ComfyUiImageAdapter(),
 }
 
 // 视频 Adapter 注册表
@@ -22,6 +28,7 @@ export const videoAdapters: Record<string, VideoProviderAdapter> = {
   volcengine: new VolcEngineVideoAdapter(),
   minimax: new MiniMaxVideoAdapter(),
   aliyun: new AliyunWanVideoAdapter(),
+  comfyui: new ComfyUiVideoAdapter(),
 }
 
 /**
@@ -44,4 +51,8 @@ export function getVideoAdapter(provider: string): VideoProviderAdapter {
   const adapter = videoAdapters[provider.toLowerCase()]
   if (!adapter) throw new Error(`Unsupported video provider: ${provider}`)
   return adapter
+}
+
+export function isLocalProvider(provider: string | null | undefined): boolean {
+  return (provider || '').toLowerCase() === 'comfyui'
 }

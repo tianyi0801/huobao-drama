@@ -186,7 +186,7 @@
     },
     "ep": {
       "statusTitle": "클릭하여 이 화의 상태 설정",
-      "resTitle": "클릭하여 이 화의 영상 해상도 변경",
+      "resTitle": "클릭하여 이 에피소드 화질 변경",
       "deleteTitle": "이 화 삭제",
       "enter": "제작 열기",
       "scriptReady": "대본 입력됨",
@@ -196,9 +196,10 @@
       "addNextTitle": "제 {n}화 추가",
       "addNextText": "제 {n}화 추가",
       "episodeN": "제 {n}화",
-      "res720": "720p · 고화질",
-      "res480": "480p · 원활",
-      "resSwitched": "이 화의 영상 해상도가 {res}(으)로 변경되었습니다"
+      "res720": "720p · 고화질 (완성 720P)",
+      "res480": "480p · 부드러움 (완성 480P)",
+      "resSwitched": "이 화의 영상 해상도가 {res}(으)로 변경되었습니다",
+      "res1080": "1080p · 초고화질 (완성 1080P)"
     },
     "epCreate": {
       "title": "새 화 만들기",
@@ -206,9 +207,9 @@
       "titlePlaceholder": "화 번호로 자동 명명",
       "titleHint": "비워 두면 화 번호로 자동 명명됩니다(예: 「{example}」).",
       "example": "제 {n}화",
-      "resolution": "영상 해상도",
-      "resolutionPlaceholder": "해상도 선택",
-      "resolutionHint": "생성 후 이 화의 영상은 이 해상도로 생성되며, 이후 화 카드에서도 변경할 수 있습니다.",
+      "resolution": "영상 화질 (완성)",
+      "resolutionPlaceholder": "화질 선택",
+      "resolutionHint": "여기서 선택하는 값은 최종 완성 해상도입니다. 로컬 엔진이 2차 패스 배율로 1차 패스 단계를 역산합니다.",
       "lockCopy": "생성 시 현재 활성화된 이미지·영상 생성 기능이 고정됩니다.",
       "creating": "생성 중...",
       "create": "생성",
@@ -464,6 +465,10 @@
     "skillDelete": {
       "title": "Skill 삭제",
       "message": "Skill 「{id}」을(를) 삭제하시겠습니까? 해당 Agent는 기본 제공 프롬프트로 돌아갑니다."
+    },
+    "localEngine": {
+      "continuity": "컷 연속성",
+      "continuityHint": "같은 장면의 연속 컷은 이전 컷의 마지막 프레임을 참조하여 카메라와 공간 배치를 유지합니다 (로컬 엔진 전용)"
     }
   },
   "episode": {
@@ -783,7 +788,10 @@
       "confirmNote": "위 설정으로 샷별로 생성을 시작합니다. 실패한 작업은 나중에 「실패 재시도」로 한 번에 다시 실행할 수 있습니다.",
       "confirmStart": "생성 시작 ({n})",
       "selectMissing": "미생성 선택",
-      "aspectRatio": "화면 비율"
+      "aspectRatio": "화면 비율",
+      "stillRunning": "생성이 오래 걸리고 있습니다. 자동 대기를 중단했습니다. 우측 상단 작업 목록에서 진행 상황을 확인하세요",
+      "confirmEta": "예상 소요 시간",
+      "queued": "대기 중"
     },
     "inspector": {
       "videoPromptPlaceholder": "{'@'}이름으로 이미지, #이름으로 음색을 참조하고 대사, 화자, 카메라 움직임을 설명하세요…",
@@ -798,11 +806,12 @@
       "refAudioHint": "참조 오디오에는 참조 이미지 또는 영상이 1개 이상 필요합니다",
       "params": "생성 파라미터",
       "duration": "분镜 길이",
-      "durationUnit": "초(2-30)",
+      "durationUnit": "초(2-8)",
       "durationHint": "수정 시 스토리보드에 즉시 저장되어 목록 및 배치 생성에도 적용됩니다",
       "effective": "{model} · {res} · {dur}초",
       "boundRefs": "바인딩 참조 이미지",
-      "noBoundRefs": "바인딩된 에셋 없음（중앙 \"참조 에셋\"에서 바인딩）"
+      "noBoundRefs": "바인딩된 에셋 없음（중앙 \"참조 에셋\"에서 바인딩）",
+      "estimate": "약 {time}"
     },
     "tasks": {
       "title": "생성 작업 목록",
@@ -848,7 +857,8 @@
       "batchGeneratingProp": "소품 이미지 일괄 생성 중",
       "allCharsDone": "모든 캐릭터 이미지가 생성되었습니다",
       "allScenesDone": "모든 장면 이미지가 생성되었습니다",
-      "allPropsDone": "모든 소품 이미지가 생성되었습니다"
+      "allPropsDone": "모든 소품 이미지가 생성되었습니다",
+      "stillRunning": "생성 시간이 예상보다 오래 걸립니다. 자동 대기를 중단했습니다. 나중에 새로고침하여 확인하세요"
     },
     "extract": {
       "done": "{type} 추출이 완료되었습니다",
@@ -876,9 +886,9 @@
       "todo": "미생성"
     },
     "resolution": {
-      "smooth": "표준",
-      "hd": "고화질",
-      "uhd": "초고화질"
+      "smooth": "부드러움 (완성 480P)",
+      "hd": "고화질 (완성 720P)",
+      "uhd": "초고화질 (완성 1080P)"
     },
     "recovery": {
       "remotePreview": "영상이 생성되었지만 아직 로컬에 저장되지 않았습니다. 온라인으로 재생하거나 아래 링크를 여세요. 다운로드가 완료되면 로컬 영상으로 전환됩니다.",
@@ -897,6 +907,16 @@
       "transferring": "영상 생성 완료, 전송 중",
       "awaitingDelivery": "영상 생성 완료, 전달 대기 중",
       "restoreHint": "기존 작업을 복구하여 중복 생성을 방지하세요"
+    },
+    "eta": {
+      "seconds": "{n}초",
+      "minutes": "약 {n}분",
+      "hours": "약 {h}시간",
+      "hoursMinutes": "약 {h}시간 {m}분",
+      "running": "{elapsed} 경과 · {finish} 완료 예정",
+      "overtime": "{elapsed} 경과, 아직 생성 중",
+      "runningNoEta": "생성 중…",
+      "queued": "대기 중: 같은 장면의 이전 컷 완료를 기다리는 중"
     }
   },
   "errors": {

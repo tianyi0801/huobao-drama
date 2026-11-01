@@ -313,7 +313,7 @@ const saveStoryboards = createTool({
           atmosphere: sb.atmosphere, imagePrompt: sb.image_prompt,
           videoPrompt: sb.video_prompt, bgmPrompt: sb.bgm_prompt,
           soundEffect: sb.sound_effect,
-          sceneId: sb.scene_id, duration: sb.duration || 10,
+          sceneId: sb.scene_id, duration: sb.duration || 5,
           updatedAt: ts,
         }).where(eq(schema.storyboards.id, existingId))
         await syncStoryboardCharacters(existingId, sb.character_ids || [])
@@ -329,7 +329,7 @@ const saveStoryboards = createTool({
           atmosphere: sb.atmosphere, imagePrompt: sb.image_prompt,
           videoPrompt: sb.video_prompt, bgmPrompt: sb.bgm_prompt,
           soundEffect: sb.sound_effect,
-          sceneId: sb.scene_id, duration: sb.duration || 10,
+          sceneId: sb.scene_id, duration: sb.duration || 5,
           createdAt: ts, updatedAt: ts,
         })
         const newId = getInsertId(res)

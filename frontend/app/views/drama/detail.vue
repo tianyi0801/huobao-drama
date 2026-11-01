@@ -581,15 +581,18 @@ const newEpisodeTitle = ref('')
 const episodeToDelete = ref(null)
 const deletingEpisode = ref(false)
 
-// 视频分辨率：创建集时固定（持久化到 episodes.resolution），集卡片上可修改
+// 视频清晰度 = 最终成片分辨率：创建集时固定（持久化到 episodes.resolution），集卡片上可修改。
+// 本地引擎会按二采倍率自动反推一采档位（成片 720P + 1.5x → 一采 480P）。
+const EP_RESOLUTIONS = ['480p', '720p', '1080p']
 const resolutionOptions = computed(() => ([
-  { label: t('detail.ep.res720'), value: '720p' },
   { label: t('detail.ep.res480'), value: '480p' },
+  { label: t('detail.ep.res720'), value: '720p' },
+  { label: t('detail.ep.res1080'), value: '1080p' },
 ]))
 const newEpisodeResolution = ref('720p')
 const epResMenuId = ref(null)
 
-function epResolution(ep) { return ep.resolution === '480p' ? '480p' : '720p' }
+function epResolution(ep) { return EP_RESOLUTIONS.includes(ep.resolution) ? ep.resolution : '720p' }
 
 async function setEpisodeResolution(ep, resolution) {
   epResMenuId.value = null

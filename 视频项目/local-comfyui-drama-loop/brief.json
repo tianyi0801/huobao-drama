@@ -1,0 +1,40 @@
+{
+  "slug": "local-comfyui-drama-loop",
+  "title": "4060Ti 8G 跑通 AI 短剧全自动闭环",
+  "type": "promo",
+  "goal": "让有显卡的创作者相信：不上云、不组队，一张 4060 Ti 8G 显存的消费级卡 + 本地 ComfyUI + 开源短剧平台，就能把剧本自动推成成片短剧",
+  "audience": "有本地显卡的 AI 绘画/视频玩家、短剧与自媒体创作者、独立开发者",
+  "duration_sec": 60,
+  "width": 1080,
+  "height": 1920,
+  "fps": 30,
+  "tone": "硬核技术流、克制不吹、用实测数据说话",
+  "palette": ["#8B5CF6", "#22D3EE"],
+  "must_show": [
+    "本地 ComfyUI 跑 MiniMax H3 视频工作流",
+    "三段工作流分工：文生图出场景 / 图生图改场景 / 参考图生视频出片段",
+    "硬件实测：RTX 4060 Ti 8G 显存 + 32G 内存",
+    "剧集分镜成品页（真实界面）"
+  ],
+  "avoid": [
+    "任何'火宝 / Huobao Drama'品牌名称与 logo",
+    "云端算力、会员付费、API Key 等商业暗示",
+    "绝对化用语（最强/第一/吊打）"
+  ],
+  "cta": "评论区留「工作流」",
+  "source": "本地实测环境：RTX 4060 Ti 8G + 32G 内存 + 本地 ComfyUI，2026-11",
+  "voiceover": false,
+  "music": "科技电子，节奏稳，不抢信息",
+  "platforms": ["douyin", "shipinhao", "xiaohongshu", "bilibili"],
+  "assets": [
+    "http://localhost:3013/drama/1/episode/1",
+    "http://192.168.31.167:8188/"
+  ],
+  "assumptions": [
+    "时长按需求取 60s 上限",
+    "竖版 1080x1920 默认",
+    "无 ElevenLabs key，改用曲库配乐 + 屏幕大字幕，不做 AI 旁白",
+    "主色收敛为紫+青两色，呼应节点式工作流界面",
+    "界面截图需规避品牌名"
+  ]
+}

@@ -57,7 +57,7 @@
       "settings": "设置"
     },
     "banner": {
-      "missing": "尚未配置{types}模型,AI 功能无法使用",
+      "missing": "以下能力尚未就绪：{types}",
       "goSettings": "前往设置"
     },
     "theme": {
@@ -186,7 +186,7 @@
     },
     "ep": {
       "statusTitle": "点击标记本集状态",
-      "resTitle": "点击修改本集视频分辨率",
+      "resTitle": "点击修改本集清晰度",
       "deleteTitle": "删除本集",
       "enter": "进入制作",
       "scriptReady": "剧本已录入",
@@ -196,9 +196,10 @@
       "addNextTitle": "添加第 {n} 集",
       "addNextText": "添加第 {n} 集",
       "episodeN": "第 {n} 集",
-      "res720": "720p · 高清",
-      "res480": "480p · 流畅",
-      "resSwitched": "本集视频分辨率已切换为 {res}"
+      "res720": "720p · 高清（成片 720P）",
+      "res480": "480p · 流畅（成片 480P）",
+      "resSwitched": "本集视频分辨率已切换为 {res}",
+      "res1080": "1080p · 超清（成片 1080P）"
     },
     "epCreate": {
       "title": "创建新集",
@@ -206,9 +207,9 @@
       "titlePlaceholder": "默认按集数自动命名",
       "titleHint": "留空时会自动按集数命名，例如“{example}”。",
       "example": "第 {n} 集",
-      "resolution": "视频分辨率",
-      "resolutionPlaceholder": "选择分辨率",
-      "resolutionHint": "创建后本集视频按此分辨率生成，之后仍可在集卡片上修改。",
+      "resolution": "视频清晰度（成片）",
+      "resolutionPlaceholder": "选择清晰度",
+      "resolutionHint": "这里选的是最终成片分辨率。本地引擎会按二采倍率反推一采档位（成片 720P + 1.5 倍 → 一采 480P）。",
       "lockCopy": "创建后自动锁定当前启用的图片与视频生成能力。",
       "creating": "创建中...",
       "create": "创建",
@@ -251,7 +252,7 @@
     "groupBase": "基础",
     "tabs": {
       "general": "通用",
-      "ai": "AI 服务",
+      "ai": "AI 与算力",
       "styles": "风格预设",
       "storage": "存储位置",
       "about": "关于更新",
@@ -286,17 +287,17 @@
       "unifiedSwitchWarning": "已切换为 {lang}，界面与 AI 内容语言将同步更新，即将刷新…"
     },
     "ai": {
-      "title": "AI 服务配置",
-      "desc": "先用推荐模板快速落配置，再按服务类型微调。工作台创建集时会锁定所选图片和视频能力。",
-      "quickTitle": "火宝快捷配置",
+      "title": "AI 模型与算力",
+      "desc": "文本模型走云端 API，图片与视频走本机 ComfyUI。按 ① ② 顺序配置即可。",
+      "quickTitle": "火宝快捷配置（仅文本模型）",
       "recommended": "推荐",
-      "quickDesc": "输入 Huobao API Key，一次写入文本、图片、视频三条推荐配置。",
+      "quickDesc": "输入 Huobao API Key，一键写入文本模型配置。图片与视频改由本机生成了，不在这里配。",
       "getKey": "前往火宝获取 Key",
       "regionCn": "国内",
       "regionCom": "国外",
       "applyQuick": "写入火宝配置",
       "manualTitle": "手动模板",
-      "manualDesc": "选择服务类型后，直接用模板填充推荐的 `provider / base URL / model`。",
+      "manualDesc": "也可以用自己的 API Key：点下面的「文本」用模板填充 provider / base URL / model。",
       "activeCount": "{n} 已启用",
       "hasKey": "已配置",
       "noKey": "无密钥",
@@ -311,7 +312,13 @@
         "text": "剧本改写、角色场景提取、分镜拆解等 Agent 文本能力",
         "image": "角色图、场景图与镜头图等静态图像生成",
         "video": "镜头视频直出生成，默认 Seedance 2.0"
-      }
+      },
+      "sectionText": "文本模型",
+      "sectionTextDesc": "剧本改写、角色场景提取、分镜拆分、提示词生成都依赖它，必须先配置",
+      "sectionLocal": "图片与视频",
+      "sectionLocalDesc": "调用本机 ComfyUI 工作流生成，不产生云端费用；装好 ComfyUI 并填对地址即可",
+      "ready": "已配置",
+      "notReady": "未配置"
     },
     "styles": {
       "title": "风格预设",
@@ -464,6 +471,61 @@
     "skillDelete": {
       "title": "删除 Skill",
       "message": "确定删除 Skill「{id}」？删除后对应 Agent 将回退到内置默认提示词。"
+    },
+    "localEngine": {
+      "title": "本地算力",
+      "desc": "图片与视频改由本机 ComfyUI 工作流生成；文本模型仍使用下方云端配置。",
+      "ready": "已就绪",
+      "notReady": "未就绪",
+      "enabled": "启用本地生成",
+      "detect": "检测",
+      "deepDetect": "深度检测",
+      "detected": "检测完成",
+      "device": "显卡",
+      "noDevice": "未检测到 GPU",
+      "disk": "磁盘",
+      "unknown": "未知",
+      "untouched": "未连接",
+      "notBound": "未绑定",
+      "notBoundHint": "从右侧选择内置预设，或在下方导入自己的工作流",
+      "usePreset": "选择预设…",
+      "presetMissing": "工作流文件缺失",
+      "remove": "移除模板",
+      "options": "可调项",
+      "allGood": "本地算力已就绪，图片与视频将使用本机生成。",
+      "importTitle": "导入自己的工作流（API 格式）",
+      "importHint": "在 ComfyUI 中通过「Workflow → Export (API)」导出 JSON；先选择槽位与沿用其字段绑定的预设，再选择文件导入。",
+      "importPresetHint": "先选择一个预设作为字段绑定模板",
+      "importPick": "选择 JSON 文件",
+      "importInvalid": "文件不是合法 JSON",
+      "importMismatch": "工作流字段与预设绑定不匹配",
+      "applied": "工作流已应用",
+      "removed": "工作流已移除",
+      "slot": {
+        "image": "文生图",
+        "imageEdit": "图片编辑（参考图）",
+        "video": "视频生成"
+      },
+      "pixelBudget": "图片像素上限",
+      "pixelBudgetHint": "正常由顶栏「清晰度」决定尺寸；此项仅用于限制异常超大请求",
+      "saved": "已保存",
+      "bundledTitle": "内置工作流（可导入 ComfyUI）",
+      "importBundled": "导入到 ComfyUI",
+      "reimportBundled": "覆盖重导",
+      "bundledInstalled": "已存在",
+      "bundledMissing": "未导入",
+      "bundledHint": "导入后可在 ComfyUI 左侧「工作流」面板直接打开这三份工作流；默认不覆盖同名文件。",
+      "importDone": "已导入 {imported} 个，跳过 {skipped} 个",
+      "importFailed": "{n} 个导入失败",
+      "advanced": "高级设置（工作流模板 / 参数）",
+      "svcComfy": "ComfyUI 服务",
+      "svcFfmpeg": "视频处理",
+      "connected": "已连接",
+      "available": "可用",
+      "unavailable": "不可用",
+      "timingHint": "耗时参考（RTX 4060 Ti 8G + 二采 1.5x）：成片 1080P 的 5 秒镜头实测 10 分 49 秒；成片 720P 的像素约为其 45%",
+      "continuity": "镜头衔接参考",
+      "continuityHint": "同一场景的相邻分镜会带上上一段的尾帧，保持机位与空间关系连续（仅本地引擎）"
     }
   },
   "episode": {
@@ -475,11 +537,12 @@
       "viewFilm": "查看成片",
       "continue": "继续制作",
       "start": "开始制作",
-      "resolution": "分辨率"
+      "resolution": "清晰度"
     },
     "model": {
       "defaultWith": "默认 · {model}",
-      "notConfigured": "未配置"
+      "notConfigured": "未配置",
+      "localEngine": "本地 ComfyUI"
     },
     "sidebar": {
       "inProgress": "进行中",
@@ -783,7 +846,10 @@
       "confirmNote": "将按以上配置逐镜头发起生成；失败的任务之后可点「重试失败」一键重跑。",
       "confirmStart": "开始生成 ({n})",
       "selectMissing": "选未生成",
-      "aspectRatio": "画面比例"
+      "aspectRatio": "画面比例",
+      "stillRunning": "生成耗时较长，已停止自动等待；可在右上角任务列表查看进度",
+      "confirmEta": "预计耗时",
+      "queued": "排队中"
     },
     "inspector": {
       "videoPromptPlaceholder": "用 {'@'}角色名引用图片，用 #角色名引用声音；描述台词、说话角色与镜头运动…",
@@ -798,11 +864,12 @@
       "refAudioHint": "参考音频需至少 1 个参考图片或视频",
       "params": "生成参数",
       "duration": "分镜时长",
-      "durationUnit": "s（2-30）",
+      "durationUnit": "s（2-8）",
       "durationHint": "修改即保存到分镜，列表与批量生成同步生效",
       "effective": "{model} · {res} · {dur}s",
       "boundRefs": "绑定参考图",
-      "noBoundRefs": "暂无绑定素材（在中间「参考素材」区点击绑定）"
+      "noBoundRefs": "暂无绑定素材（在中间「参考素材」区点击绑定）",
+      "estimate": "预计约 {time}"
     },
     "tasks": {
       "title": "生成任务列表",
@@ -848,7 +915,8 @@
       "batchGeneratingProp": "道具图片批量生成中",
       "allCharsDone": "所有角色图片已生成",
       "allScenesDone": "所有场景图片已生成",
-      "allPropsDone": "所有道具图片已生成"
+      "allPropsDone": "所有道具图片已生成",
+      "stillRunning": "生成耗时较长，已停止自动等待；稍后刷新页面查看结果"
     },
     "extract": {
       "done": "{type}提取完成",
@@ -876,9 +944,9 @@
       "todo": "待生成"
     },
     "resolution": {
-      "smooth": "流畅",
-      "hd": "高清",
-      "uhd": "超清"
+      "smooth": "流畅（成片 480P）",
+      "hd": "高清（成片 720P）",
+      "uhd": "超清（成片 1080P）"
     },
     "recovery": {
       "remotePreview": "视频已生成，暂未保存到本地。可在线播放或打开下方链接，下载完成后自动切换本地视频。",
@@ -897,6 +965,16 @@
       "transferring": "视频已生成，转存中",
       "awaitingDelivery": "视频已生成，等待交付",
       "restoreHint": "恢复已有任务，避免重复生成"
+    },
+    "eta": {
+      "seconds": "{n} 秒",
+      "minutes": "约 {n} 分钟",
+      "hours": "约 {h} 小时",
+      "hoursMinutes": "约 {h} 小时 {m} 分",
+      "running": "已用 {elapsed} · 预计 {finish} 完成",
+      "overtime": "已用 {elapsed}，仍在生成",
+      "runningNoEta": "正在生成…",
+      "queued": "排队中，等待同一场景的前一个镜头完成"
     }
   },
   "errors": {

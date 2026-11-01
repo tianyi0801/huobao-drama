@@ -5,7 +5,10 @@ import { success, created, badRequest } from '../utils/response.js'
 import { generateImage, generateVideo, recoverVideoTask } from '../services/generation.js'
 import { safeTaskError } from '../services/video-download.js'
 import { getActiveConfig, getConfigById } from '../services/ai.js'
+import { getComfyConfig } from '../services/comfyui/config.js'
+import { buildContinuityPromptSuffix, resolvePreviousShotFrame } from '../services/storyboard-continuity.js'
 import { getDramaStylePrompt } from '../services/style-preset.js'
+import { resolveDramaImageSize } from '../services/image-size.js'
 import { resolveStoryboardVoiceReferences } from '../services/character-voice-references.js'
 import { logTaskError, logTaskPayload, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 
@@ -173,6 +176,21 @@ app.post('/', async (c) => {
       if (voices.hasVoiceReferences && videoBody.generate_audio === false) return badRequest(c, '引用角色音色时需要开启视频声音')
       const referenceError = validateVideoRequest(videoBody, effectiveConfig?.provider)
       if (referenceError) return badRequest(c, referenceError)
+
+      // 镜头衔接：同场景相邻分镜把「上一段尾帧」作为额外参考，避免机位朝向跳变。
+      // 仅本地 ComfyUI 生效（云端厂商的参考图语义不同，且需公网可达地址）。
+      if (effectiveConfig?.provider === 'comfyui'
+        && getComfyConfig().continuityReference
+        && body.storyboard_id) {
+        const previous = await resolvePreviousShotFrame(Number(body.storyboard_id))
+        const existing = Array.isArray(videoBody.reference_image_urls) ? videoBody.reference_image_urls : []
+        // 留出余量，避免叠加后超出上游素材上限
+        if (previous && existing.length < 12) {
+          const imageIndex = existing.length + 1
+          videoBody.reference_image_urls = [...existing, previous.framePath]
+          videoBody.prompt = `${videoBody.prompt || ''}${buildContinuityPromptSuffix(imageIndex)}`
+        }
+      }
     }
 
     logTaskStart('TaskAPI', 'generate', {
@@ -192,6 +210,11 @@ app.post('/', async (c) => {
       if (stylePrompt) videoPrompt = `${stylePrompt}，\n${videoPrompt}`
     }
 
+    // 未显式指定尺寸时按项目画面比例 + 集清晰度档推导，避免竖屏项目出横图
+    const imageSize = type === 'image' && !body.size
+      ? await resolveDramaImageSize(body.drama_id, undefined)
+      : body.size
+
     const id = type === 'image'
       ? await generateImage({
         storyboardId: body.storyboard_id,
@@ -200,7 +223,7 @@ app.post('/', async (c) => {
         characterId: body.character_id,
         prompt: body.prompt,
         model: body.model,
-        size: body.size,
+        size: imageSize,
         referenceImages: body.reference_images,
         frameType: body.frame_type,
         configId,

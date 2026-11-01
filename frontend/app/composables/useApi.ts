@@ -177,6 +177,29 @@ export const storageAPI = {
 export const settingsAPI = {
   contentLanguage: () => api.get<{ language: string }>('/settings/content-language'),
   setContentLanguage: (language: string) => api.put('/settings/content-language', { language }),
+  // 本地算力是否就绪（首页未配置引导用，不发起网络探测）
+  localEngine: () => api.get<{ enabled: boolean; url: string; imageReady: boolean; videoReady: boolean }>('/settings/local-engine'),
+}
+
+// 本地 ComfyUI 环境检测
+export const localEnvAPI = {
+  status: () => api.get<any>('/local-env'),
+  test: () => api.post<any>('/local-env/test'),
+  saveConfig: (data: any) => api.put<any>('/local-env/config', data),
+}
+
+// 本地工作流模板（预设导入 / 自定义绑定）
+export const workflowAPI = {
+  presets: () => api.get<any[]>('/workflows/presets'),
+  preview: (id: string, data: any = {}) => api.post<any>(`/workflows/presets/${id}/preview`, data),
+  apply: (id: string, data: any) => api.post<any>(`/workflows/presets/${id}/apply`, data),
+  validate: (data: any) => api.post<any>('/workflows/validate', data),
+  save: (kind: string, data: any) => api.put<any>(`/workflows/${kind}`, data),
+  remove: (kind: string) => api.del<any>(`/workflows/${kind}`),
+  // 内置 UI 格式工作流：一键导入目标 ComfyUI 的 workflows 目录
+  bundled: () => api.get<any>('/workflows/bundled'),
+  importBundled: (presetIds?: string[], overwrite = false) =>
+    api.post<any>('/workflows/import', { presetIds, overwrite }),
 }
 
 // 服务器/Docker 部署的版本检查与更新（桌面版走 useDesktopBridge，不用此 API）

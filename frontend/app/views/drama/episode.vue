@@ -45,6 +45,11 @@
             :default-label="t('episode.model.defaultWith', { model: videoModelOptions[0].model })"
             :show-config="videoModelMultiCfg"
           />
+          <!-- 图片/视频改为本地 ComfyUI 工作流后没有云端模型可选，这里给出明确标识 -->
+          <span
+            v-if="!imageModelOptions.length && !videoModelOptions.length"
+            class="tag tag-accent local-engine-tag"
+          >{{ t('episode.model.localEngine') }}</span>
           <ModelSelect
             v-model="episodeResolution"
             :label="t('episode.topbar.resolution')"
@@ -814,10 +819,10 @@
                       <span class="video-param-name">{{ t('episode.inspector.duration') }}</span>
                       <span class="video-param-control">
                         <input
-                          :value="selectedSb.duration || 10"
+                          :value="selectedSb.duration || 5"
                           type="number"
                           min="2"
-                          max="30"
+                          max="8"
                           class="input video-duration-input"
                           @change="onVideoDurationChange"
                         />
@@ -828,6 +833,13 @@
                   </section>
                   <div class="video-inspector-effective">
                     {{ t('episode.inspector.effective', { model: effectiveVideoModelLabel || t('episode.vid.defaultModel'), res: episodeResolutionShort, dur: effectiveVideoDuration }) }}
+                    <span class="video-eta-estimate">
+                      · {{ t('episode.inspector.estimate', { time: formatMinutes(estimateVideoSeconds(effectiveVideoDuration)) }) }}
+                    </span>
+                  </div>
+                  <div v-if="videoTaskState(selectedSb) === 'pending'" class="video-eta-running">
+                    <Clock :size="11" />
+                    <span>{{ runningEtaText(selectedSb) }}</span>
                   </div>
                   <button
                     class="btn btn-primary video-inspector-action"
@@ -1423,6 +1435,7 @@
           <div class="dialog-body batch-video-body">
             <div class="batch-video-row"><span>{{ t('episode.vid.confirmShots') }}</span><strong>{{ t('episode.vid.confirmShotsValue', { n: batchVideoConfirm.targets.length }) }}</strong></div>
             <div class="batch-video-row"><span>{{ t('episode.vid.confirmTotal') }}</span><strong>{{ t('episode.vid.confirmApprox', { n: batchVideoTotalDuration }) }}</strong></div>
+            <div class="batch-video-row"><span>{{ t('episode.vid.confirmEta') }}</span><strong>{{ formatMinutes(estimateBatchVideoSeconds()) }}</strong></div>
             <div class="batch-video-row"><span>{{ t('episode.vid.confirmModel') }}</span><strong>{{ effectiveVideoModelLabel || t('episode.vid.defaultModel') }}</strong></div>
             <div class="batch-video-row"><span>{{ t('episode.vid.confirmResolution') }}</span><strong>{{ episodeResolutionLabel }}</strong></div>
             <p class="batch-video-note">{{ t('episode.vid.confirmNote') }}</p>
@@ -1452,7 +1465,7 @@ import { toast } from 'vue-sonner'
 import { useI18n } from 'vue-i18n'
 import {
   Users, FileText, FolderKanban, Clapperboard, Download, Loader2,
-  Plus, X, ListTodo, CircleHelp,
+  Plus, X, ListTodo, CircleHelp, Clock,
 } from 'lucide-vue-next'
 import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, aiConfigAPI, uploadAPI } from '~/composables/useApi'
 import { startTour, autoTour } from '~/composables/useTour'
@@ -1620,6 +1633,17 @@ const pendingSceneImageIds = ref([])
 const pendingPropImageIds = ref([])
 const pendingVideoIds = ref([])
 const failedVideoMessages = ref({})
+// 点击生成时的本地时间戳：任务记录尚未拉回来时用它兜底推算 ETA
+const videoStartTimes = ref({})
+function markVideoStart(sbId) {
+  videoStartTimes.value = { ...videoStartTimes.value, [sbId]: Date.now() }
+}
+function clearVideoStart(sbId) {
+  if (!(sbId in videoStartTimes.value)) return
+  const next = { ...videoStartTimes.value }
+  delete next[sbId]
+  videoStartTimes.value = next
+}
 // 任务列表面板：顶栏按钮触发的右侧抽屉,按集聚合 sys_task + video_merges
 const genTasks = ref([])
 const genMerges = ref([])
@@ -1958,6 +1982,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleImageViewerKeydown)
   stopGenTasksPolling()
+  stopClock()
 })
 
 function isPendingSceneImage(id) {
@@ -2053,7 +2078,12 @@ function videoTaskActionLabel(sb) {
   if (latestVideoTask(sb?.id)?.status === 'failed') return t('episode.recovery.newGeneration')
   const state = videoTaskState(sb)
   if (state === 'done') return t('episode.asset.regen')
-  if (state === 'pending') return t('episode.asset.generating')
+  if (state === 'pending') {
+    // 同场景串行排队：还没开始跑，要明确区分于正在生成
+    return latestVideoTask(sb?.id)?.stage === 'queued'
+      ? t('episode.vid.queued')
+      : t('episode.asset.generating')
+  }
   return t('episode.asset.generate')
 }
 
@@ -2120,13 +2150,21 @@ const RESOLUTION_TIERS = {
   volcengine: ['480p', '720p'],
   minimax: ['720p', '1080p'],
   aliyun: ['480p', '720p', '1080p'],
+  // 本地 ComfyUI：H3 原生支持 360P~1080P，图片侧同档位换算像素预算
+  comfyui: ['480p', '720p', '1080p'],
 }
 const RESOLUTION_DISPLAY = {
   volcengine: { '480p': '480p', '720p': '720p', '1080p': '720p' },
   minimax: { '480p': '768P', '720p': '768P', '1080p': '2K' },
   aliyun: { '480p': '480P', '720p': '720P', '1080p': '1080P' },
+  comfyui: { '480p': '480P', '720p': '720P', '1080p': '1080P' },
 }
-const resolutionProvider = computed(() => RESOLUTION_TIERS[selectedVideoConfig.value?.provider] ? selectedVideoConfig.value.provider : 'volcengine')
+const resolutionProvider = computed(() => {
+  const provider = selectedVideoConfig.value?.provider
+  if (provider && RESOLUTION_TIERS[provider]) return provider
+  // 本地模式没有云端视频配置，按 H3 的原生档位展示
+  return 'comfyui'
+})
 const resolutionOptions = computed(() => RESOLUTION_TIERS[resolutionProvider.value].map(key => ({
   key,
   model: `${RESOLUTION_DISPLAY[resolutionProvider.value][key]} · ${t(`episode.resolution.${key === '480p' ? 'smooth' : key === '720p' ? 'hd' : 'uhd'}`)}`,
@@ -2218,9 +2256,75 @@ const episodeResolutionLabel = computed(() =>
 // 短档位标签（480p / 768P / 2K 等厂商原生档位），用于底部生效配置小结
 const episodeResolutionShort = computed(() =>
   RESOLUTION_DISPLAY[resolutionProvider.value][episodeResolution.value] || episodeResolution.value)
-const effectiveVideoDuration = computed(() => Number(selectedSb.value?.duration || 10))
+const effectiveVideoDuration = computed(() => Number(selectedSb.value?.duration || 5))
 const batchVideoTotalDuration = computed(() =>
   batchVideoConfirm.value.targets.reduce((sum, sb) => sum + (Number(sb.duration) || 5), 0))
+
+// ========== 预计耗时（本地 ComfyUI 视频） ==========
+// 实测基线（RTX 4060 Ti 8G + 二采 1.5x，5 秒镜头）：
+//   成片 1080P（一采 720P）649 秒；成片 720P（一采 480P）277 秒
+// 成片档位 → 每秒成片所需秒数（已含一采按倍率回退的换算）
+const VIDEO_SECONDS_PER_CLIP_SECOND = { '480p': 32, '720p': 55, '1080p': 130 }
+
+// 每秒 tick 一次，仅用于渲染「已用时长 / 剩余时间」
+const clockNow = ref(Date.now())
+let clockTimer = null
+function startClock() {
+  if (clockTimer) return
+  clockTimer = setInterval(() => { clockNow.value = Date.now() }, 1000)
+}
+function stopClock() {
+  if (clockTimer) { clearInterval(clockTimer); clockTimer = null }
+}
+
+function estimateVideoSeconds(durationSeconds) {
+  const perSecond = VIDEO_SECONDS_PER_CLIP_SECOND[episodeResolution.value] || 58
+  return Math.round(perSecond * Math.max(1, Number(durationSeconds) || 5))
+}
+
+function estimateBatchVideoSeconds() {
+  return batchVideoConfirm.value.targets
+    .reduce((sum, sb) => sum + estimateVideoSeconds(sb.duration || 5), 0)
+}
+
+function formatMinutes(seconds) {
+  const total = Math.max(0, Math.round(Number(seconds) || 0))
+  if (total < 60) return t('episode.eta.seconds', { n: total })
+  const min = Math.round(total / 60)
+  if (min < 60) return t('episode.eta.minutes', { n: min })
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  return m ? t('episode.eta.hoursMinutes', { h, m }) : t('episode.eta.hours', { h })
+}
+
+/** 该分镜正在跑的视频任务（取最新一条），用于推算已用时长 */
+function activeVideoTask(sbId) {
+  return genTasks.value
+    .filter(x => x.type === 'video' && x.storyboard_id === sbId && x.status === 'processing')
+    .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))[0] || null
+}
+
+/** 生成中的进度文案：已用 X · 预计 HH:MM 完成 */
+function runningEtaText(sb) {
+  if (!sb) return ''
+  const task = activeVideoTask(sb.id)
+  // 排队中还没开始跑，给绝对时刻会误导，直接说明在等前一个镜头
+  if (task?.stage === 'queued') return t('episode.eta.queued')
+  const startMs = task?.created_at ? Date.parse(task.created_at) : videoStartTimes.value[sb.id]
+  if (!startMs || Number.isNaN(startMs)) return t('episode.eta.runningNoEta')
+
+  const totalMs = estimateVideoSeconds(sb.duration || 5) * 1000
+  const elapsedMs = Math.max(0, clockNow.value - startMs)
+  const elapsed = formatMinutes(elapsedMs / 1000)
+  if (elapsedMs >= totalMs) return t('episode.eta.overtime', { elapsed })
+
+  const finish = new Date(startMs + totalMs)
+  const finishText = `${String(finish.getHours()).padStart(2, '0')}:${String(finish.getMinutes()).padStart(2, '0')}`
+  return t('episode.eta.running', { elapsed, finish: finishText })
+}
+
+// 只有存在生成中的镜头时才走秒级计时，空闲时不占资源
+watch(() => pendingVideoIds.value.length, len => { len ? startClock() : stopClock() }, { immediate: true })
 
 function openBatchVideoConfirm(pool) {
   const targets = pool.filter(s => !isPendingVideo(s.id))
@@ -2250,7 +2354,12 @@ function confirmBatchVideos() {
     const done = !!getVideoUrl(target)
     if (done) pendingVideoIds.value = pendingVideoIds.value.filter(item => item !== id)
     return done
-  }), 80, 4000)
+  // 本地 ComfyUI 单镜头约 10 分钟且串行排队，窗口需按镜头数放宽
+  }), Math.max(300, ids.length * 200), 4000, () => {
+    pendingVideoIds.value = pendingVideoIds.value.filter(item => !ids.includes(item))
+    ids.forEach(id => clearVideoStart(id))
+    toast.warning(t('episode.vid.stillRunning'))
+  })
   if (videoSelectMode.value) toggleVideoSelectMode()
 }
 
@@ -2606,7 +2715,7 @@ const currentMainStageLabel = computed(() => {
 
 const currentSubStageLabel = computed(() => currentStageLabel.value)
 
-const totalDuration = computed(() => sbs.value.reduce((s, sb) => s + (sb.duration || 10), 0))
+const totalDuration = computed(() => sbs.value.reduce((s, sb) => s + (sb.duration || 5), 0))
 const selectedSb = ref(null)
 const selectedVideoTaskNumber = computed(() => {
   const index = videoTaskRows.value.findIndex(task => String(task.id) === String(selectedSb.value?.id))
@@ -2724,7 +2833,9 @@ async function refresh() {
     toastError(e)
   }
   try { mergeData.value = await mergeAPI.status(epId.value) } catch {}
-  await Promise.all([loadGenTasks(), loadExportMerges()])
+  // 任务面板/成片列表刷新失败不应让整个 refresh 抛错：它被轮询等待复用，
+  // reject 会让等待循环提前中断，导致按钮卡在「生成中」
+  try { await Promise.all([loadGenTasks(), loadExportMerges()]) } catch { /* 忽略 */ }
 }
 
 function saveRaw() { episodeAPI.update(epId.value, { content: localRaw.value }); episode.value.content = localRaw.value }
@@ -2915,9 +3026,9 @@ async function genVideoPrompt(sb) {
     await api.post(`/agent/prompt_generator/chat`, {
       message: `请为分镜 #${idx}(ID:${sb.id})生成视频提示词(video_prompt)。视频模型:${label},请根据该模型的特性和时长限制生成。
 
-该分镜信息:时长 ${sb.duration || 10}s;场景:${getSceneName(sb) || '未绑定'};角色:${charNames};道具:${propNames}。
+该分镜信息:时长 ${sb.duration || 5}s;场景:${getSceneName(sb) || '未绑定'};角色:${charNames};道具:${propNames}。
 
-请先调用 read_storyboard_context 获取该分镜的画面描述(含【镜头N】子镜头与台词/旁白)、氛围及时长,据此生成 video_prompt(按 3 秒分段换行、用 @角色名/@场景名/@道具名 引用参考素材；段落内允许多镜头切镜,但不跨场景,切镜点对齐 description 的【镜头N】结构),然后调用 update_storyboard 保存到分镜 ID:${sb.id}。只更新 video_prompt 字段,不要改动其他字段,不要重新拆分整集。`,
+请先调用 read_storyboard_context 获取该分镜的画面描述(含【镜头N】子镜头与台词/旁白)、氛围及时长,据此生成 video_prompt,必须是 H3 原生六段结构(小节名固定、顺序不可变):subject_definitions(每个出场人物一行 <Subject N> 是 @角色名：参考图可见的外貌)、shot_summary(一句话讲清谁·在哪·做什么·结果)、reference_usage(逐张声明用途并明确不提供构图与姿态;不可省略)、detailed_description([Shot N] 起始秒-结束秒：景别/角度/运镜 + 动作 + 台词)、overall_soundscape、non_diegetic_music(无则 N/A);段落内允许多镜头切镜但不跨场景,用 @角色名/@场景名/@道具名 引用素材;然后调用 update_storyboard 保存到分镜 ID:${sb.id}。只更新 video_prompt 字段,不要改动其他字段,不要重新拆分整集。`,
       drama_id: dramaId,
       episode_id: epId.value,
       model: chatModelOverride() || undefined,
@@ -2936,14 +3047,30 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-function watchAsyncResult(check, attempts = 24, delay = 2500) {
+/**
+ * 轮询等待异步结果。
+ *
+ * 注意窗口长度：本地 ComfyUI 出图要 25-60 秒（1080P 档更久），
+ * 旧实现是 24×2.5s=60s，正好卡在出图时间边缘 —— 一旦超时，
+ * 循环直接退出、pending 态没人清，按钮就永久转圈。
+ * 因此：① 默认窗口放宽到 7.5 分钟；② 用尽后必须回调 onTimeout 兜底清理。
+ */
+function watchAsyncResult(check, attempts = 180, delay = 2500, onTimeout) {
   void (async () => {
     for (let i = 0; i < attempts; i++) {
       await sleep(delay)
-      await refresh()
+      // 单轮刷新失败（后端重启、请求超时）不应中断整个等待，
+      // 否则循环静默退出、pending 态永久残留
+      try { await refresh() } catch { /* 继续下一轮 */ }
       if (check()) return
     }
+    onTimeout?.()
   })()
+}
+
+/** 批量生成的等待窗口：按张数线性放宽（每张约 75 秒），最少 10 分钟 */
+function batchAttempts(count) {
+  return Math.max(240, count * 30)
 }
 
 async function genCharImg(id) {
@@ -2964,6 +3091,9 @@ async function genCharImg(id) {
       const done = !!(char?.image_url || char?.imageUrl)
       if (done) pendingCharImageIds.value = pendingCharImageIds.value.filter(item => item !== id)
       return done
+    }, 180, 2500, () => {
+      pendingCharImageIds.value = pendingCharImageIds.value.filter(item => item !== id)
+      toast.warning(t('episode.image.stillRunning'))
     })
   } catch (e) {
     pendingCharImageIds.value = pendingCharImageIds.value.filter(item => item !== id)
@@ -2982,7 +3112,10 @@ function batchCharImages() {
       const done = !!(char?.image_url || char?.imageUrl)
       if (done) pendingCharImageIds.value = pendingCharImageIds.value.filter(item => item !== id)
       return done
-    }), 36)
+    }), batchAttempts(ids.length), 2500, () => {
+      pendingCharImageIds.value = pendingCharImageIds.value.filter(item => !ids.includes(item))
+      toast.warning(t('episode.image.stillRunning'))
+    })
   }).catch(e => {
     pendingCharImageIds.value = pendingCharImageIds.value.filter(item => !ids.includes(item))
     toastError(e)
@@ -3006,6 +3139,9 @@ async function genSceneImg(id) {
       const done = !!(scene?.image_url || scene?.imageUrl)
       if (done) pendingSceneImageIds.value = pendingSceneImageIds.value.filter(item => item !== id)
       return done
+    }, 180, 2500, () => {
+      pendingSceneImageIds.value = pendingSceneImageIds.value.filter(item => item !== id)
+      toast.warning(t('episode.image.stillRunning'))
     })
   } catch (e) {
     pendingSceneImageIds.value = pendingSceneImageIds.value.filter(item => item !== id)
@@ -3033,6 +3169,9 @@ async function genPropImg(id) {
       const done = !!(prop?.image_url || prop?.imageUrl)
       if (done) pendingPropImageIds.value = pendingPropImageIds.value.filter(item => item !== id)
       return done
+    }, 180, 2500, () => {
+      pendingPropImageIds.value = pendingPropImageIds.value.filter(item => item !== id)
+      toast.warning(t('episode.image.stillRunning'))
     })
   } catch (e) {
     pendingPropImageIds.value = pendingPropImageIds.value.filter(item => item !== id)
@@ -3050,7 +3189,10 @@ function batchSceneImages() {
     const done = !!(scene?.image_url || scene?.imageUrl)
     if (done) pendingSceneImageIds.value = pendingSceneImageIds.value.filter(item => item !== id)
     return done
-  }), 36)
+  }), batchAttempts(ids.length), 2500, () => {
+    pendingSceneImageIds.value = pendingSceneImageIds.value.filter(item => !ids.includes(item))
+    toast.warning(t('episode.image.stillRunning'))
+  })
 }
 function batchPropImages() {
   const ids = propItems.value.filter(p => !(p.image_url || p.imageUrl)).map(p => p.id)
@@ -3063,7 +3205,10 @@ function batchPropImages() {
     const done = !!(prop?.image_url || prop?.imageUrl)
     if (done) pendingPropImageIds.value = pendingPropImageIds.value.filter(item => item !== id)
     return done
-  }), 36)
+  }), batchAttempts(ids.length), 2500, () => {
+    pendingPropImageIds.value = pendingPropImageIds.value.filter(item => !ids.includes(item))
+    toast.warning(t('episode.image.stillRunning'))
+  })
 }
 function getVideoUrl(s) { return s?.video_url || s?.videoUrl || s?.composed_video_url || s?.composedVideoUrl || null }
 function hasVid(s) { return !!getVideoUrl(s) }
@@ -3312,14 +3457,14 @@ function resolveVideoPromptRefs(sb) {
 }
 
 // 分镜时长（视频生成参数区直接编辑并保存到分镜）：
-// 统一限制 2-30s，列表/批量/单次生成统一读取该值；超出厂商支持范围由后端适配器收敛
+// 本地视频模型 5 秒最稳、8 秒为硬上限（更长会明显掉质量且耗时激增）
 function onVideoDurationChange(e) {
   const sb = selectedSb.value
   if (!sb) return
   const min = 2
-  const max = 30
+  const max = 8
   let v = Math.round(Number(e.target.value))
-  if (!Number.isFinite(v)) v = Number(sb.duration || 10)
+  if (!Number.isFinite(v)) v = Number(sb.duration || 5)
   v = Math.min(max, Math.max(min, v))
   e.target.value = v
   updateField(sb, 'duration', v)
@@ -3374,7 +3519,7 @@ async function genVid(sb, opts = {}) {
     storyboard_id: sb.id,
     drama_id: dramaId,
     prompt: resolveVideoPromptRefs(sb),
-    duration: Number(sb.duration || 10),
+    duration: Number(sb.duration || 5),
     aspect_ratio: dramaAspectRatio.value,
     generate_audio: true,
     model: bareModelName(videoModel.value) || undefined,
@@ -3388,12 +3533,14 @@ async function genVid(sb, opts = {}) {
   try {
     delete failedVideoMessages.value[sb.id]
     if (!isPendingVideo(sb.id)) pendingVideoIds.value.push(sb.id)
+    markVideoStart(sb.id)
     const generation = await taskAPI.generate({ type: 'video', ...params, force_new: !!forceNew })
     if (!opts.silent) toast.success(t('episode.vid.generating'))
     await refresh()
     pollVideoGeneration(generation?.id, sb.id)
   } catch (e) {
     pendingVideoIds.value = pendingVideoIds.value.filter(item => item !== sb.id)
+    clearVideoStart(sb.id)
     failedVideoMessages.value = {
       ...failedVideoMessages.value,
       [sb.id]: e.message || t('episode.vid.genFailed'),
@@ -3408,22 +3555,29 @@ async function pollVideoGeneration(generationId, storyboardId) {
       const done = !!(target?.video_url || target?.videoUrl)
       if (done) pendingVideoIds.value = pendingVideoIds.value.filter(item => item !== storyboardId)
       return done
-    }, 60, 4000)
+    }, 300, 4000, () => {
+      pendingVideoIds.value = pendingVideoIds.value.filter(item => item !== storyboardId)
+      clearVideoStart(storyboardId)
+      toast.warning(t('episode.vid.stillRunning'))
+    })
     return
   }
-  for (let i = 0; i < 120; i++) {
+  // 本地引擎单镜头约 10 分钟，窗口给到 20 分钟
+  for (let i = 0; i < 300; i++) {
     await sleep(4000)
     try {
       const res = await taskAPI.get(generationId)
       await refresh()
       if (res?.status === 'completed') {
         pendingVideoIds.value = pendingVideoIds.value.filter(item => item !== storyboardId)
+        clearVideoStart(storyboardId)
         delete failedVideoMessages.value[storyboardId]
         toast.success(t('episode.vid.genDone'))
         return
       }
       if (res?.status === 'failed') {
         pendingVideoIds.value = pendingVideoIds.value.filter(item => item !== storyboardId)
+        clearVideoStart(storyboardId)
         const errMsg = res?.error_msg || res?.errorMsg || t('episode.vid.genFailed')
         failedVideoMessages.value = {
           ...failedVideoMessages.value,
@@ -3434,7 +3588,11 @@ async function pollVideoGeneration(generationId, storyboardId) {
       }
     } catch {}
   }
-  // 页面等待结束不代表上游失败；后续由任务列表轮询继续跟踪。
+  // 页面等待结束不代表上游失败：先清掉前端 pending 态避免按钮卡在「生成中」，
+  // 后续进度仍由任务列表轮询继续跟踪
+  pendingVideoIds.value = pendingVideoIds.value.filter(item => item !== storyboardId)
+  clearVideoStart(storyboardId)
+  toast.warning(t('episode.vid.stillRunning'))
   await loadGenTasks()
 }
 async function doMerge(ids) {
@@ -5045,6 +5203,23 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* 预计耗时：生成前给个心理预期，生成中显示剩余时间 */
+.video-eta-estimate { opacity: 0.75; }
+.video-eta-running {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: var(--radius);
+  background: var(--surface-sunken);
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-align: center;
+}
+.video-eta-running svg { flex: 0 0 auto; opacity: 0.7; }
 /* 生成参数：强调卡片，时长是当前分镜生成的核心参数 */
 .video-params-card {
   padding: 7px 10px;

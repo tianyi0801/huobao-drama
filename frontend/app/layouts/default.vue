@@ -58,7 +58,7 @@
 <script setup>
 import { LayoutGrid, Settings, TriangleAlert, Github } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
-import { aiConfigAPI } from '~/composables/useApi'
+import { aiConfigAPI, settingsAPI } from '~/composables/useApi'
 import brandLogo from '~/assets/brand-logo.png'
 
 const { t, locale } = useI18n()
@@ -73,13 +73,21 @@ const SERVICE_TYPE_LABELS = computed(() => ({
 }))
 const missingConfigLabels = ref([])
 
+// 文本模型走云端配置；图片/视频改由本地 ComfyUI 工作流生成，改为检查本地算力是否就绪
 async function checkAiConfigs() {
   try {
-    const configs = await aiConfigAPI.list()
     const labels = SERVICE_TYPE_LABELS.value
-    missingConfigLabels.value = Object.entries(labels)
-      .filter(([type]) => !configs.some(c => c.service_type === type && c.is_active))
-      .map(([, label]) => label)
+    const missing = []
+    const configs = await aiConfigAPI.list()
+    if (!configs.some(c => c.service_type === 'text' && c.is_active)) missing.push(labels.text)
+    try {
+      const local = await settingsAPI.localEngine()
+      if (!local?.imageReady) missing.push(labels.image)
+      if (!local?.videoReady) missing.push(labels.video)
+    } catch {
+      missing.push(labels.image, labels.video)
+    }
+    missingConfigLabels.value = missing
   } catch { /* 配置检查失败不阻塞页面 */ }
 }
 

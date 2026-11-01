@@ -10,8 +10,19 @@ const run = promisify(execFile)
 const require = createRequire(import.meta.url)
 const release = require('ffmpeg-static/package.json')['ffmpeg-static']['binary-release-tag']
 
+/**
+ * 校验 Mach-O 是否包含目标架构。
+ * 不用 `lipo -verify_arch`：新版 Xcode 的 lipo 已不接受该用法
+ * （会报 "unknown architecture specification flag"，两种参数顺序均失败），
+ * 改用 `lipo -archs` 取出架构列表后自行比对。
+ */
 export function assertMacArchitecture(file, arch) {
-  execFileSync('lipo', ['-verify_arch', arch === 'x64' ? 'x86_64' : arch, file], { stdio: 'pipe' })
+  const expected = arch === 'x64' ? 'x86_64' : arch
+  const archs = execFileSync('lipo', ['-archs', file], { stdio: 'pipe', encoding: 'utf8' })
+    .trim().split(/\s+/).filter(Boolean)
+  if (!archs.includes(expected)) {
+    throw new Error(`${file} 架构不符：期望 ${expected}，实际 ${archs.join(' ') || '未知'}`)
+  }
 }
 
 export async function prepareMacMedia(desktop, resources) {
