@@ -9,6 +9,7 @@
  */
 import { spawn } from 'child_process'
 import fs from 'fs'
+import path from 'path'
 import ffmpeg from 'fluent-ffmpeg'
 import { createRequire } from 'module'
 
@@ -25,8 +26,43 @@ function resolveStatic(moduleName: string): string | null {
   }
 }
 
-const ffmpegPath = process.env.FFMPEG_BIN || resolveStatic('ffmpeg-static')
-const ffprobePath = process.env.FFPROBE_BIN || resolveStatic('ffprobe-static')
+/** 在 PATH 里查找可执行文件（dev/服务器常直接用系统安装的 ffmpeg） */
+function findInPath(name: string): string | null {
+  const exts = process.platform === 'win32' ? ['.exe', '.cmd', ''] : ['']
+  for (const dir of (process.env.PATH || '').split(path.delimiter)) {
+    if (!dir) continue
+    for (const ext of exts) {
+      const candidate = path.join(dir, name + ext)
+      try {
+        if (fs.statSync(candidate).isFile()) return candidate
+      } catch {
+        /* 该目录下不存在，继续找 */
+      }
+    }
+  }
+  return null
+}
+
+/**
+ * 按「显式环境变量 → 内置 npm 包 → 系统 PATH」取第一个真实存在的二进制。
+ * npm 包的 postinstall 可能下载失败（目录在、文件不在），此时必须继续回退，
+ * 否则 dev 模式明明装了系统 ffmpeg 也会被误判为不可用。
+ */
+function pickBinary(envValue: string | undefined, name: string, staticPath: string | null): string | null {
+  const candidates = [envValue, staticPath, findInPath(name)]
+  for (const candidate of candidates) {
+    if (!candidate) continue
+    try {
+      if (fs.statSync(candidate).isFile()) return candidate
+    } catch {
+      /* 该候选不可用，继续回退 */
+    }
+  }
+  return null
+}
+
+const ffmpegPath = pickBinary(process.env.FFMPEG_BIN, 'ffmpeg', resolveStatic('ffmpeg-static'))
+const ffprobePath = pickBinary(process.env.FFPROBE_BIN, 'ffprobe', resolveStatic('ffprobe-static'))
 
 // 系统未安装 ffmpeg 时使用项目内置二进制
 if (ffmpegPath) ffmpeg.setFfmpegPath(ffmpegPath)
@@ -78,9 +114,10 @@ export async function checkFfmpegSuite(): Promise<FfmpegSuite> {
   } else if (!warned) {
     warned = true
     console.warn(
-      `[ffmpeg] 内置二进制不可用 (ffmpeg=${ffmpegOk ? 'ok' : 'FAIL'}, ffprobe=${ffprobeOk ? 'ok' : 'FAIL'})。` +
-      `海报帧提取与视频拼接将跳过/失败。修复：删除 node_modules 后在本机重新 npm install，` +
-      `或设置 FFMPEG_BIN/FFPROBE_BIN 指向有效的可执行文件`
+      `[ffmpeg] 未找到可用的可执行文件 (ffmpeg=${ffmpegOk ? 'ok' : 'FAIL'}, ffprobe=${ffprobeOk ? 'ok' : 'FAIL'})。`
+      + `已依次尝试 FFMPEG_BIN/FFPROBE_BIN、node_modules 内置包、系统 PATH。`
+      + `海报帧提取与视频拼接将跳过/失败。修复：安装系统 ffmpeg（brew install ffmpeg / apt install ffmpeg），`
+      + `或设置 FFMPEG_BIN/FFPROBE_BIN 指向有效可执行文件`
     )
   }
   return suite

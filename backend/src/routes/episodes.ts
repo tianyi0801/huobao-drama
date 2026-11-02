@@ -14,11 +14,12 @@ app.post('/', async (c) => {
   const body = await c.req.json()
   if (!body.drama_id) return badRequest(c, 'drama_id 必填')
 
-  // 图片/视频配置：显式传入优先，缺省时自动锁定当前启用的最高优先级官方配置
+  // 图片/视频配置：显式传入优先，缺省时自动锁定当前启用的最高优先级官方配置。
+  // 允许为空：文本模型（剧本/分镜/提示词）与图片视频生成是两条独立链路，
+  // 用户可以先建集写剧本，等真正生图/生视频时再由 generateImage/generateVideo
+  // 回落到「当前启用配置」并给出明确提示（见 services/generation.ts）。
   const imageConfigId = body.image_config_id ?? await getActiveConfigId('image')
   const videoConfigId = body.video_config_id ?? await getActiveConfigId('video')
-  if (!imageConfigId) return badRequest(c, '未找到启用的图片生成配置，请先在设置中心添加')
-  if (!videoConfigId) return badRequest(c, '未找到启用的视频生成配置，请先在设置中心添加')
   const ts = now()
 
   // Get next episode number（忽略已软删的集，删除中间集后新集号可复用空位之后的最大值）

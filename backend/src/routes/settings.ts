@@ -2,7 +2,16 @@
  * 应用设置路由 — 全局配置的读写入口（当前：AI 内容语言）
  */
 import { Hono } from 'hono'
-import { getContentLanguage, setContentLanguage, getToursSeen, setToursSeen, CONTENT_LANGUAGES, type ContentLanguage } from '../services/app-settings.js'
+import {
+  getContentLanguage,
+  setContentLanguage,
+  getToursSeen,
+  setToursSeen,
+  getWorkspaceSyncNotice,
+  setWorkspaceSyncNotice,
+  CONTENT_LANGUAGES,
+  type ContentLanguage,
+} from '../services/app-settings.js'
 import { getComfyConfig, isComfyReadyFor } from '../services/comfyui/config.js'
 import { success, badRequest } from '../utils/response.js'
 
@@ -33,6 +42,17 @@ app.put('/content-language', async (c) => {
   }
   const saved = await setContentLanguage(language as ContentLanguage)
   return success(c, { language: saved })
+})
+
+// GET /workspace-notice — 升级后待告知的内置模板同步结果（null = 无通知）
+app.get('/workspace-notice', async (c) => {
+  return success(c, { notice: getWorkspaceSyncNotice() })
+})
+
+// POST /workspace-notice/dismiss — 前端展示过即清除，保证只提示一次
+app.post('/workspace-notice/dismiss', async (c) => {
+  setWorkspaceSyncNotice(null)
+  return success(c, { dismissed: true })
 })
 
 // GET /tours-seen — 已看过的引导漫游 id 列表

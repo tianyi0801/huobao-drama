@@ -28,6 +28,7 @@ import workflows from './routes/workflows.js'
 import { requestLogger, errorHandler } from './middleware/logger.js'
 import { resumeInterruptedTasks } from './services/generation.js'
 import { seedComfyDefaultsIfMissing } from './services/comfyui/bootstrap.js'
+import { syncWorkspaceTemplate } from './agents/workspace-sync.js'
 import { DATA_ROOT } from './utils/paths.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -91,6 +92,15 @@ app.get('*', serveStatic({ root: distPath, path: 'index.html' }))
 const port = Number(process.env.PORT || 5679)
 console.log(`🚀 Huobao Drama TS server on http://localhost:${port}`)
 
+// 内置 workspace 模板同步：升级时覆盖内置 prompt / skill（覆盖前备份，结果供前端告知一次）。
+// 仅桌面版 / Docker 注入 WORKSPACE_TEMPLATE_DIR；源码模式 workspace 即模板，函数内部直接跳过。
+// 必须在 ComfyUI 默认配置预置之前执行——presets.json 需要先落到可写 workspace 目录。
+// 同步失败（目录只读、磁盘满等）只告警，绝不阻断服务启动。
+try {
+  syncWorkspaceTemplate()
+} catch (error) {
+  console.warn(`[startup] 内置模板同步失败，继续启动: ${(error as Error).message}`)
+}
 // 首次启动预置本地 ComfyUI 工作流模板（已有配置时不覆盖）
 seedComfyDefaultsIfMissing()
 await resumeInterruptedTasks()

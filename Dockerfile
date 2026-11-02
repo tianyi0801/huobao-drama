@@ -33,6 +33,7 @@ ENV NODE_ENV=production \
     HUOBAO_DATA_DIR=/app/data \
     SQLITE_PATH=/app/data/huobao.sqlite3 \
     WORKSPACE_PATH=/app/data/workspace \
+    WORKSPACE_TEMPLATE_DIR=/app/workspace-template \
     FRONTEND_DIST=/app/frontend-dist
 
 # ffprobe-static 不包含 Linux ARM64 二进制；两个架构统一使用系统媒体工具。
@@ -45,7 +46,8 @@ COPY --from=backend-build /build/backend/src ./backend/src
 COPY --from=backend-build /build/backend/node_modules ./backend/node_modules
 COPY --from=backend-build /build/backend/package.json ./backend/package.json
 COPY --from=backend-build /build/backend/tsconfig.json ./backend/tsconfig.json
-# workspace 模板（skills/prompts），entrypoint copy-once 到数据卷后可在线编辑
+# workspace 模板（skills/prompts/comfyui + template.json 版本清单）：
+# 后端启动时按版本同步到数据卷（覆盖同名内置文件、覆盖前备份、用户新建目录保留）
 COPY backend/workspace ./workspace-template
 COPY --from=frontend-build /build/frontend/.output/public ./frontend-dist
 COPY docker/entrypoint.sh ./entrypoint.sh

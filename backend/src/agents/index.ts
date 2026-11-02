@@ -180,7 +180,9 @@ let lastLoggedTextEndpointKey = ''
 const thinkingOffEnabled = (process.env.AI_DISABLE_THINKING ?? 'true').toLowerCase() !== 'false'
 
 function isOfficialTextHost(baseURL: string) {
-  return /api\.openai\.com|generativelanguage\.googleapis\.com/.test(baseURL)
+  // deepseek：官方 API 与 OpenAI/Gemini 一样不接受中转站专有的 thinking 参数，跳过注入；
+  // 但 max_tokens 注入对其是必要的（见 isOfficialOpenAIHost 的反例说明）
+  return /api\.openai\.com|generativelanguage\.googleapis\.com|api\.xiaomimimo\.com|api\.deepseek\.com/.test(baseURL)
 }
 
 function openaiThinkingOffPatch(): Record<string, any> {
@@ -276,7 +278,7 @@ function createTemperatureFetch(providerName: string, temperature: number, inner
 const defaultMaxTokens = Number(process.env.AI_MAX_TOKENS || 16384)
 
 function isOfficialOpenAIHost(baseURL: string) {
-  return /api\.openai\.com/.test(baseURL)
+  return /api\.openai\.com|api\.xiaomimimo\.com/.test(baseURL)
 }
 
 function createMaxTokensFetch(providerName: string, inner?: typeof fetch): typeof fetch {

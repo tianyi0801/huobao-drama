@@ -98,22 +98,15 @@ test('non-ASCII Windows install resources use one short path for backend and med
   assert.ok(p.forkArgs()[2].env.FRONTEND_DIST.startsWith(shortPath))
   assert.equal(p.errors.length, 0)
 })
-test('内置 ComfyUI 预设即使模板版本一致也会覆盖同步到用户目录', async () => {
-  const p = await boot('healthy', { templateVersion: '5' })
-  const comfyCopy = p.copies.find(item => /workspace-template[\\/]comfyui$/.test(item.from))
-  assert.ok(comfyCopy, '未同步内置工作流目录')
-  assert.match(comfyCopy.to, /workspace[\\/]comfyui$/)
-  assert.equal(comfyCopy.force, true)
-  // 版本一致时仍不应覆盖 skills：只跳过整目录补缺失文件
-  assert.equal(p.copies.some(item => /workspace-template$/.test(item.from)), false)
+test('模板同步交给后端：主进程只注入模板目录与可写 workspace，不自行拷贝', async () => {
+  const p = await boot('healthy')
+  const env = p.forkArgs()[2].env
+  // 后端据此按模板版本覆盖 prompts/skills 并备份（逻辑见 backend/src/agents/workspace-sync.ts）
+  assert.match(env.WORKSPACE_TEMPLATE_DIR, /workspace-template$/)
+  assert.match(env.WORKSPACE_PATH, /workspace$/)
+  // 主进程不再自己 cp 模板，避免与后端逻辑重复、行为不一致
+  assert.equal(p.copies.some(item => /workspace-template/.test(item.from)), false)
   assert.equal(p.errors.length, 0)
-})
-
-test('旧模板版本升级时补齐 workspace 并强制同步内置工作流', async () => {
-  const p = await boot('healthy', { templateVersion: '4' })
-  assert.ok(p.copies.some(item => /workspace-template$/.test(item.from) && item.force === false))
-  assert.ok(p.copies.some(item => /workspace-template[\\/]prompts$/.test(item.from) && item.force === true))
-  assert.ok(p.copies.some(item => /workspace-template[\\/]comfyui$/.test(item.from) && item.force === true))
 })
 
 test('closing while backend starts cancels silently', async () => {

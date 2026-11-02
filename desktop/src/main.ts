@@ -29,8 +29,6 @@ const BACKEND_BUNDLE = path.join(DESKTOP_ROOT, 'build', 'backend.mjs')
 let backendBundle = BACKEND_BUNDLE
 let runtimeResourcesDir = ''
 
-/** workspace 模板版本：内置模板更新时递增，触发向用户目录补缺失文件 */
-const TEMPLATE_VERSION = '5'
 const STORAGE_CONFIG_FILE = 'storage-config.json'
 
 let mainWindow: BrowserWindow | null = null
@@ -157,31 +155,11 @@ export function normCase(p: string): string {
 }
 
 // ---- workspace 模板 ----
+// 模板同步已下沉到后端 backend/src/agents/workspace-sync.ts：
+// 升级时以内置为准覆盖同名 prompt / skill（用户新建的目录保留），覆盖前备份，并把结果落库供前端提示一次。
+// 主进程只负责把「随包模板目录」与「可写 workspace 目录」通过环境变量传给后端，
+// 从而让桌面版与 Docker 走同一套逻辑（此前两边各写一份，行为已经不一致）。
 
-/**
- * workspace 模板拷贝（copy-once + 版本标记）：
- * - 目标无版本标记（首启动）或版本较旧 → 只补缺失文件，永不覆盖用户编辑
- * - 版本一致 → 跳过
- * 例外：prompts/ 随版本升级强制覆盖——prompt 与代码内 DEFAULT_PROMPTS 同源迭代
- * （设置页有「恢复默认」，且编辑场景少）；skills/ 保持只增不覆盖（可能有用户新建）
- * comfyui/ 为随包只读资产，每次启动强制覆盖（见下方说明）
- */
-function syncWorkspaceTemplate(templateDir: string, destDir: string) {
-  const marker = path.join(destDir, '.template-version')
-  const upToDate = fs.existsSync(marker) && fs.readFileSync(marker, 'utf8').trim() === TEMPLATE_VERSION
-  if (!upToDate) {
-    fs.cpSync(templateDir, destDir, { recursive: true, force: false, errorOnExist: false })
-    fs.cpSync(path.join(templateDir, 'prompts'), path.join(destDir, 'prompts'), { recursive: true, force: true })
-    fs.writeFileSync(marker, TEMPLATE_VERSION)
-  }
-
-  // 内置 ComfyUI 预设/API 图/UI 工作流是随包发布的只读资产（用户自定义模板存在数据库里），
-  // 每次启动强制覆盖：旧版本残留或文件缺失时无需用户手动拷贝，升级后设置页立刻能看到预设。
-  const bundledComfy = path.join(templateDir, 'comfyui')
-  if (fs.existsSync(bundledComfy)) {
-    fs.cpSync(bundledComfy, path.join(destDir, 'comfyui'), { recursive: true, force: true })
-  }
-}
 
 function resolveResourceDir(): string {
   // 打包后在 resources/（extraResources）；dev 直指仓库目录
@@ -220,6 +198,8 @@ function startBackend(): void {
     FRONTEND_DIST: currentFrontendDist,
   }
   if (app.isPackaged) {
+    // 内置模板目录：后端启动时按模板版本覆盖 prompts/skills 并备份（dev 模式 workspace 即源码目录，不注入）
+    env.WORKSPACE_TEMPLATE_DIR = path.join(resources, 'workspace-template')
     const exe = process.platform === 'win32' ? '.exe' : ''
     env.FFMPEG_BIN = path.join(resources, 'bin', `ffmpeg${exe}`)
     env.FFPROBE_BIN = path.join(resources, 'bin', `ffprobe${exe}`)
@@ -326,8 +306,8 @@ async function bootstrap() {
     currentWorkspaceDir = app.isPackaged
       ? path.join(userData, 'workspace')
       : templateDir
+    // 模板向用户目录的同步由后端启动时执行（覆盖前备份并记录通知），此处只准备路径
     startupLog.write('preparing workspace')
-    if (app.isPackaged) syncWorkspaceTemplate(templateDir, currentWorkspaceDir)
 
     currentFrontendDist = app.isPackaged
       ? path.join(runtimeResourcesDir, 'frontend')

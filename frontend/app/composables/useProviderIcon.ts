@@ -18,6 +18,7 @@ const FILENAMES: Record<string, string> = {
   zhipu: 'zhipu-color.png',
   xai: 'grok.png',
   xiaomi: 'xiaomi-color.png',
+  'xiaomi-mimo': 'xiaomi-color.png',  // 小米 MiMo（OpenAI 兼容），与小米共用图标
   vidu: 'vidu-color.png',
   ollama: 'ollama.png',
   midjourney: 'midjourney.png',

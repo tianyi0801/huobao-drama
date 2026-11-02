@@ -1,7 +1,10 @@
 {
   "app": {
     "title": "Huobao Shorts",
-    "updateAvailable": "New version v{version} is available. Upgrade in Settings → About."
+    "updateAvailable": "New version v{version} is available. Upgrade in Settings → About.",
+    "workspaceSyncNotice": "Built-in prompts and skills synced to v{version} ({overwritten} updated, {added} added, {removed} removed).",
+    "workspaceSyncIncomplete": "Built-in prompt and skill sync is incomplete ({overwritten} updated, {added} added, {removed} removed). It will retry on the next startup.",
+    "workspaceSyncBackup": "Previous content was backed up to {backup}."
   },
   "characterVoice": {
     "title": "Character voice",
@@ -25,6 +28,7 @@
   },
   "common": {
     "confirm": "Confirm",
+    "gotIt": "Got it",
     "cancel": "Cancel",
     "back": "Back",
     "saved": "Saved",
@@ -210,7 +214,7 @@
       "resolution": "Video quality (final)",
       "resolutionPlaceholder": "Select quality",
       "resolutionHint": "This is the FINAL resolution. The local engine derives the first-pass tier from the second-pass scale (720P final + 1.5x → 480P first pass).",
-      "lockCopy": "The currently active image and video generation capabilities will be locked on creation.",
+      "lockCopy": "You can write the script right away; image and video models are checked when generating, and you'll be prompted to configure them if missing.",
       "creating": "Creating...",
       "create": "Create",
       "added": "Episode added"
@@ -289,15 +293,6 @@
     "ai": {
       "title": "AI models & compute",
       "desc": "Text models use a cloud API; images and videos run on your local ComfyUI. Configure in the order below.",
-      "quickTitle": "Huobao quick setup (text only)",
-      "recommended": "Recommended",
-      "quickDesc": "Paste your Huobao API Key to write the text-model config in one click. Images and videos are generated locally now.",
-      "getKey": "Get a Huobao API key",
-      "regionCn": "China",
-      "regionCom": "Global",
-      "applyQuick": "Apply Huobao Config",
-      "manualTitle": "Manual Templates",
-      "manualDesc": "Or use your own API key: click “Text” below to prefill provider / base URL / model.",
       "activeCount": "{n} active",
       "hasKey": "Configured",
       "noKey": "No key",
@@ -305,8 +300,6 @@
       "setDefault": "Set as default model for this type",
       "noBaseUrl": "Base URL not set",
       "test": "Test",
-      "apiKeyRequired": "Please enter a Huobao API Key",
-      "quickApplied": "Huobao quick config written",
       "defaultModelSwitched": "Default {type} model switched to {model}",
       "meta": {
         "text": "Text capabilities: script rewriting, asset extraction, storyboard breaking",
@@ -542,7 +535,23 @@
     "model": {
       "defaultWith": "Default · {model}",
       "notConfigured": "Not configured",
-      "localEngine": "Local ComfyUI"
+      "localEngine": "Local ComfyUI",
+      "localEngineReady": "Ready",
+      "localEnginePartial": "Partially ready",
+      "localEngineNotReady": "Not ready",
+      "localEngineHint": "Local ComfyUI {url} | image and video workflows both passed the check",
+      "localEngineHintUnknown": "Local engine status not checked yet",
+      "localEngineHintBlocked": "Not ready: {reasons}",
+      "localEngineHintDisabled": "Local engine is off. Enable it in Settings → Local compute and bind workflows.",
+      "imageNotReadyTitle": "Image generation not ready",
+      "imageNotReadyDesc": "No image generation capability is available. Bind an image workflow in Settings → Local compute (and make sure ComfyUI is running), then try again.",
+      "videoNotReadyTitle": "Video generation not ready",
+      "videoNotReadyDesc": "No video generation capability is available. Bind a video workflow in Settings → Local compute (and make sure ComfyUI is running), then try again.",
+      "engineAlertReasonsTitle": "Why it is not ready",
+      "engineAlertHint": "Text capabilities (script, storyboards, prompts) are unaffected — you can finish those first.",
+      "engineRecheck": "Check again",
+      "engineRecheckOk": "Ready now — you can start generating",
+      "engineRecheckFailed": "Still not ready. Make sure ComfyUI is running and a workflow is bound."
     },
     "sidebar": {
       "inProgress": "In progress",
@@ -1008,14 +1017,10 @@
       },
       "settings": {
         "title": "Step 1 · Configure AI services",
-        "desc": "Every AI feature needs this first. Open Settings and paste a Huobao API Key to set up text/image/video in one click."
+        "desc": "Every AI feature needs this first. Open Settings and add a text-model config with your own API key."
       }
     },
     "settings": {
-      "quick": {
-        "title": "Fastest setup: Quick Setup",
-        "desc": "Paste a Huobao API Key to write the three recommended configs (text/image/video) at once, with connectivity testing."
-      },
       "nav": {
         "title": "Everything lives here",
         "desc": "Switch sections on the left: AI services, general (UI & content language), style presets, agent prompts & skills, storage, about."

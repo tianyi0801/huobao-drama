@@ -57,6 +57,8 @@ temp/
 backend/workspace/*
 !backend/workspace/skills/
 !backend/workspace/prompts/
+# 模板版本清单随包发布（决定升级时是否覆盖内置 prompt/skill），必须入库
+!backend/workspace/template.json
 
 # Desktop (Electron) build artifacts
 desktop/node_modules/

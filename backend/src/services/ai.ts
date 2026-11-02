@@ -56,7 +56,8 @@ export function parseConfigTemperature(settingsRaw: string | null | undefined): 
 }
 
 export const officialProviders: Record<ServiceType, readonly string[]> = {
-  text: ['openai', 'gemini', 'volcengine'],
+  // xiaomi-mimo / deepseek：OpenAI 兼容协议，复用 openai 的请求链路
+  text: ['openai', 'gemini', 'volcengine', 'xiaomi-mimo', 'deepseek'],
   image: ['openai', 'gemini', 'volcengine'],
   video: ['volcengine', 'minimax', 'aliyun'],
 }
@@ -69,7 +70,8 @@ export function isOfficialProvider(serviceType?: string | null, provider?: strin
 export function getTextProviderBaseUrl(config: AIConfig) {
   const provider = config.provider.toLowerCase()
 
-  if (provider === 'openai') {
+  if (provider === 'openai' || provider === 'xiaomi-mimo' || provider === 'deepseek') {
+    // OpenAI 兼容协议（xiaomi-mimo / deepseek 官方）同样按 /v1 前缀拼接（已含 /v1 时幂等）
     return joinProviderUrl(config.baseUrl, '/v1', '')
   }
 

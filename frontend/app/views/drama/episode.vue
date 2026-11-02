@@ -45,11 +45,12 @@
             :default-label="t('episode.model.defaultWith', { model: videoModelOptions[0].model })"
             :show-config="videoModelMultiCfg"
           />
-          <!-- 图片/视频改为本地 ComfyUI 工作流后没有云端模型可选，这里给出明确标识 -->
+          <!-- 图片/视频改为本地 ComfyUI 工作流后没有云端模型可选；这里同时显示引擎就绪状态 -->
           <span
             v-if="!imageModelOptions.length && !videoModelOptions.length"
-            class="tag tag-accent local-engine-tag"
-          >{{ t('episode.model.localEngine') }}</span>
+            :class="['tag', 'local-engine-tag', localEngineTagClass]"
+            :title="localEngineTitle"
+          >{{ t('episode.model.localEngine') }} · {{ localEngineStatusText }}</span>
           <ModelSelect
             v-model="episodeResolution"
             :label="t('episode.topbar.resolution')"
@@ -1460,6 +1461,37 @@
         </div>
       </div>
 
+      <!-- 生成未就绪：居中提示 + 一键去设置 -->
+      <div v-if="engineAlert" class="overlay" @click.self="engineAlert = null">
+        <div class="dialog engine-alert-dialog">
+          <header class="dialog-head">
+            <h2 class="dialog-title">{{ engineAlertTitle }}</h2>
+            <button class="btn btn-ghost btn-icon" @click="engineAlert = null">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </header>
+          <div class="dialog-body">
+            <p class="engine-alert-desc">{{ engineAlertDesc }}</p>
+            <!-- 直接展示后端检测到的具体原因（ComfyUI 未连接 / 模板校验失败等） -->
+            <div v-if="engineAlertReasons.length" class="engine-alert-reasons">
+              <div class="engine-alert-reasons-title">{{ t('episode.model.engineAlertReasonsTitle') }}</div>
+              <ul>
+                <li v-for="reason in engineAlertReasons" :key="reason">{{ reason }}</li>
+              </ul>
+            </div>
+            <p class="engine-alert-hint">{{ t('episode.model.engineAlertHint') }}</p>
+          </div>
+          <footer class="dialog-foot">
+            <button class="btn" :disabled="recheckingEngine" @click="recheckEngine">
+              <Loader2 v-if="recheckingEngine" :size="12" class="animate-spin" />
+              {{ t('episode.model.engineRecheck') }}
+            </button>
+            <button class="btn" @click="engineAlert = null">{{ t('common.gotIt') }}</button>
+            <button class="btn btn-primary" @click="goEngineSettings">{{ t('layout.banner.goSettings') }}</button>
+          </footer>
+        </div>
+      </div>
+
       <ConfirmDialog
         :open="assetDelete.open"
         :title="t('episode.delete.title', { type: assetDeleteTypeLabel })"
@@ -1488,7 +1520,7 @@ import {
   Users, FileText, FolderKanban, Clapperboard, Download, Loader2,
   Plus, X, ListTodo, CircleHelp, Clock, Trash2,
 } from 'lucide-vue-next'
-import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, aiConfigAPI, uploadAPI } from '~/composables/useApi'
+import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propAPI, taskAPI, mergeAPI, aiConfigAPI, uploadAPI, localEnvAPI } from '~/composables/useApi'
 import { startTour, autoTour } from '~/composables/useTour'
 import { useAgent } from '~/composables/useAgent'
 import { resolveTextModelSelection } from '~/utils/text-model-selection'
@@ -2379,7 +2411,8 @@ function runningEtaText(sb) {
 // 只有存在生成中的镜头时才走秒级计时，空闲时不占资源
 watch(() => pendingVideoIds.value.length, len => { len ? startClock() : stopClock() }, { immediate: true })
 
-function openBatchVideoConfirm(pool) {
+async function openBatchVideoConfirm(pool) {
+  if (!(await ensureVideoEngine())) return
   const targets = pool.filter(s => !isPendingVideo(s.id))
   if (!targets.length) { toast.info(t('episode.vid.noneToGenerate')); return }
   batchVideoConfirm.value = { open: true, targets }
@@ -3127,6 +3160,7 @@ function batchAttempts(count) {
 }
 
 async function genCharImg(id) {
+  if (!(await ensureImageEngine())) return
   try {
     if (!isPendingCharImage(id)) pendingCharImageIds.value.push(id)
     const char = chars.value.find(c => c.id === id)
@@ -3153,7 +3187,8 @@ async function genCharImg(id) {
     toastError(e)
   }
 }
-function batchCharImages() {
+async function batchCharImages() {
+  if (!(await ensureImageEngine())) return
   const ids = visualChars.value.filter(c => !(c.image_url || c.imageUrl)).map(c => c.id)
   if (!ids.length) { toast.info(t('episode.image.allCharsDone')); return }
   pendingCharImageIds.value = [...new Set([...pendingCharImageIds.value, ...ids])]
@@ -3175,6 +3210,7 @@ function batchCharImages() {
   })
 }
 async function genSceneImg(id) {
+  if (!(await ensureImageEngine())) return
   try {
     if (!isPendingSceneImage(id)) pendingSceneImageIds.value.push(id)
     const scene = scenes.value.find(s => s.id === id)
@@ -3205,6 +3241,7 @@ function isPendingPropImage(id) {
   return pendingPropImageIds.value.includes(id)
 }
 async function genPropImg(id) {
+  if (!(await ensureImageEngine())) return
   try {
     if (!isPendingPropImage(id)) pendingPropImageIds.value.push(id)
     const prop = propItems.value.find(p => p.id === id)
@@ -3231,7 +3268,8 @@ async function genPropImg(id) {
     toastError(e)
   }
 }
-function batchSceneImages() {
+async function batchSceneImages() {
+  if (!(await ensureImageEngine())) return
   const ids = scenes.value.filter(s => !(s.image_url || s.imageUrl)).map(s => s.id)
   if (!ids.length) { toast.info(t('episode.image.allScenesDone')); return }
   pendingSceneImageIds.value = [...new Set([...pendingSceneImageIds.value, ...ids])]
@@ -3247,7 +3285,8 @@ function batchSceneImages() {
     toast.warning(t('episode.image.stillRunning'))
   })
 }
-function batchPropImages() {
+async function batchPropImages() {
+  if (!(await ensureImageEngine())) return
   const ids = propItems.value.filter(p => !(p.image_url || p.imageUrl)).map(p => p.id)
   if (!ids.length) { toast.info(t('episode.image.allPropsDone')); return }
   pendingPropImageIds.value = [...new Set([...pendingPropImageIds.value, ...ids])]
@@ -3566,6 +3605,8 @@ async function genVid(sb, opts = {}) {
   const latest = latestVideoTask(sb.id)
   const forceNew = opts.forceNew || latest?.status === 'failed'
   if (forceNew && !window.confirm(t('episode.recovery.confirmNew'))) return
+  // 恢复已有任务不需要配置；只有真正提交新视频任务时才校验引擎就绪
+  if (!(await ensureVideoEngine())) return
   const referenceImages = getShotReferenceImages(sb)
   // 参考素材完全来自分镜绑定的角色/场景/道具图片
   const params = {
@@ -3687,7 +3728,113 @@ async function loadConfigs() {
   } catch (e) { console.error('Failed to load AI configs', e) }
 }
 
-onMounted(async () => { await refresh(); loadConfigs(); syncExtractStatus() })
+// ===== 本地 ComfyUI 就绪状态（顶栏标识 + 生成守卫）=====
+// 与设置页同一检测源 GET /local-env：真实请求 ComfyUI（1.5s 短超时）拿可达性，
+// 并校验图片/视频工作流模板结构。只看「启用开关」不够——服务没启起来同样不可用。
+const localEnv = ref(null)
+let localEnvCheckedAt = 0
+
+/** ComfyUI 真的可用 = 已启用 + 服务可达 + 对应模板通过结构校验 */
+const comfyImageReady = computed(() => {
+  const env = localEnv.value
+  if (!env?.enabled || !env?.comfyui?.reachable) return false
+  return !!(env.templates?.image?.ok || env.templates?.imageEdit?.ok)
+})
+const comfyVideoReady = computed(() => {
+  const env = localEnv.value
+  return !!(env?.enabled && env?.comfyui?.reachable && env?.templates?.video?.ok)
+})
+
+/** 拉取环境报告；force=false 时 3 秒内复用，避免连点重复探测 */
+async function refreshLocalEnv(force = false) {
+  if (!force && Date.now() - localEnvCheckedAt < 3000) return localEnv.value
+  try {
+    localEnv.value = await localEnvAPI.status()
+  } catch {
+    localEnv.value = null
+  }
+  localEnvCheckedAt = Date.now()
+  return localEnv.value
+}
+
+const localEngineReady = computed(() => comfyImageReady.value && comfyVideoReady.value)
+const localEnginePartial = computed(() => comfyImageReady.value !== comfyVideoReady.value)
+const localEngineStatusText = computed(() => {
+  if (localEngineReady.value) return t('episode.model.localEngineReady')
+  if (localEnginePartial.value) return t('episode.model.localEnginePartial')
+  return t('episode.model.localEngineNotReady')
+})
+// 复用全局 tag 状态色：就绪=绿、部分就绪=黄、未就绪=红
+const localEngineTagClass = computed(() => localEngineReady.value
+  ? 'tag-success'
+  : localEnginePartial.value ? 'tag-warning' : 'tag-error')
+const localEngineTitle = computed(() => {
+  const env = localEnv.value
+  if (!env) return t('episode.model.localEngineHintUnknown')
+  if (!env.enabled) return t('episode.model.localEngineHintDisabled')
+  const reasons = (env.blockers || []).slice(0, 3).join('；')
+  return reasons
+    ? t('episode.model.localEngineHintBlocked', { reasons })
+    : t('episode.model.localEngineHint', { url: env.comfyui?.url || '-' })
+})
+
+// ===== 生成前置校验 =====
+// 创建集时不校验图片/视频配置（可以先写剧本），改为点击「生成」时拦截。
+// 每次点击先重检（3 秒内复用），用户刚启动 ComfyUI 时不会被旧状态挡住。
+const imageEngineReady = computed(() => imageModelOptions.value.length > 0 || comfyImageReady.value)
+const videoEngineReady = computed(() => videoModelOptions.value.length > 0 || comfyVideoReady.value)
+
+// 未就绪时用居中对话框提示（角落 toast 容易错过），并提供直达设置的入口
+const engineAlert = ref(null)
+const recheckingEngine = ref(false)
+
+/** 图片生成守卫：未就绪时弹窗并返回 false，调用方直接中断 */
+async function ensureImageEngine() {
+  await refreshLocalEnv()
+  if (imageEngineReady.value) return true
+  engineAlert.value = { kind: 'image' }
+  return false
+}
+
+/** 视频生成守卫：未就绪时弹窗并返回 false，调用方直接中断 */
+async function ensureVideoEngine() {
+  await refreshLocalEnv()
+  if (videoEngineReady.value) return true
+  engineAlert.value = { kind: 'video' }
+  return false
+}
+
+const engineAlertTitle = computed(() => t(engineAlert.value?.kind === 'video'
+  ? 'episode.model.videoNotReadyTitle' : 'episode.model.imageNotReadyTitle'))
+const engineAlertDesc = computed(() => t(engineAlert.value?.kind === 'video'
+  ? 'episode.model.videoNotReadyDesc' : 'episode.model.imageNotReadyDesc'))
+/** 后端给出的具体未就绪原因（比固定文案更准确） */
+const engineAlertReasons = computed(() => (localEnv.value?.blockers || []).slice(0, 3))
+
+/** 弹窗内「重新检测」：ComfyUI 刚启动时不必来回跳页面 */
+async function recheckEngine() {
+  recheckingEngine.value = true
+  try {
+    await refreshLocalEnv(true)
+    const ready = engineAlert.value?.kind === 'video' ? videoEngineReady.value : imageEngineReady.value
+    if (ready) {
+      engineAlert.value = null
+      toast.success(t('episode.model.engineRecheckOk'))
+    } else {
+      toast.warning(t('episode.model.engineRecheckFailed'))
+    }
+  } finally {
+    recheckingEngine.value = false
+  }
+}
+
+/** 跳到设置页「AI 与算力」并滚动到本地算力面板 */
+function goEngineSettings() {
+  engineAlert.value = null
+  navigateTo('/settings?tab=ai&focus=local-engine')
+}
+
+onMounted(async () => { await refresh(); loadConfigs(); syncExtractStatus(); refreshLocalEnv(true) })
 
 // ===== 应用内引导（工作台）：沿左侧进度栏走 6 步流水线 =====
 const EPISODE_TOUR = [
@@ -3701,6 +3848,38 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
 </script>
 
 <style scoped>
+/* 生成未就绪弹窗 */
+.engine-alert-dialog { max-width: 420px; }
+.engine-alert-desc { font-size: 13px; line-height: 1.7; color: var(--text-1); }
+.engine-alert-reasons {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--error-bg);
+}
+.engine-alert-reasons-title {
+  font: 600 11.5px var(--font-body);
+  color: var(--error);
+  margin-bottom: 4px;
+}
+.engine-alert-reasons ul { margin: 0; padding-left: 16px; }
+.engine-alert-reasons li {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-2);
+  word-break: break-all;
+}
+.engine-alert-hint { margin-top: 10px; font-size: 12px; line-height: 1.6; color: var(--text-3); }
+/* 顶栏本地 ComfyUI 就绪标识：状态点取 currentColor，跟随 tag-success/warning/error 配色 */
+.local-engine-tag { display: inline-flex; align-items: center; gap: 6px; }
+.local-engine-tag::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
 .voice-reference-hint {
   margin: 8px 0 0;
   font-size: 11px;

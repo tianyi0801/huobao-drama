@@ -14,6 +14,7 @@ import MigrateOverlay from '~/components/MigrateOverlay.vue'
 import { useDesktopBridge } from '~/composables/useDesktopBridge'
 import { useMigrateState } from '~/composables/useMigrateState'
 import { useTheme } from '~/composables/useTheme'
+import { settingsAPI } from '~/composables/useApi'
 
 const { t } = useI18n()
 const { resolvedTheme } = useTheme()
@@ -24,7 +25,32 @@ useHead(() => ({ title: t('app.title') }))
 const bridge = useDesktopBridge()
 const { state, begin, update, end } = useMigrateState()
 
+/**
+ * 升级后一次性告知：内置提示词与技能已按新版覆盖（覆盖前后端自动备份）。
+ * 纯提示不打断操作；展示过立即清除，保证只出现一次。
+ */
+async function notifyWorkspaceSync() {
+  try {
+    const { notice } = await settingsAPI.workspaceNotice()
+    if (!notice) return
+    const message = t(notice.incomplete ? 'app.workspaceSyncIncomplete' : 'app.workspaceSyncNotice', {
+      version: notice.version ?? '?',
+      overwritten: notice.overwritten ?? 0,
+      added: notice.added ?? 0,
+      removed: notice.removed ?? 0,
+    })
+    const backup = notice.backupDir ? ` ${t('app.workspaceSyncBackup', { backup: notice.backupDir })}` : ''
+    if (notice.incomplete) toast.warning(message + backup, { duration: 15000 })
+    else toast.info(message + backup, { duration: 15000 })
+    await settingsAPI.dismissWorkspaceNotice()
+  } catch {
+    /* 静默：告知失败不影响正常使用 */
+  }
+}
+
 onMounted(() => {
+  void notifyWorkspaceSync()
+
   if (!bridge) return
   bridge.onMigrateProgress((p) => {
     if (p.phase === 'done') {

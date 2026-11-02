@@ -1,7 +1,10 @@
 {
   "app": {
     "title": "화바오 숏드라마",
-    "updateAvailable": "새 버전 v{version}을 사용할 수 있습니다. 「설정 → 업데이트 정보」에서 업그레이드하세요"
+    "updateAvailable": "새 버전 v{version}을 사용할 수 있습니다. 「설정 → 업데이트 정보」에서 업그레이드하세요",
+    "workspaceSyncNotice": "내장 프롬프트와 스킬을 v{version}에 동기화했습니다(덮어쓰기 {overwritten}개, 추가 {added}개, 정리 {removed}개).",
+    "workspaceSyncIncomplete": "내장 프롬프트와 스킬 동기화가 완료되지 않았습니다(덮어쓰기 {overwritten}개, 추가 {added}개, 정리 {removed}개). 다음 실행 시 다시 시도합니다.",
+    "workspaceSyncBackup": "이전 내용은 {backup}에 백업되었습니다."
   },
   "characterVoice": {
     "title": "캐릭터 음색",
@@ -25,6 +28,7 @@
   },
   "common": {
     "confirm": "확인",
+    "gotIt": "확인",
     "cancel": "취소",
     "back": "뒤로",
     "saved": "저장됨",
@@ -210,7 +214,7 @@
       "resolution": "영상 화질 (완성)",
       "resolutionPlaceholder": "화질 선택",
       "resolutionHint": "여기서 선택하는 값은 최종 완성 해상도입니다. 로컬 엔진이 2차 패스 배율로 1차 패스 단계를 역산합니다.",
-      "lockCopy": "생성 시 현재 활성화된 이미지·영상 생성 기능이 고정됩니다.",
+      "lockCopy": "생성 후 바로 대본을 작성할 수 있습니다. 이미지·영상 모델은 실제 생성 시 검증하며, 미설정이면 설정 안내가 표시됩니다.",
       "creating": "생성 중...",
       "create": "생성",
       "added": "새 화가 추가되었습니다"
@@ -289,15 +293,6 @@
     "ai": {
       "title": "AI 서비스 설정",
       "desc": "먼저 추천 템플릿으로 설정을 만들고, 서비스 유형별로 미세 조정합니다. 워크벤치에서 화를 생성할 때 선택한 이미지·영상 기능이 고정됩니다.",
-      "quickTitle": "화바오 빠른 설정",
-      "recommended": "추천",
-      "quickDesc": "Huobao API Key를 입력하면 텍스트·이미지·영상 세 개의 추천 설정을 한 번에 작성합니다.",
-      "getKey": "Huobao API Key 받기",
-      "regionCn": "중국",
-      "regionCom": "해외",
-      "applyQuick": "화바오 설정 작성",
-      "manualTitle": "수동 템플릿",
-      "manualDesc": "서비스 유형을 선택하면 추천 `provider / base URL / model`이 템플릿에서 입력됩니다.",
       "activeCount": "{n}개 활성화됨",
       "hasKey": "설정됨",
       "noKey": "키 없음",
@@ -305,8 +300,6 @@
       "setDefault": "이 유형의 기본 모델로 설정",
       "noBaseUrl": "Base URL 미설정",
       "test": "테스트",
-      "apiKeyRequired": "Huobao API Key를 입력하세요",
-      "quickApplied": "화바오 빠른 설정이 작성되었습니다",
       "defaultModelSwitched": "기본 {type} 모델이 {model}(으)로 변경되었습니다",
       "meta": {
         "text": "대본 재작성, 캐릭터·장면 추출, 스토리보드 분해 등 Agent 텍스트 기능",
@@ -485,7 +478,24 @@
     },
     "model": {
       "defaultWith": "기본 · {model}",
-      "notConfigured": "미설정"
+      "notConfigured": "미설정",
+      "localEngine": "로컬 ComfyUI",
+      "localEngineReady": "준비됨",
+      "localEnginePartial": "일부 준비됨",
+      "localEngineNotReady": "준비 안 됨",
+      "localEngineHint": "로컬 ComfyUI {url}｜이미지·영상 워크플로 모두 검사 통과",
+      "localEngineHintUnknown": "로컬 엔진 상태를 아직 확인하지 않았습니다",
+      "localEngineHintBlocked": "준비 안 됨: {reasons}",
+      "localEngineHintDisabled": "로컬 엔진이 비활성화되어 있습니다. 「설정 → 로컬 연산」에서 활성화하고 워크플로를 연결하세요",
+      "imageNotReadyTitle": "이미지 생성 준비 안 됨",
+      "imageNotReadyDesc": "사용 가능한 이미지 생성 기능이 없습니다. 「설정 → 로컬 연산」에서 이미지 워크플로를 설정하고(ComfyUI 실행 여부도 확인) 다시 시도하세요.",
+      "videoNotReadyTitle": "영상 생성 준비 안 됨",
+      "videoNotReadyDesc": "사용 가능한 영상 생성 기능이 없습니다. 「설정 → 로컬 연산」에서 영상 워크플로를 설정하고(ComfyUI 실행 여부도 확인) 다시 시도하세요.",
+      "engineAlertReasonsTitle": "준비 안 된 이유",
+      "engineAlertHint": "대본·스토리보드·프롬프트 등 텍스트 기능은 영향을 받지 않으므로 먼저 진행할 수 있습니다.",
+      "engineRecheck": "다시 검사",
+      "engineRecheckOk": "준비되었습니다. 생성을 시작할 수 있습니다",
+      "engineRecheckFailed": "아직 준비되지 않았습니다. ComfyUI 실행과 워크플로 연결을 확인하세요"
     },
     "sidebar": {
       "inProgress": "진행 중",
@@ -951,14 +961,10 @@
       },
       "settings": {
         "title": "1단계 · AI 서비스 설정",
-        "desc": "모든 AI 기능에 사전 설정이 필요합니다. 설정 페이지에서 Huobao API 키를 붙여넣어 텍스트/이미지/영상을 한 번에 설정하세요."
+        "desc": "모든 AI 기능에 사전 설정이 필요합니다. 설정 페이지에서 텍스트 모델 설정을 추가하고 자신의 API 키를 입력하세요."
       }
     },
     "settings": {
-      "quick": {
-        "title": "가장 빠른 설정: 빠른 설정",
-        "desc": "Huobao API 키를 붙여넣으면 추천 설정 3종(텍스트/이미지/영상)을 한 번에 등록합니다. 연결 테스트 지원."
-      },
       "nav": {
         "title": "모든 설정이 여기에",
         "desc": "왼쪽에서 섹션 전환: AI 서비스, 일반(UI·생성 언어), 스타일 프리셋, Agent 프롬프트와 스킬, 저장소, 정보."

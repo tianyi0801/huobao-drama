@@ -1,7 +1,10 @@
 {
   "app": {
     "title": "火宝短剧",
-    "updateAvailable": "发现新版本 v{version}，可在「设置 → 关于更新」中升级"
+    "updateAvailable": "发现新版本 v{version}，可在「设置 → 关于更新」中升级",
+    "workspaceSyncNotice": "内置提示词与技能已同步到 v{version}：覆盖 {overwritten} 个、新增 {added} 个、清理 {removed} 个。",
+    "workspaceSyncIncomplete": "内置提示词与技能同步未完成：已覆盖 {overwritten} 个、新增 {added} 个、清理 {removed} 个。下次启动将重试。",
+    "workspaceSyncBackup": "原内容已备份到 {backup}。"
   },
   "characterVoice": {
     "title": "角色音色",
@@ -25,6 +28,7 @@
   },
   "common": {
     "confirm": "确认",
+    "gotIt": "知道了",
     "cancel": "取消",
     "back": "返回",
     "saved": "已保存",
@@ -210,7 +214,7 @@
       "resolution": "视频清晰度（成片）",
       "resolutionPlaceholder": "选择清晰度",
       "resolutionHint": "这里选的是最终成片分辨率。本地引擎会按二采倍率反推一采档位（成片 720P + 1.5 倍 → 一采 480P）。",
-      "lockCopy": "创建后自动锁定当前启用的图片与视频生成能力。",
+      "lockCopy": "创建后可直接写剧本；图片与视频模型在真正生成时校验，未配置时会提示前往设置。",
       "creating": "创建中...",
       "create": "创建",
       "added": "已添加新集"
@@ -289,15 +293,6 @@
     "ai": {
       "title": "AI 模型与算力",
       "desc": "文本模型走云端 API，图片与视频走本机 ComfyUI。按 ① ② 顺序配置即可。",
-      "quickTitle": "火宝快捷配置（仅文本模型）",
-      "recommended": "推荐",
-      "quickDesc": "输入 Huobao API Key，一键写入文本模型配置。图片与视频改由本机生成了，不在这里配。",
-      "getKey": "前往火宝获取 Key",
-      "regionCn": "国内",
-      "regionCom": "国外",
-      "applyQuick": "写入火宝配置",
-      "manualTitle": "手动模板",
-      "manualDesc": "也可以用自己的 API Key：点下面的「文本」用模板填充 provider / base URL / model。",
       "activeCount": "{n} 已启用",
       "hasKey": "已配置",
       "noKey": "无密钥",
@@ -305,8 +300,6 @@
       "setDefault": "设为该类型默认模型",
       "noBaseUrl": "未设置 Base URL",
       "test": "测试",
-      "apiKeyRequired": "请填写 Huobao API Key",
-      "quickApplied": "火宝快捷配置已写入",
       "defaultModelSwitched": "默认{type}模型已切换为 {model}",
       "meta": {
         "text": "剧本改写、角色场景提取、分镜拆解等 Agent 文本能力",
@@ -542,7 +535,23 @@
     "model": {
       "defaultWith": "默认 · {model}",
       "notConfigured": "未配置",
-      "localEngine": "本地 ComfyUI"
+      "localEngine": "本地 ComfyUI",
+      "localEngineReady": "就绪",
+      "localEnginePartial": "部分就绪",
+      "localEngineNotReady": "未就绪",
+      "localEngineHint": "本地 ComfyUI {url}｜图片与视频工作流均已通过检测",
+      "localEngineHintUnknown": "尚未检测本地引擎状态",
+      "localEngineHintBlocked": "未就绪：{reasons}",
+      "localEngineHintDisabled": "未启用本地引擎，请在「设置 → 本地算力」中启用并绑定工作流",
+      "imageNotReadyTitle": "图片生成未就绪",
+      "imageNotReadyDesc": "当前没有可用的图片生成能力。请到「设置 → 本地算力」绑定图片工作流（并确认 ComfyUI 已启动），然后再回来生成。",
+      "videoNotReadyTitle": "视频生成未就绪",
+      "videoNotReadyDesc": "当前没有可用的视频生成能力。请到「设置 → 本地算力」绑定视频工作流（并确认 ComfyUI 已启动），然后再回来生成。",
+      "engineAlertReasonsTitle": "未就绪原因",
+      "engineAlertHint": "剧本、分镜、提示词等文本能力不受影响，可以先把内容做完。",
+      "engineRecheck": "重新检测",
+      "engineRecheckOk": "已就绪，可以开始生成了",
+      "engineRecheckFailed": "仍未就绪，请确认 ComfyUI 已启动并已绑定工作流"
     },
     "sidebar": {
       "inProgress": "进行中",
@@ -1008,14 +1017,10 @@
       },
       "settings": {
         "title": "第 1 步 · 配置 AI 服务",
-        "desc": "所有 AI 功能都要先配置。点这里进「设置」页，粘贴 Huobao API Key 一键完成文本/图片/视频三条配置。"
+        "desc": "所有 AI 功能都要先配置。点这里进「设置」页，新增一条文本模型配置并填入自己的 API Key 即可。"
       }
     },
     "settings": {
-      "quick": {
-        "title": "最快上手：快捷配置",
-        "desc": "粘贴 Huobao API Key，一键写入文本、图片、视频三条推荐配置，支持连通性测试。"
-      },
       "nav": {
         "title": "全部配置都在这",
         "desc": "左侧切换：AI 服务、通用（界面语言/内容语言）、风格预设、Agent 提示词与技能、存储位置、关于更新。"

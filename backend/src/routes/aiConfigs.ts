@@ -61,7 +61,8 @@ function buildProbe(serviceType: string, provider: string, baseUrl: string, mode
     }
   }
 
-  if (p === 'openai') {
+  if (p === 'openai' || p === 'xiaomi-mimo' || p === 'deepseek') {
+    // OpenAI 兼容协议（xiaomi-mimo / deepseek），用 GET /v1/models 探测鉴权与连通性
     return {
       method: 'GET',
       url: joinProviderUrl(baseUrl, '/v1', '/models'),

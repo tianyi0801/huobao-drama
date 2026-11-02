@@ -89,71 +89,6 @@
               {{ textModelReady ? t('settings.ai.ready') : t('settings.ai.notReady') }}
             </span>
           </div>
-          <section class="card quick-card">
-            <div class="quick-card-head">
-              <div class="setup-title">{{ t('settings.ai.quickTitle') }}</div>
-              <span class="tag tag-accent">{{ t('settings.ai.recommended') }}</span>
-            </div>
-            <p class="setup-desc">
-              {{ t('settings.ai.quickDesc') }}
-              <a class="huobao-site-link" :href="huobaoSiteUrl" target="_blank" rel="noopener noreferrer">
-                {{ t('settings.ai.getKey') }}
-                <ExternalLink :size="12" :stroke-width="1.8" />
-              </a>
-            </p>
-            <div class="huobao-quick-row">
-              <input v-model="huobaoApiKey" class="input" type="password" placeholder="Huobao API Key" />
-              <div class="lang-picker">
-                <button
-                  type="button"
-                  :class="['lang-option', { on: huobaoRegion === 'cn' }]"
-                  @click="huobaoRegion = 'cn'"
-                >{{ t('settings.ai.regionCn') }}</button>
-                <button
-                  type="button"
-                  :class="['lang-option', { on: huobaoRegion === 'com' }]"
-                  @click="huobaoRegion = 'com'"
-                >{{ t('settings.ai.regionCom') }}</button>
-              </div>
-              <button class="btn btn-primary" :disabled="huobaoSaving" @click="applyHuobaoQuickConfig">
-                <Loader2 v-if="huobaoSaving" :size="13" class="animate-spin" />
-                <Sparkles v-else :size="13" />
-                {{ t('settings.ai.applyQuick') }}
-              </button>
-            </div>
-            <div class="huobao-quick-models">
-              <div v-for="q in huobaoQuickConfigs" :key="q.name" class="hqm-row">
-                <span class="hqm-label">{{ serviceMeta[q.service_type].label }}</span>
-                <span class="hqm-provider">
-                  <img v-if="providerIconUrl(q.provider)" :src="providerIconUrl(q.provider)" class="hqm-provider-icon" alt="" />
-                  {{ q.provider }}
-                </span>
-                <span class="hqm-models mono">
-                  <span v-for="(m, i) in q.model" :key="m" :class="['hqm-model', { 'is-default': i === 0 }]">
-                    {{ m }}<em v-if="i === 0">{{ t('common.default') }}</em>
-                  </span>
-                </span>
-              </div>
-            </div>
-          </section>
-          <section class="card setup-panel">
-            <div class="setup-panel-head compact">
-              <div>
-                <div class="setup-title">{{ t('settings.ai.manualTitle') }}</div>
-                <div class="setup-desc">{{ t('settings.ai.manualDesc') }}</div>
-              </div>
-            </div>
-            <div class="template-row">
-              <button
-                v-for="st in serviceTypes"
-                :key="st.type"
-                class="template-type-chip"
-                @click="startAddCfg(st.type)"
-              >
-                {{ st.label }}
-              </button>
-            </div>
-          </section>
           <div class="sections">
             <section v-for="st in serviceTypes" :key="st.type" class="card svc-group">
               <div class="svc-group-head">
@@ -705,7 +640,7 @@
 </template>
 
 <script setup>
-import { Plus, Pencil, Trash2, FileText, ChevronDown, Check, Loader2, Bot, Cpu, Sparkles, Palette, ExternalLink, Star, HardDrive, Database, RefreshCw, Download, Languages, SunMoon, X } from 'lucide-vue-next'
+import { Plus, Pencil, Trash2, FileText, ChevronDown, Check, Loader2, Bot, Cpu, Sparkles, Palette, Star, HardDrive, Database, RefreshCw, Download, Languages, SunMoon, X } from 'lucide-vue-next'
 import BaseSelect from '~/components/BaseSelect.vue'
 import { toast } from 'vue-sonner'
 import { toastError } from '~/composables/useToast'
@@ -719,8 +654,10 @@ import { startTour, autoTour } from '~/composables/useTour'
 import { confirmUnifiedLanguage } from '~/composables/useUnifiedLanguage'
 
 const { t, locale } = useI18n()
+const route = useRoute()
 
 const showBrandImage = ref(true)
+// 工作台「生成未就绪」弹窗会带 ?tab=ai&focus=local-engine 跳进来，tab 在 onMounted 里按白名单应用
 const tab = ref('ai')
 const baseTabs = computed(() => [
   { id: 'ai', label: t('settings.tabs.ai'), icon: Cpu },
@@ -737,11 +674,6 @@ const cfgDialog = ref(false)
 const cfgEditId = ref(null)
 const cfgTesting = ref(false)
 const cfgTestResult = ref(null)
-const huobaoApiKey = ref('')
-const huobaoSaving = ref(false)
-// 火宝节点选择：默认跟随界面语言（中文→国内 .cn，其他→国外 .com），一键配置与取 Key 链接共用
-const huobaoRegion = ref(locale.value?.startsWith('zh') ? 'cn' : 'com')
-const huobaoSiteUrl = computed(() => `https://api.firemux.${huobaoRegion.value}`)
 const cfgForm = reactive({ name: '', provider: '', api_key: '', base_url: '', models: [], service_type: 'text', priority: 0, temperature: '' })
 // 模型标签编辑器：首位即默认模型；输入框支持回车添加、逗号/换行批量粘贴
 const modelInput = ref('')
@@ -769,7 +701,7 @@ function pinModelTop(i) {
 const serviceTypes = computed(() => [
   { type: 'text', label: t('common.serviceType.text') },
 ])
-const providers = ['gemini', 'openai', 'volcengine', 'minimax', 'aliyun']
+const providers = ['gemini', 'openai', 'volcengine', 'minimax', 'aliyun', 'xiaomi-mimo', 'deepseek']
 const providerSelectOptions = computed(() => providers.map(p => ({ label: p, value: p })))
 const serviceMeta = computed(() => ({
   text: { label: t('common.serviceType.text'), desc: t('settings.ai.meta.text') },
@@ -780,6 +712,10 @@ const providerPresets = {
   text: {
     gemini: { label: 'Gemini 官方', baseUrl: 'https://generativelanguage.googleapis.com', models: ['gemini-3.8-flash', 'gemini-3.1-pro-preview', 'gemini-3-flash-preview'] },
     openai: { label: 'OpenAI 官方', baseUrl: 'https://api.openai.com', models: ['deepseek-v4-pro', 'gpt-5.6-terra'] },
+    // 小米 MiMo：OpenAI 兼容协议（https://api.xiaomimimo.com/v1），后端复用 openai 请求链路
+    'xiaomi-mimo': { label: '小米 MiMo 官方（OpenAI 兼容）', baseUrl: 'https://api.xiaomimimo.com', models: ['mimo-v2.6-pro', 'mimo-v2.6-flash'] },
+    // DeepSeek 官方：OpenAI 兼容协议（https://api.deepseek.com/v1），后端复用 openai 请求链路
+    deepseek: { label: 'DeepSeek 官方（OpenAI 兼容）', baseUrl: 'https://api.deepseek.com', models: ['deepseek-flash'] },
   },
   image: {
     gemini: { label: 'Gemini 官方', baseUrl: 'https://generativelanguage.googleapis.com', models: ['gemini-3-pro-image', 'gemini-3.1-flash-image'] },
@@ -791,15 +727,6 @@ const providerPresets = {
     minimax: { label: 'MiniMax H3 官方', baseUrl: 'https://api.minimaxi.com', models: ['MiniMax-H3'] },
   },
 }
-const huobaoQuickConfigs = computed(() => {
-  const base = huobaoSiteUrl.value
-  return [
-    { service_type: 'text', provider: 'gemini', name: '火宝文本服务 · Gemini', base_url: base, model: ['gemini-3.8-flash', 'gemini-3.1-pro-preview', 'gemini-3-flash-preview'], priority: 101 },
-    { service_type: 'text', provider: 'openai', name: '火宝文本服务 · OpenAI', base_url: base, model: ['deepseek-v4-pro', 'deepseek-v4-flash', 'gpt-5.6-terra'], priority: 100 },
-    // 图片/视频改由本地 ComfyUI 工作流生成，快捷配置不再写入云端图片/视频服务
-  ]
-})
-
 function byType(t) { return (Array.isArray(cfgs.value) ? cfgs.value : []).filter(c => c.service_type === t) }
 
 // 文本模型是唯一的必配项：剧本改写/提取/分镜/提示词都依赖它
@@ -863,26 +790,6 @@ async function setDefaultModel(type, c, m) {
 }
 async function toggleCfg(c) { await aiConfigAPI.update(c.id, { is_active: !c.is_active }); loadCfgs() }
 async function delCfg(id) { await aiConfigAPI.del(id); toast.success(t('index.deleted')); loadCfgs() }
-async function applyHuobaoQuickConfig() {
-  const apiKey = huobaoApiKey.value.trim()
-  if (!apiKey) { toast.warning(t('settings.ai.apiKeyRequired')); return }
-  huobaoSaving.value = true
-  try {
-    for (const preset of huobaoQuickConfigs.value) {
-      const payload = { ...preset, api_key: apiKey }
-      const existing = cfgs.value.find(c => c.name === preset.name || (c.service_type === preset.service_type && c.provider === preset.provider && c.base_url === preset.base_url))
-      if (existing) await aiConfigAPI.update(existing.id, payload)
-      else await aiConfigAPI.create(payload)
-    }
-    toast.success(t('settings.ai.quickApplied'))
-    huobaoApiKey.value = ''
-    await loadCfgs()
-  } catch (e) {
-    toastError(e)
-  } finally {
-    huobaoSaving.value = false
-  }
-}
 function startAddCfg(t) {
   cfgEditId.value = null
   cfgTestResult.value = null
@@ -1249,11 +1156,18 @@ async function saveStyle() {
   } catch (e) { toastError(e) }
 }
 
-onMounted(() => { loadCfgs(); loadAgents(); loadAllSkills(); loadAgentPrompt(selectedAgent.value); loadStylePresets() })
+onMounted(() => {
+  loadCfgs(); loadAgents(); loadAllSkills(); loadAgentPrompt(selectedAgent.value); loadStylePresets()
+  // 支持从工作台「生成未就绪」弹窗直达：指定 tab，并滚动到本地算力面板
+  const wantedTab = String(route.query.tab || '')
+  if (wantedTab && baseTabs.value.some(item => item.id === wantedTab)) tab.value = wantedTab
+  if (route.query.focus === 'local-engine') {
+    setTimeout(() => document.querySelector('.le-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 500)
+  }
+})
 
-// ===== 应用内引导（设置页）：快捷配置 + 手动模板两步 =====
+// ===== 应用内引导（设置页）=====
 const SETTINGS_TOUR = [
-  { element: '.quick-card', titleKey: 'tour.settings.quick.title', descKey: 'tour.settings.quick.desc', popoverSide: 'bottom' },
   { element: '.nav-item:has(.lucide-cpu), .nav-item:nth-of-type(1)', titleKey: 'tour.settings.nav.title', descKey: 'tour.settings.nav.desc', popoverSide: 'right' },
 ]
 onMounted(() => setTimeout(() => autoTour('settings', SETTINGS_TOUR, t), 800))
@@ -1459,7 +1373,8 @@ onBeforeUnmount(stopUsagePoll)
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 28px 0 12px;
+  /* 左右保留 auto：跟随 .settings-scroll > * 的限宽居中，否则标题会脱离内容列贴到左缘 */
+  margin: 28px auto 12px;
   padding-top: 4px;
 }
 .ai-section-head:first-of-type { margin-top: 4px; }
@@ -1478,81 +1393,6 @@ onBeforeUnmount(stopUsagePoll)
 .ai-section-text { flex: 1 1 auto; min-width: 0; }
 .ai-section-title { font: 700 14px var(--font-body); color: var(--text-0); letter-spacing: -0.01em; }
 .ai-section-desc { font: 400 11.5px/1.5 var(--font-body); color: var(--text-3); margin-top: 2px; }
-
-/* 火宝快捷配置 */
-.quick-card {
-  padding: 20px;
-  margin-bottom: 16px;
-  border: 1.5px solid var(--accent);
-}
-.quick-card:hover { border-color: var(--accent); }
-.quick-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
-.setup-title { font-size: 15px; font-weight: 700; color: var(--text-0); }
-.setup-desc { font-size: 12.5px; color: var(--text-2); margin-bottom: 14px; }
-.huobao-site-link {
-  display: inline-flex; align-items: center; gap: 3px;
-  margin-left: 6px;
-  color: var(--accent); text-decoration: none;
-  font-weight: 600; white-space: nowrap;
-}
-.huobao-site-link:hover { text-decoration: underline; }
-.huobao-quick-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 10px;
-  align-items: center;
-}
-.huobao-quick-models {
-  margin-top: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-.hqm-row {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  font-size: 11px;
-  line-height: 1.6;
-}
-.hqm-label {
-  flex-shrink: 0;
-  width: 28px;
-  font-weight: 600;
-  color: var(--text-2);
-}
-.hqm-provider {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: var(--accent-bg);
-  color: var(--accent);
-  font-size: 9px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-}
-.hqm-provider-icon { width: 11px; height: 11px; object-fit: contain; border-radius: 2px; }
-.hqm-models {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  color: var(--text-3);
-}
-.hqm-model.is-default { color: var(--text-1); font-weight: 600; }
-.hqm-model em {
-  font-style: normal;
-  margin-left: 4px;
-  padding: 0 5px;
-  border-radius: 5px;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--accent-text);
-  background: var(--accent-bg);
-}
 
 /* 模型标签编辑器（配置弹窗） */
 .model-chips {
@@ -1600,33 +1440,6 @@ onBeforeUnmount(stopUsagePoll)
 .model-add-row { display: flex; gap: 8px; }
 .model-add-row .input { flex: 1; }
 
-/* 手动模板 */
-.setup-panel { padding: 18px 20px; margin-bottom: 16px; }
-.setup-panel-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 14px;
-}
-.setup-panel-head.compact { margin-bottom: 12px; }
-.template-row { display: flex; flex-wrap: wrap; gap: 8px; }
-.template-type-chip {
-  min-height: var(--button-height-sm);
-  padding: 0 14px;
-  border: none;
-  border-radius: var(--radius-pill);
-  background: var(--button-bg);
-  color: var(--text-1);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1;
-  cursor: pointer;
-  transition: all 0.16s var(--ease-out);
-}
-.template-type-chip:hover { background: var(--button-bg-hover); color: var(--text-0); }
-.template-type-chip:focus-visible { outline: none; box-shadow: 0 0 0 3.5px var(--button-focus); }
-
 /* ===== 内容语言选择器（通用 tab） ===== */
 .lang-picker { display: flex; gap: 2px; padding: 3px; border-radius: var(--radius-pill); background: var(--overlay-track); }
 .lang-option {
@@ -1670,6 +1483,8 @@ onBeforeUnmount(stopUsagePoll)
 .provider-badge[data-provider="openai"] { background: #10a37f; }
 .provider-badge[data-provider="gemini"] { background: #4285f4; }
 .provider-badge[data-provider="volcengine"] { background: #ff5c39; }
+.provider-badge[data-provider="xiaomi-mimo"] { background: #ff6900; }
+.provider-badge[data-provider="deepseek"] { background: #4d6bfe; }
 /* 有厂商图标时用中性底，彩色图标直接展示 */
 .provider-badge.has-icon { background: var(--bg-2); }
 .provider-badge-icon { width: 20px; height: 20px; object-fit: contain; }

@@ -497,7 +497,8 @@ onMounted(load)
 </script>
 
 <style scoped>
-.le-panel { display: flex; flex-direction: column; gap: 12px; }
+/* 此前依赖 settings.vue 的 .setup-panel scoped 样式提供内边距（子组件根元素继承父 scope id），现自带 */
+.le-panel { display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; }
 .le-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .le-url { flex: 1 1 240px; min-width: 200px; }
 .le-switch { position: relative; display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; cursor: pointer; }

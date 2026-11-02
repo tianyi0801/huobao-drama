@@ -69,3 +69,57 @@ export function setToursSeen(ids: unknown): string[] {
     .run()
   return clean
 }
+
+// ─── 内置 workspace 模板同步通知 ───────────────────────────────────
+// 升级时内置 prompt / skill 会覆盖用户目录（产品规则：以内置为准）。
+// 覆盖前自动备份，结果落库供前端「纯告知」一次，避免用户不知情。
+
+/** 一次内置模板同步的结果摘要 */
+export interface WorkspaceSyncNotice {
+  /** 本次同步的模板版本号；模板未声明版本时为 null */
+  version: number | null
+  /** 同步时间（ISO 字符串） */
+  syncedAt: string
+  /** 被新版覆盖的已有文件数 */
+  overwritten: number
+  /** 新增的内置文件数 */
+  added: number
+  /** 清理掉的废弃内置文件数 */
+  removed: number
+  /** 备份目录（相对 workspace 根，如 .backup/v6-20261102120000）；空串表示本次无需备份 */
+  backupDir: string
+  /** 部分同步失败，旧版本状态保留，下次启动重试 */
+  incomplete?: boolean
+}
+
+const WORKSPACE_NOTICE_KEY = 'workspace_sync_notice'
+
+/** 读取待展示的模板同步通知；无通知返回 null */
+export function getWorkspaceSyncNotice(): WorkspaceSyncNotice | null {
+  const row = db.select().from(schema.appSettings)
+    .where(eq(schema.appSettings.key, WORKSPACE_NOTICE_KEY))
+    .get()
+  if (!row?.value) return null
+  try {
+    const parsed = JSON.parse(row.value)
+    return parsed && typeof parsed === 'object' ? parsed as WorkspaceSyncNotice : null
+  } catch {
+    return null
+  }
+}
+
+/** 写入或清除（传 null）模板同步通知 */
+export function setWorkspaceSyncNotice(notice: WorkspaceSyncNotice | null): void {
+  if (!notice) {
+    db.delete(schema.appSettings).where(eq(schema.appSettings.key, WORKSPACE_NOTICE_KEY)).run()
+    return
+  }
+  const value = JSON.stringify(notice)
+  db.insert(schema.appSettings)
+    .values({ key: WORKSPACE_NOTICE_KEY, value, updatedAt: now() })
+    .onConflictDoUpdate({
+      target: schema.appSettings.key,
+      set: { value, updatedAt: now() },
+    })
+    .run()
+}

@@ -180,6 +180,19 @@ export const settingsAPI = {
   setContentLanguage: (language: string) => api.put('/settings/content-language', { language }),
   // 本地算力是否就绪（首页未配置引导用，不发起网络探测）
   localEngine: () => api.get<{ enabled: boolean; url: string; imageReady: boolean; videoReady: boolean }>('/settings/local-engine'),
+  // 升级后待告知的内置模板同步结果（prompt/skill 已被新版覆盖）
+  workspaceNotice: () => api.get<{ notice: WorkspaceSyncNotice | null }>('/settings/workspace-notice'),
+  dismissWorkspaceNotice: () => api.post('/settings/workspace-notice/dismiss'),
+}
+
+export interface WorkspaceSyncNotice {
+  version: number | null
+  syncedAt: string
+  overwritten: number
+  added: number
+  removed: number
+  backupDir: string
+  incomplete?: boolean
 }
 
 // 本地 ComfyUI 环境检测
