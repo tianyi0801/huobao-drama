@@ -6,6 +6,8 @@ import { eq } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { mastra } from '../mastra/index.js'
 import { buildAgentRequestContext } from '../agents/context.js'
+import { assertAgentSaved } from '../agents/execution.js'
+import { getComfyConfig } from './comfyui/config.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 
 export interface VideoPromptBatchStatus {
@@ -39,13 +41,7 @@ export async function startVideoPromptBatch(
     : sbs.filter(sb => !(sb.videoPrompt || '').trim())
   if (!pending.length) return { started: false, total: 0 }
 
-  // 视频模型标签：跟随该集锁定的视频配置，供 Agent 按模型特性生成
-  const [ep] = await db.select().from(schema.episodes).where(eq(schema.episodes.id, episodeId))
-  let videoLabel = '默认'
-  if (ep?.videoConfigId) {
-    const [cfg] = await db.select().from(schema.aiServiceConfigs).where(eq(schema.aiServiceConfigs.id, ep.videoConfigId))
-    if (cfg) videoLabel = `${cfg.name} (${cfg.provider})`
-  }
+  const videoLabel = `本地 ComfyUI · ${getComfyConfig().video?.name || 'H3 六节视频工作流'}`
 
   const task: VideoPromptBatchStatus = {
     status: 'running',
@@ -60,22 +56,20 @@ export async function startVideoPromptBatch(
   ;(async () => {
     const agent = mastra.getAgent('prompt_generator')
     if (!agent) throw new Error('视频提示词 Agent 不可用')
-    const requestContext = buildAgentRequestContext({
-      episodeId,
-      dramaId,
-      modelOverride: opts.model || undefined,
-      textConfigId: opts.configId || undefined,
-    })
     for (const sb of pending) {
+      const requestContext = buildAgentRequestContext({
+        episodeId, dramaId, modelOverride: opts.model || undefined, textConfigId: opts.configId || undefined,
+      })
       task.current_storyboard_id = sb.id
       logTaskProgress('VideoPrompt', 'batch-shot', { episodeId, storyboardId: sb.id, index: task.completed + task.failed + 1, total: task.total })
       try {
-        await agent.generate([{
+        const result = await agent.generate([{
           role: 'user',
           content: `请为分镜 #${sb.storyboardNumber}(ID:${sb.id})生成视频提示词(video_prompt)。视频模型:${videoLabel},请根据该模型的特性和时长限制生成。
 请先调用 read_storyboard_context 获取该分镜的画面描述(含【镜头N】子镜头与台词/旁白)、氛围及时长，据此生成 video_prompt，必须是 H3 原生六段结构(小节名固定、顺序不可变)：subject_definitions(每个出场人物一行 <Subject N> 是 @角色名：参考图可见的外貌)、shot_summary(一句话讲清谁·在哪·做什么·结果)、reference_usage(逐张声明用途 identity_reference/scene_reference/object_reference 并明确不提供构图与姿态；不可省略)、detailed_description([Shot N] 起始秒-结束秒：景别/角度/运镜 + 动作 + 台词，≤5 秒写 2 个 [Shot]、6-8 秒写 2-3 个，各段相加等于 duration，切镜点对齐【镜头N】结构)、overall_soundscape(环境音/动作音/对白，无则 N/A)、non_diegetic_music(配乐情绪风格，无则 N/A)。段落内允许多镜头切镜但不跨场景，用 @角色名/@场景名/@道具名 引用素材。然后调用 update_storyboard 保存到分镜 ID:${sb.id}。update_storyboard 参数只传 storyboard_id 和 video_prompt 两个键,不要回传该分镜的其他任何字段,不要重新拆分整集。`,
         }], { maxSteps: 8, requestContext })
-        // 以实际落库为准判定成败
+        assertAgentSaved('prompt_generator', result, requestContext)
+        // 以本次保存回执与实际落库为准，旧值非空不代表本次成功
         const [fresh] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, sb.id))
         if ((fresh?.videoPrompt || '').trim()) task.completed++
         else {

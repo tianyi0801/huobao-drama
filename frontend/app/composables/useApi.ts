@@ -1,7 +1,7 @@
 const BASE = '/api/v1'
 
 async function req<T = any>(method: string, path: string, body?: any): Promise<T> {
-  const opts: RequestInit = { method, headers: { 'Content-Type': 'application/json' } }
+  const opts: RequestInit = { method, headers: { 'Content-Type': 'application/json' }, cache: 'no-store' }
   if (body) opts.body = JSON.stringify(body)
 
   const start = performance.now()

@@ -19,6 +19,8 @@ import { loadAgentPromptFile, loadBasePromptFile } from './prompts.js'
 import { buildLanguageDirective } from './language.js'
 import { getContentLanguageFromRC } from './context.js'
 import { getVoiceReferenceInstructions } from './voice-reference-instructions.js'
+import { registerAgentTools } from './execution.js'
+import { buildLocalAgentContract } from './local-contract.js'
 
 // Default prompts (used when workspace/prompts/<type>.md 文件缺失时兜底)
 export const DEFAULT_PROMPTS: Record<string, { name: string; instructions: string }> = {
@@ -57,7 +59,7 @@ export const DEFAULT_PROMPTS: Record<string, { name: string; instructions: strin
 11. 提取本集的关键道具——必须同时满足以下两条，缺一不可：
     a) 直接推动剧情：该物品的出现、交接、损坏或发现会引发情节转折（如凶器、信物、关键文件、定情礼物、证据）；
     b) 值得单独生成图片：后续分镜会给它特写或反复出现，需要固定外观。
-    判定三问（自问自答，任一答"否"即放弃该道具）：① 删掉它剧情是否依然成立？成立 → 不提取；② 它只是角色随手使用的日常物品（手机、筷子、杯子、烟）吗？是 → 不提取；③ 它是场景陈设的一部分（桌椅、灯具、门窗、装饰）吗？是 → 不提取。
+    排除三问（自问自答，以下任一答"是"即放弃该道具）：① 删掉它剧情是否依然成立？成立 → 不提取；② 它只是角色随手使用的日常物品（手机、筷子、杯子、烟）吗？是 → 不提取；③ 它是场景陈设的一部分（桌椅、灯具、门窗、装饰）吗？是 → 不提取。
     宁可少提，不要多提：一集通常 0-3 个关键道具，超过 3 个时按剧情重要性排序只保留前 3 个；没有符合条件的道具就一个都不要提取
 12. 对每个道具：若同名已存在则合并更新，若不存在则新增
 13. 调用 save_dedup_props 保存道具（去重合并，自动处理新增和更新，并关联到当前集）；若没有需要提取的道具，调用时传空数组即可，不要强行凑数
@@ -83,7 +85,7 @@ export const DEFAULT_PROMPTS: Record<string, { name: string; instructions: strin
 1. 调用 read_storyboard_context 读取剧本、角色列表、场景列表、道具列表
 2. 先识别剧本的叙事节拍（如【开场】【触发】【高潮】【收尾】等标记或叙事转折点），节拍边界强制切段；再将每个节拍拆为 1 到多个分镜段落，总体保持剧情完整连续
 3. 为每个段落一并补全生产字段：description（画面描述）与 video_prompt（视频提示词）同步产出，规则分别见下
-4. 分批调用 save_storyboards 保存全部分镜段落：第一批调用必须带 replace_existing: true（先清空该集旧分镜再写入，保证整集重新生成时不留旧镜头），后续每批省略 replace_existing（追加保存）。每批最多 8 个段落，shot_number 必须按顺序递增；全部段落保存完成前不要结束（不要只保存部分段落就停止）
+4. 分批调用 save_storyboards 保存全部分镜段落：第一批调用必须带 replace_existing: true（先清空该集旧分镜再写入，保证整集重新生成时不留旧镜头），后续每批省略 replace_existing（追加保存）。每批最多 2 个段落，每轮仅一次 save_storyboards，shot_number 必须按顺序递增；全部段落保存完成前不要结束（不要只保存部分段落就停止）
 
 硬约束（必须遵守）：
 - 不要输出任何规划、分析、推理或解释性文本，不要复述剧本，不要写「我正在…」「首先我需要…」这类话——思考留在模型内部，输出只允许工具调用
@@ -154,7 +156,7 @@ video_prompt 规则（硬约束，H3 六段结构）：
 6. 调用 update_storyboard 保存时参数只传两个键：storyboard_id 和 video_prompt。不要回传该分镜的其他任何字段（title、description、scene_id 等一律不传）
 
 通用规范：
-- 所有提示词使用本次会话语言指令指定的目标语言输出，单段连贯描述，不要分点，不要混入无关词汇
+- 正文使用本次会话目标语言；图片提示词单段连贯描述，video_prompt 保持六节结构，不要混淆两类格式
 - 项目设定的视觉风格描述会由工具在保存图片提示词时自动注入到最终提示词的最前方，不要自行添加风格词
 - 必须实际调用保存工具，不要只在回复中给出提示词`,
   },
@@ -180,9 +182,11 @@ let lastLoggedTextEndpointKey = ''
 const thinkingOffEnabled = (process.env.AI_DISABLE_THINKING ?? 'true').toLowerCase() !== 'false'
 
 function isOfficialTextHost(baseURL: string) {
-  // deepseek：官方 API 与 OpenAI/Gemini 一样不接受中转站专有的 thinking 参数，跳过注入；
-  // 但 max_tokens 注入对其是必要的（见 isOfficialOpenAIHost 的反例说明）
-  return /api\.openai\.com|generativelanguage\.googleapis\.com|api\.xiaomimimo\.com|api\.deepseek\.com/.test(baseURL)
+  try {
+    return ['api.openai.com', 'generativelanguage.googleapis.com'].includes(new URL(baseURL).hostname)
+  } catch {
+    return false
+  }
 }
 
 function openaiThinkingOffPatch(): Record<string, any> {
@@ -201,9 +205,13 @@ function openaiThinkingOffPatch(): Record<string, any> {
   }
 }
 
-function createThinkingOffFetch(providerName: string, baseURL: string): typeof fetch | undefined {
+export function createThinkingOffFetch(providerName: string, baseURL: string): typeof fetch | undefined {
   if (!thinkingOffEnabled || isOfficialTextHost(baseURL)) return undefined
-  const openaiPatch = openaiThinkingOffPatch()
+  // DeepSeek 与 MiMo 官方都支持 thinking.type=disabled，只注入各自文档支持的字段。
+  // 多轮工具调用不完整回传 reasoning_content，因此该链路使用非思考模式。
+  let supportsNativeThinking = false
+  try { supportsNativeThinking = ['api.deepseek.com', 'api.xiaomimimo.com'].includes(new URL(baseURL).hostname) } catch { /* 保留兼容端点处理 */ }
+  const openaiPatch = supportsNativeThinking ? { thinking: { type: 'disabled' } } : openaiThinkingOffPatch()
 
   return async (input: any, init?: any) => {
     try {
@@ -316,6 +324,8 @@ async function getModel(fileModel: string | undefined, modelOverride?: string, t
       provider: textConfig.provider,
       baseUrl: resolvedBaseURL,
       model: modelName,
+      thinkingOff: thinkingOffEnabled && !isOfficialTextHost(resolvedBaseURL),
+      maxOutputTokens: isOfficialOpenAIHost(resolvedBaseURL) ? 'provider-default' : defaultMaxTokens,
       ...(temperature !== null ? { temperature } : {}),
     })
   }
@@ -368,7 +378,7 @@ function buildInstructions(type: string) {
     const skillInstructions = await loadAgentSkills(type, lang)
     const languageDirective = buildLanguageDirective(lang)
     const voiceInstructions = getVoiceReferenceInstructions(type, lang)
-    return [baseInstructions, skillInstructions, voiceInstructions, languageDirective]
+    return [baseInstructions, skillInstructions, buildLocalAgentContract(type, requestContext), voiceInstructions, languageDirective]
       .filter(Boolean)
       .join('\n\n')
   }
@@ -394,7 +404,7 @@ export const agentRegistry: Record<string, Agent> = Object.fromEntries(
       name: DEFAULT_PROMPTS[type].name,
       instructions: buildInstructions(type),
       model: buildModel(type),
-      tools: AGENT_TOOLS[type],
+      tools: registerAgentTools(AGENT_TOOLS[type]),
       workspace: skillWorkspaces[type],
       skillsFormat: 'markdown',
     }),

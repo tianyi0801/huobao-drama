@@ -467,6 +467,29 @@
     }
   },
   "episode": {
+    "logUi": {
+      "showDetails": "ログ詳細",
+      "hideDetails": "ログを閉じる",
+      "savedBatches": "{n} バッチ保存済み",
+      "savedShots": "{n} 絵コンテ保存済み",
+      "calls": "ツール実行 {n} 回",
+      "failures": "失敗 {n} 回",
+      "actions": "実行内容",
+      "grouped": "繰り返し処理を集約",
+      "result": "結果を見る",
+      "waiting": "タスク開始待ち",
+      "processing": "モデル処理中・今回の結果を待っています",
+      "nextBatch": "保存済み・続きの内容を処理中",
+      "syncing": "生成完了・画面を更新中",
+      "tailOnly": "最新の出力のみ",
+      "fullOutput": "全出力を見る",
+      "created": "追加",
+      "merged": "統合 / 再利用",
+      "timeline": "リアルタイム実行記録",
+      "follow": "最新に追従",
+      "reconnect": "再接続",
+      "disconnected": "ログ切断・タスク状態は作業画面で確認"
+    },
     "liveLog": {
       "badge": "ログ",
       "title": "{type}の抽出ログ",

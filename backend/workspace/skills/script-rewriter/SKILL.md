@@ -42,7 +42,7 @@ description: 小说改写为格式化剧本的方法论和规范
 
 1. 先调用 `read_episode_script` 读取原始内容
 2. 分析内容结构（对话、叙述、心理描写的比例）
-3. 调用 `rewrite_to_screenplay` 执行改写
+3. 自己将原文改写为格式化剧本；`rewrite_to_screenplay` 只返回原文与格式说明，不会代替模型改写，已读取原文时无需再次调用
 4. 检查改写结果，确认符合格式化剧本格式
 5. 调用 `save_script` 保存最终结果
 

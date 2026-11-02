@@ -10,12 +10,14 @@ const useAgent = read('app/composables/useAgent.ts')
 const panel = read('app/components/AgentActivityPanel.vue')
 const episode = read('app/views/drama/episode.vue')
 
-test('后端提供 SSE 流式端点，事件覆盖思考 / 工具 / 文本 / 完成 / 错误', () => {
+test('模型沿用 generate，SSE 仅逐轮推送日志，不改变厂商请求协议', () => {
   assert.match(backendRoute, /streamSSE/)
   assert.match(backendRoute, /app\.post\('\/:type\/stream'/)
-  assert.match(backendRoute, /agent\.stream\(/)
-  for (const event of ['start', 'step', 'text', 'reasoning', 'tool-call', 'tool-result', 'done', 'error']) {
-    assert.match(backendRoute, new RegExp(`event: '${event}'`), `缺少 ${event} 事件`)
+  assert.match(backendRoute, /agent\.generate\(/)
+  assert.doesNotMatch(backendRoute, /agent\.stream\(/)
+  assert.match(backendRoute, /onStepFinish/)
+  for (const event of ['start', 'step', 'text', 'tool-call', 'tool-result', 'done', 'error']) {
+    assert.match(backendRoute, new RegExp(`live.send\\('${event}'`), `缺少 ${event} 事件`)
   }
   // 既有非流式端点保持可用（旧前端/脚本兼容）
   assert.match(backendRoute, /app\.post\('\/:type\/chat'/)
@@ -26,10 +28,16 @@ test('useAgent 以 SSE 逐块解析并暴露实时活动状态', () => {
   assert.match(useAgent, /export type AgentPhase = 'idle' \| 'connecting' \| 'thinking' \| 'tool' \| 'done' \| 'error'/)
   assert.match(useAgent, /phase: AgentPhase/)
   assert.match(useAgent, /const activity = reactive<AgentActivity>/)
-  // 手写 SSE 解析：按空行切事件块，兼容 event/data 字段
-  assert.match(useAgent, /indexOf\('\\n\\n'\)/)
-  assert.match(useAgent, /line\.startsWith\('event:'\)/)
-  assert.match(useAgent, /line\.startsWith\('data:'\)/)
+  const parser = read('app/utils/agent-sse.ts')
+  assert.match(useAgent, /consumeAgentSSE\(resp,/)
+  assert.match(useAgent, /event === 'saved'/)
+  assert.match(useAgent, /await onDone\?\.\(\)/)
+  assert.match(parser, /value\.startsWith\('event:'\)/)
+  assert.match(parser, /value\.startsWith\('data:'\)/)
+  assert.match(parser, /if \(!completed\) throw/)
+  assert.match(parser, /reader\.releaseLock\(\)/)
+  assert.match(useAgent, /onScopeDispose/)
+  assert.match(useAgent, /controller\?\.abort\(\)/)
   // 旧后端无流式端点时回退到一次性请求
   assert.match(useAgent, /resp\.status === 404 \|\| resp\.status === 405/)
   assert.match(useAgent, /agent\/\$\{type\}\/chat/)
@@ -40,7 +48,11 @@ test('useAgent 以 SSE 逐块解析并暴露实时活动状态', () => {
 test('AI 活动面板展示阶段文案、工具流水与实时输出', () => {
   assert.match(panel, /defineProps<\{\s*activity: AgentActivity/)
   assert.match(panel, /episode\.activity\.phaseTool/)
-  assert.match(panel, /episode\.activity\.phaseThinking/)
+  assert.match(panel, /episode\.logUi\.processing/)
+  assert.match(panel, /groupActivityTools\(props\.activity\.tools\)/)
+  assert.match(panel, /v-if="expanded" class="agent-live-details"/)
+  assert.match(panel, /max-height: 240px; overflow-y: auto/)
+  assert.doesNotMatch(panel, /v-for="tool in activity\.tools"/)
   assert.match(panel, /episode\.activity\.liveOutput/)
   // 工具名做人类可读映射，未登记时回退原名
   assert.match(panel, /function toolLabel\(name: string\)/)
@@ -51,8 +63,8 @@ test('AI 活动面板展示阶段文案、工具流水与实时输出', () => {
 
 test('工作台的改写与拆分镜都接入了实时面板', () => {
   assert.match(episode, /activity: agentActivity/)
-  assert.match(episode, /<AgentActivityPanel :activity="agentActivity" :agent-type="rt" \/>/)
-  assert.match(episode, /<AgentActivityPanel\s+v-if="rt === 'storyboard_breaker'"/)
+  assert.match(episode, /v-if="agentActivity\.type === 'script_rewriter' && agentActivity\.startedAt"/)
+  assert.match(episode, /v-if="agentActivity\.type === 'storyboard_breaker' && agentActivity\.startedAt"/)
 })
 
 test('四种语言的实时面板文案齐全', () => {

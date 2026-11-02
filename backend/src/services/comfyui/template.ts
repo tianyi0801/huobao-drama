@@ -226,7 +226,7 @@ export function buildSubmission(
       else value = value[binding.index]
     }
     const missing = value === undefined || value === null
-      || (Array.isArray(value) && value.length === 0)
+      || (Array.isArray(value) && value.length === 0 && binding.source !== 'media')
       || (typeof value === 'string' && value.trim() === '')
 
     if (missing) {

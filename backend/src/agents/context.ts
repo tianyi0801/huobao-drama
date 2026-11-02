@@ -4,8 +4,12 @@
  */
 import { RequestContext } from '@mastra/core/request-context'
 import { getContentLanguage, type ContentLanguage } from '../services/app-settings.js'
+import type { AgentSaveReceipt } from './execution.js'
 
 export interface AgentRequestContextValues {
+  saveReceipts?: AgentSaveReceipt[]
+  onSave?: (receipt: AgentSaveReceipt) => void
+  extractTarget?: string
   episodeId: number
   dramaId: number
   modelOverride?: string
@@ -18,6 +22,9 @@ export function buildAgentRequestContext(values: AgentRequestContextValues): Req
   const rc = new RequestContext<AgentRequestContextValues>()
   rc.set('episodeId', values.episodeId)
   rc.set('dramaId', values.dramaId)
+  rc.set('saveReceipts', [])
+  if (values.onSave) rc.set('onSave', values.onSave)
+  if (values.extractTarget) rc.set('extractTarget', values.extractTarget)
   if (values.modelOverride) rc.set('modelOverride', values.modelOverride)
   if (values.textConfigId) rc.set('textConfigId', values.textConfigId)
   // 语言在构建处统一解析：4 条链路（chat/提取/图片提示词/视频提示词）都经过这里，

@@ -523,6 +523,29 @@
     }
   },
   "episode": {
+    "logUi": {
+      "showDetails": "Log details",
+      "hideDetails": "Hide log",
+      "savedBatches": "{n} batches saved",
+      "savedShots": "{n} storyboards written",
+      "calls": "{n} tool calls",
+      "failures": "{n} failures",
+      "actions": "Actions",
+      "grouped": "Repeated actions grouped",
+      "result": "View result",
+      "waiting": "Waiting for a task",
+      "processing": "Model is processing; waiting for this round",
+      "nextBatch": "Batch saved; processing the next content",
+      "syncing": "Generation complete; updating the workbench",
+      "tailOnly": "Recent output only",
+      "fullOutput": "View all output",
+      "created": "Added",
+      "merged": "Merged / reused",
+      "timeline": "Live activity",
+      "follow": "Follow latest",
+      "reconnect": "Reconnect",
+      "disconnected": "Log disconnected; check the workbench for task status"
+    },
     "liveLog": {
       "badge": "Log",
       "title": "{type} extraction log",

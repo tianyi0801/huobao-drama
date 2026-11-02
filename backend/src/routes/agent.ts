@@ -2,17 +2,20 @@
  * Agent 聊天路由
  *
  * - POST /:type/chat   非流式（兼容旧调用方）
- * - POST /:type/stream 流式（SSE）：把「思考 / 调工具 / 输出文本」实时推给前端，
- *   用于工作台显示「AI 正在做什么」。工具副作用（写剧本、写分镜）仍由工具自身落库，
- *   事件只承担展示职责，因此流式与一次性执行的结果一致。
+ * - POST /:type/stream 通过 SSE 推送每轮工具结果与输出文本。
+ *   模型本身沿用 generate 调用，避免流式工具参数在部分兼容接口上失败。
+ *   展示队列不阻塞 AI；工具副作用（写剧本、写分镜）仍由工具自身落库。
  */
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import { validAgentTypes } from '../agents/index.js'
 import { buildAgentRequestContext } from '../agents/context.js'
+import { assertAgentSaved, getAgentUsage } from '../agents/execution.js'
+import { STORYBOARD_MAX_STEPS } from '../agents/local-contract.js'
 import { mastra } from '../mastra/index.js'
 import { success, badRequest } from '../utils/response.js'
 import { logTaskError, logTaskPayload, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
+import { createLiveSSE } from '../utils/live-sse.js'
 
 const app = new Hono()
 
@@ -74,8 +77,9 @@ app.post('/:type/chat', async (c) => {
   try {
     const result = await agent.generate(
       [{ role: 'user', content: message }],
-      { maxSteps: 20, requestContext },
+      { maxSteps: agentType === 'storyboard_breaker' ? STORYBOARD_MAX_STEPS : 20, requestContext },
     )
+    assertAgentSaved(agentType, result, requestContext)
 
     const elapsed = ((performance.now() - startTime) / 1000).toFixed(1)
     logTaskSuccess('Agent', agentType, { elapsedSeconds: elapsed })
@@ -122,8 +126,8 @@ function summarize(value: any, max = 160) {
   return text.length > max ? `${text.slice(0, max)}…` : text
 }
 
-// POST /agent/:type/stream — 流式 Agent 对话（SSE）
-// 事件：start / step / text / reasoning / tool-call / tool-result / done / error
+// POST /agent/:type/stream — 实时活动 SSE，模型仍走非流式生成
+// 事件：start / step / text / tool-call / tool-result / done / error；等待期间发送 ping
 app.post('/:type/stream', async (c) => {
   const agentType = c.req.param('type')
   if (!validAgentTypes.includes(agentType)) {
@@ -155,80 +159,60 @@ app.post('/:type/stream', async (c) => {
   c.header('X-Accel-Buffering', 'no')
 
   return streamSSE(c, async (stream) => {
-    let text = ''
-    const toolStartedAt = new Map<string, number>()
-    // 页面关闭/切走时中止 Agent，避免后台空跑
     const abort = new AbortController()
     const onAbort = () => abort.abort()
+    const live = createLiveSSE(stream, onAbort)
+    requestContext.set('onSave', receipt => {
+      live.send('saved', { tool: receipt.tool, count: receipt.result.count, episode_id })
+    })
     c.req.raw.signal.addEventListener('abort', onAbort)
+    if (c.req.raw.signal.aborted) onAbort()
+    let stepIndex = 0
 
     try {
-      const result = await agent.stream([{ role: 'user', content: message }], {
-        maxSteps: 20,
+      live.send('start', { agent: agentType })
+      // 保持升级前的模型请求协议：SSE 只传展示信息，不强迫厂商支持流式工具调用。
+      const result = await agent.generate([{ role: 'user', content: message }], {
+        maxSteps: agentType === 'storyboard_breaker' ? STORYBOARD_MAX_STEPS : 20,
         requestContext,
         abortSignal: abort.signal,
+        onStepFinish: (step: any) => {
+          live.send('step', { index: ++stepIndex })
+          logTaskProgress('Agent', 'step-usage', { agentType, step: stepIndex, ...getAgentUsage(step) })
+          const calls = step?.toolCalls || []
+          const results = step?.toolResults || []
+          for (const [index, call] of calls.entries()) {
+            const name = normalizeToolName(call) || 'tool'
+            const id = call?.payload?.toolCallId || call?.toolCallId || `${stepIndex}-${index}`
+            const toolResult = results.find((entry: any) =>
+              (entry?.payload?.toolCallId || entry?.toolCallId) === id,
+            ) || results[index]
+            const output = toolResult?.payload?.result ?? toolResult?.result
+            logTaskProgress('Agent', 'tool-finished', { agentType, step: stepIndex, tool: name })
+            live.send('tool-call', { id, name, args: summarize(call?.payload?.args ?? call?.args) })
+            if (toolResult) live.send('tool-result', {
+              id, name,
+              ok: !toolResult?.payload?.isError && !toolResult?.isError && !output?.error,
+              preview: summarize(output, 120),
+            })
+          }
+          if (step?.text) live.send('text', { text: String(step.text) })
+        },
       })
-      await stream.writeSSE({ event: 'start', data: JSON.stringify({ agent: agentType }) })
-
-      for await (const chunk of result.fullStream as AsyncIterable<any>) {
-        const payload = chunk?.payload || {}
-        switch (chunk?.type) {
-          case 'step-start':
-            await stream.writeSSE({ event: 'step', data: JSON.stringify({ index: payload.stepIndex ?? null }) })
-            break
-          case 'text-delta': {
-            const delta = String(payload.text || '')
-            if (!delta) break
-            text += delta
-            await stream.writeSSE({ event: 'text', data: JSON.stringify({ text: delta }) })
-            break
-          }
-          case 'reasoning-delta': {
-            const delta = String(payload.text || '')
-            if (delta) await stream.writeSSE({ event: 'reasoning', data: JSON.stringify({ text: delta }) })
-            break
-          }
-          case 'tool-call': {
-            const name = normalizeToolName(chunk) || 'tool'
-            const id = payload.toolCallId || `${name}-${toolStartedAt.size}`
-            toolStartedAt.set(id, performance.now())
-            logTaskProgress('Agent', 'tool-call', { agentType, tool: name })
-            await stream.writeSSE({
-              event: 'tool-call',
-              data: JSON.stringify({ id, name, args: summarize(payload.args) }),
-            })
-            break
-          }
-          case 'tool-result': {
-            const name = normalizeToolName(chunk) || 'tool'
-            const id = payload.toolCallId || [...toolStartedAt.keys()].pop() || name
-            const startedAt = toolStartedAt.get(id)
-            const ms = startedAt ? Math.round(performance.now() - startedAt) : undefined
-            logTaskProgress('Agent', 'tool-result', { agentType, tool: name, ms })
-            await stream.writeSSE({
-              event: 'tool-result',
-              data: JSON.stringify({ id, name, ok: !payload.isError, ms, preview: summarize(payload.result, 120) }),
-            })
-            break
-          }
-          case 'error':
-            throw new Error(payload?.error?.message || payload?.message || 'Agent 执行失败')
-          default:
-            break
-        }
-      }
-
+      if (abort.signal.aborted) throw new Error('已取消')
+      logTaskProgress('Agent', 'generation-usage', { agentType, ...getAgentUsage(result) })
+      assertAgentSaved(agentType, result, requestContext)
       const elapsedMs = Math.round(performance.now() - startTime)
-      logTaskSuccess('Agent', `${agentType} stream`, { elapsedMs, chars: text.length })
-      await stream.writeSSE({ event: 'done', data: JSON.stringify({ text, elapsedMs }) })
+      logTaskSuccess('Agent', `${agentType} stream`, { elapsedMs, steps: stepIndex, chars: result.text?.length || 0 })
+      live.send('done', { text: result.text || '', elapsedMs })
     } catch (err: any) {
       const reason = abort.signal.aborted ? '已取消' : (err?.message || 'Agent 执行失败')
-      logTaskError('Agent', `${agentType} stream`, { error: reason })
+      logTaskError('Agent', `${agentType} stream`, { elapsedMs: Math.round(performance.now() - startTime), error: reason })
       if (!abort.signal.aborted) console.error(err?.stack || err)
-      try {
-        await stream.writeSSE({ event: 'error', data: JSON.stringify({ message: reason }) })
-      } catch { /* 连接已断开，无需再写 */ }
+      live.send('error', { message: reason })
     } finally {
+      await live.flush()
+      live.dispose()
       c.req.raw.signal.removeEventListener('abort', onAbort)
     }
   })

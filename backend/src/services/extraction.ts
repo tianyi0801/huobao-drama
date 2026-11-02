@@ -7,6 +7,7 @@ import { mastra } from '../mastra/index.js'
 import { buildAgentRequestContext } from '../agents/context.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
 import { clearLiveLog, pushLiveLog } from './live-log.js'
+import { assertAgentSaved, getAgentUsage } from '../agents/execution.js'
 
 export type ExtractTarget = 'characters' | 'scenes' | 'props'
 export const EXTRACT_TARGETS: ExtractTarget[] = ['characters', 'scenes', 'props']
@@ -25,7 +26,7 @@ const keyOf = (episodeId: number, target: string) => `${episodeId}:${target}`
 const EXTRACT_MESSAGES: Record<ExtractTarget, string> = {
   characters: '请从本集剧本中提取所有角色信息（外貌需融合性格、含妆造），先用 read_existing_characters 读取项目已有角色，同名或近名（带括号定位/别名，如「林小雨（主角）」与「林小雨」）直接复用已有、不要重复创建，再用 save_dedup_characters 保存。本次只提取角色，不要提取场景和道具。',
   scenes: '请从本集剧本中提取所有场景信息（地点、时间、光影等），先用 read_existing_scenes 读取已有场景去重，再用 save_dedup_scenes 保存。本次只提取场景，不要提取角色和道具。',
-  props: '请从本集剧本中提取关键道具——必须同时满足：① 直接推动剧情（出现/交接/损坏/发现会引发情节转折，如凶器、信物、关键文件、定情礼物、证据）；② 值得单独生成白底单品图（分镜会给它特写或反复出现）。判定三问任一答"否"即放弃：删掉它剧情依然成立吗？它只是随手使用的日常物品（手机、筷子、水杯）吗？它是场景陈设（桌椅、灯具）吗？宁可少提不要多提，一集通常 0-3 个，超过 3 个只保留最重要的 3 个，没有就一个都不提取（save_dedup_props 传空数组）。description 只记录物品外貌。先用 read_existing_props 读取已有道具去重，再用 save_dedup_props 保存。本次只提取道具，不要提取角色和场景。',
+  props: '请从本集剧本中提取关键道具——必须同时满足：① 直接推动剧情（出现/交接/损坏/发现会引发情节转折，如凶器、信物、关键文件、定情礼物、证据）；② 值得单独生成白底单品图（分镜会给它特写或反复出现）。以下排除三问任一答"是"即放弃：删掉它剧情依然成立吗？它只是随手使用的日常物品（手机、筷子、水杯）吗？它是场景陈设（桌椅、灯具）吗？宁可少提不要多提，一集通常 0-3 个，超过 3 个只保留最重要的 3 个，没有就一个都不提取（save_dedup_props 传空数组）。description 只记录物品外貌。先用 read_existing_props 读取已有道具去重，再用 save_dedup_props 保存。本次只提取道具，不要提取角色和场景。',
 }
 
 /** 启动异步提取任务（立即返回）；同集同类型已在运行时返回 false；可指定文本模型覆盖 */
@@ -51,12 +52,14 @@ export function startExtraction(episodeId: number, dramaId: number, target: Extr
       dramaId,
       modelOverride: opts.model || undefined,
       textConfigId: opts.configId || undefined,
+      extractTarget: target,
     })
-    return agent.generate([{ role: 'user', content: EXTRACT_MESSAGES[target] }], {
+    const result = await agent.generate([{ role: 'user', content: EXTRACT_MESSAGES[target] }], {
       maxSteps: 20,
       requestContext,
       // 逐步打印 Agent 进展：调用了哪些工具、输出了什么
       onStepFinish: (step: any) => {
+        logTaskProgress('Extract', 'step-usage', { episodeId, target, ...getAgentUsage(step) })
         const tools = (step?.toolCalls || [])
           .map((t: any) => t?.toolName || t?.payload?.toolName)
           .filter(Boolean)
@@ -78,6 +81,8 @@ export function startExtraction(episodeId: number, dramaId: number, target: Extr
         if (text) pushLiveLog(logKey, { kind: 'text', chars: text.length, text: text.slice(0, 400) })
       },
     })
+    assertAgentSaved('extractor', result, requestContext, target)
+    return result
   })()
     .then((result: any) => {
       task.status = 'done'
@@ -111,7 +116,7 @@ function readSaveCounts(result: any) {
   if (typeof data.created !== 'number' && typeof data.merged !== 'number') return null
   return {
     created: typeof data.created === 'number' ? data.created : 0,
-    merged: typeof data.merged === 'number' ? data.merged : 0,
+    merged: typeof data.merged === 'number' ? data.merged : (typeof data.reused === 'number' ? data.reused : 0),
   }
 }
 

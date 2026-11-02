@@ -216,6 +216,11 @@
             </div>
           </div>
 
+          <AgentActivityPanel
+            v-if="agentActivity.type === 'script_rewriter' && agentActivity.startedAt"
+            :activity="agentActivity"
+            agent-type="script_rewriter"
+          />
           <div v-if="!scriptContent && !rn" class="step-empty">
             <div class="empty-visual">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round">
@@ -235,11 +240,7 @@
               </button>
             </div>
           </div>
-          <!-- 改写中：实时展示 AI 在做什么（思考 / 调工具 / 输出），不再是纯转圈 -->
-          <div v-else-if="rn && rt === 'script_rewriter'" class="step-loading agent-live-stage">
-            <AgentActivityPanel :activity="agentActivity" :agent-type="rt" />
-          </div>
-          <textarea v-else class="fill-textarea" v-model="localScript" :placeholder="t('episode.script.scriptPlaceholder')" />
+          <textarea v-else class="fill-textarea" v-model="localScript" :disabled="rn && rt === 'script_rewriter'" :placeholder="t('episode.script.scriptPlaceholder')" />
         </div>
       </div>
 
@@ -527,9 +528,9 @@
             </div>
             <!-- 拆分镜中：实时展示 AI 在做什么（读取上下文 / 写入分镜 / 输出文本） -->
             <AgentActivityPanel
-              v-if="rt === 'storyboard_breaker'"
+              v-if="agentActivity.type === 'storyboard_breaker' && agentActivity.startedAt"
               :activity="agentActivity"
-              :agent-type="rt"
+              agent-type="storyboard_breaker"
             />
             <div v-if="!sbs.length" class="step-empty video-task-empty-state">
               <div class="empty-visual">
@@ -1537,6 +1538,7 @@ import { api, dramaAPI, episodeAPI, storyboardAPI, characterAPI, sceneAPI, propA
 import { startTour, autoTour } from '~/composables/useTour'
 import { useAgent } from '~/composables/useAgent'
 import { resolveTextModelSelection } from '~/utils/text-model-selection'
+import { createWorkbenchRefresh } from '~/utils/workbench-refresh'
 import { toastError, mapError, MODERATION_RE } from '~/composables/useToast'
 import LocaleSwitcher from '~/components/LocaleSwitcher.vue'
 
@@ -2901,47 +2903,61 @@ function sceneShotCount(sceneId) {
 watch(rawContent, v => { localRaw.value = v }, { immediate: true })
 watch(scriptContent, v => { localScript.value = v }, { immediate: true })
 
-async function refresh() {
-  try {
-    drama.value = await dramaAPI.get(dramaId)
-    const ep = drama.value.episodes?.find(e => (e.episode_number || e.episodeNumber) === episodeNumber)
-    if (ep) {
-      episode.value = ep
-      try { chars.value = await episodeAPI.characters(ep.id) } catch { chars.value = [] }
-      try { scenes.value = await episodeAPI.scenes(ep.id) } catch { scenes.value = [] }
-      try { propItems.value = await episodeAPI.props(ep.id) } catch { propItems.value = [] }
-      sbs.value = await episodeAPI.storyboards(ep.id)
-      selectedVideoSbIds.value = selectedVideoSbIds.value.filter(id => sbs.value.some(sb => sb.id === id))
-      if (sbs.value.length) {
-        const currentSelectedId = selectedSb.value?.id
-        selectedSb.value = sbs.value.find(sb => sb.id === currentSelectedId) || sbs.value[0]
-      } else {
-        selectedSb.value = null
-      }
-
-      const epHasContent = !!(episode.value?.content)
-      const epHasScript = !!(episode.value?.script_content || episode.value?.scriptContent)
-
-      if (panelRestored) {
-        // 已恢复到上次所在步骤，跳过自动重置（仅首次加载生效）
-        panelRestored = false
-      } else if (epHasScript || epHasContent) scriptStep.value = 1
-      else scriptStep.value = 0
-    }
-  } catch (e) {
-    toastError(e)
+const refreshWorkbenchData = createWorkbenchRefresh(async () => {
+  const nextDrama = await dramaAPI.get(dramaId)
+  const nextEpisode = nextDrama.episodes?.find(e => Number(e.episode_number ?? e.episodeNumber) === episodeNumber)
+  if (!nextEpisode) throw new Error('当前集不存在，无法刷新工作台')
+  const [characters, sceneList, props, storyboards] = await Promise.all([
+    episodeAPI.characters(nextEpisode.id), episodeAPI.scenes(nextEpisode.id),
+    episodeAPI.props(nextEpisode.id), episodeAPI.storyboards(nextEpisode.id),
+  ])
+  return { nextDrama, nextEpisode, characters, sceneList, props, storyboards }
+}, snapshot => {
+  drama.value = snapshot.nextDrama
+  episode.value = snapshot.nextEpisode
+  chars.value = snapshot.characters
+  scenes.value = snapshot.sceneList
+  propItems.value = snapshot.props
+  sbs.value = snapshot.storyboards
+  selectedVideoSbIds.value = selectedVideoSbIds.value.filter(id => sbs.value.some(sb => sb.id === id))
+  const currentSelectedId = selectedSb.value?.id
+  selectedSb.value = sbs.value.find(sb => sb.id === currentSelectedId) || sbs.value[0] || null
+  if (assetDetail.value.open) {
+    const pool = assetDetail.value.type === 'character' ? chars.value : assetDetail.value.type === 'scene' ? scenes.value : propItems.value
+    const fresh = pool.find(item => item.id === assetDetail.value.item?.id)
+    if (fresh) assetDetail.value.item = fresh
   }
+  if (panelRestored) panelRestored = false
+  else scriptStep.value = (episode.value?.content || episode.value?.script_content || episode.value?.scriptContent) ? 1 : 0
+})
+
+async function refresh() {
+  try { await refreshWorkbenchData() } catch (e) { toastError(e) }
   try { mergeData.value = await mergeAPI.status(epId.value) } catch {}
   // 任务面板/成片列表刷新失败不应让整个 refresh 抛错：它被轮询等待复用，
   // reject 会让等待循环提前中断，导致按钮卡在「生成中」
   try { await Promise.all([loadGenTasks(), loadExportMerges()]) } catch { /* 忽略 */ }
 }
 
-function saveRaw() { episodeAPI.update(epId.value, { content: localRaw.value }); episode.value.content = localRaw.value }
-function saveScr() { episodeAPI.update(epId.value, { script_content: localScript.value }); episode.value.script_content = localScript.value }
+async function saveRaw() {
+  const content = localRaw.value
+  await episodeAPI.update(epId.value, { content })
+  episode.value.content = content
+}
+async function saveScr() {
+  const content = localScript.value
+  await episodeAPI.update(epId.value, { script_content: content })
+  episode.value.script_content = content
+}
 // 发给 Agent 的 message 是功能性提示词而非 UI 文案：产出语言由后端全局「内容语言」指令控制，
 // 这里保持中文不随界面语言变化
-function doRewrite() { saveRaw(); runAgent('script_rewriter', '请读取剧本并改写为格式化剧本，然后保存', dramaId, epId.value, refresh, chatModelOverride(), chatConfigId()) }
+async function doRewrite() {
+  if (rn.value) return
+  try {
+    await saveRaw()
+    await runAgent('script_rewriter', '请读取剧本并改写为格式化剧本，然后保存', dramaId, epId.value, refreshWorkbenchData, chatModelOverride(), chatConfigId(), refreshWorkbenchData)
+  } catch (e) { toastError(e) }
+}
 function skipRewrite() {
   const raw = (localRaw.value || rawContent.value || '').trim()
   if (!raw) {
@@ -2965,16 +2981,17 @@ const extractingTargets = ref([])
 const extractingLabels = computed(() => EXTRACT_TARGETS.value.filter(x => extractingTargets.value.includes(x.key)).map(x => x.label).join(t('common.listJoin')))
 function isExtracting(target) { return extractingTargets.value.includes(target) }
 
-function doExtract(target) {
+async function doExtract(target) {
   if (isExtracting(target) || !epId.value) return
-  saveScr()
   extractingTargets.value.push(target)
-  episodeAPI.extract(epId.value, target, chatModelOverride(), chatConfigId())
-    .then(() => pollExtractStatus(target))
-    .catch(e => {
-      extractingTargets.value = extractingTargets.value.filter(x => x !== target)
-      toastError(e)
-    })
+  try {
+    await saveScr()
+    await episodeAPI.extract(epId.value, target, chatModelOverride(), chatConfigId())
+    pollExtractStatus(target)
+  } catch (e) {
+    extractingTargets.value = extractingTargets.value.filter(x => x !== target)
+    toastError(e)
+  }
 }
 function doExtractAll() { EXTRACT_TARGETS.value.forEach(x => doExtract(x.key)) }
 
@@ -2984,14 +3001,12 @@ function pollExtractStatus(target, attempts = 150) {
     try {
       const st = await episodeAPI.extractStatus(epId.value)
       const task = st?.[target]
+      if (!isExtracting(target)) return
       if (task && task.status !== 'running') {
+        await refreshWorkbenchData()
         extractingTargets.value = extractingTargets.value.filter(x => x !== target)
-        if (task.status === 'done') {
-          toast.success(t('episode.extract.done', { type: label }))
-          await refresh()
-        } else {
-          toastError(task.error, { fallback: 'episode.extract.failed' })
-        }
+        if (task.status === 'done') toast.success(t('episode.extract.done', { type: label }))
+        else toastError(task.error, { fallback: 'episode.extract.failed' })
         return
       }
     } catch {}
@@ -3102,12 +3117,12 @@ function doBreakdown() {
 - 每个镜头必须根据剧本内容，从上述当前集已有角色中选出出场的角色绑定 character_ids（ID 必须来自上述列表；有角色出场就必须绑定，不要遗漏）
 - 每个镜头尽量匹配上述已有场景填写 scene_id（ID 必须来自上述列表），不要凭空创造新场景
 - 每个镜头出现关键道具（被使用、交接、特写或在画面中明显可见）时，从上述当前集已有道具中绑定 prop_ids（ID 必须来自上述列表）；没有道具出现可传空数组
-- 只有纯环境空镜头才可以不绑定角色`, dramaId, epId.value, onBreakdownDone, chatModelOverride(), chatConfigId())
+- 只有纯环境空镜头才可以不绑定角色`, dramaId, epId.value, onBreakdownDone, chatModelOverride(), chatConfigId(), refreshWorkbenchData)
 }
 
 /** 拆分完成后刷新并自动补齐缺失的视频提示词（兜住 Agent 漏写/截断） */
 async function onBreakdownDone() {
-  await refresh()
+  await refreshWorkbenchData()
   const missing = sbs.value.filter(sb => !(sb.video_prompt || sb.videoPrompt || '').trim())
   if (missing.length) batchVideoPrompts()
 }

@@ -1,7 +1,8 @@
 import { toast } from 'vue-sonner'
-import { api } from './useApi'
+import { onScopeDispose } from 'vue'
 import { toastError } from './useToast'
 import { i18n } from './i18n'
+import { consumeAgentSSE } from '../utils/agent-sse'
 
 /** 单次工具调用（展示用：AI 正在调哪个工具、耗时多久） */
 export interface AgentToolEvent {
@@ -22,6 +23,9 @@ export interface AgentActivity {
   phase: AgentPhase
   /** 已调用/正在调用的工具，按时间顺序 */
   tools: AgentToolEvent[]
+  toolCount: number
+  savedCount: number
+  savedBatches: number
   /** 已生成的正文（面板只展示尾部） */
   text: string
   /** 思考内容字符数（部分模型会产出 reasoning） */
@@ -40,6 +44,9 @@ function createActivity(): AgentActivity {
     type: null,
     phase: 'idle',
     tools: [],
+    toolCount: 0,
+    savedCount: 0,
+    savedBatches: 0,
     text: '',
     reasoningChars: 0,
     startedAt: 0,
@@ -48,53 +55,25 @@ function createActivity(): AgentActivity {
   }
 }
 
-/** 从 fetch 响应体里逐块解析 SSE，回调每个事件的 data 对象 */
-async function consumeSSE(resp: Response, onEvent: (event: string, data: any) => void) {
-  const reader = resp.body?.getReader()
-  if (!reader) return
-  const decoder = new TextDecoder()
-  let buffer = ''
-
-  const flush = (block: string) => {
-    let event = 'message'
-    const dataLines: string[] = []
-    for (const line of block.split('\n')) {
-      if (line.startsWith('event:')) event = line.slice(6).trim()
-      else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim())
-    }
-    if (!dataLines.length) return
-    const raw = dataLines.join('\n')
-    let data: any = raw
-    try { data = JSON.parse(raw) } catch { /* 非 JSON 时原样给出 */ }
-    onEvent(event, data)
-  }
-
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    let idx = buffer.indexOf('\n\n')
-    while (idx >= 0) {
-      const block = buffer.slice(0, idx)
-      buffer = buffer.slice(idx + 2)
-      if (block.trim()) flush(block)
-      idx = buffer.indexOf('\n\n')
-    }
-  }
-  if (buffer.trim()) flush(buffer)
-}
-
 export function useAgent() {
   const running = ref(false)
   const runningType = ref<string | null>(null)
   const activity = reactive<AgentActivity>(createActivity())
 
   let timer: ReturnType<typeof setInterval> | null = null
+  let controller: AbortController | null = null
+  let disposed = false
 
   function stopTimer() {
     if (timer) clearInterval(timer)
     timer = null
   }
+
+  onScopeDispose(() => {
+    disposed = true
+    controller?.abort()
+    stopTimer()
+  })
 
   function reset(type: string) {
     Object.assign(activity, createActivity(), { active: true, type, phase: 'connecting', startedAt: Date.now() })
@@ -119,13 +98,19 @@ export function useAgent() {
       case 'reasoning':
         activity.reasoningChars += String(data?.text ?? '').length
         break
+      case 'saved':
+        activity.savedBatches++
+        if (data?.tool === 'save_storyboards' && Number.isFinite(data?.count)) activity.savedCount += data.count
+        break
       case 'tool-call':
+        activity.toolCount++
         activity.tools.push({
           id: String(data?.id ?? data?.name ?? `tool-${activity.tools.length}`),
           name: String(data?.name ?? 'tool'),
           args: data?.args ? String(data.args) : undefined,
           status: 'running',
         })
+        if (activity.tools.length > 120) activity.tools.splice(0, activity.tools.length - 120)
         activity.phase = 'tool'
         break
       case 'tool-result': {
@@ -150,11 +135,12 @@ export function useAgent() {
   }
 
   /** 走流式端点；后端不支持（404/405）时返回 false，由调用方回退到非流式 */
-  async function tryStream(type: string, payload: any): Promise<boolean> {
+  async function tryStream(type: string, payload: any, signal: AbortSignal, onSaved?: () => void | Promise<void>): Promise<boolean> {
     const resp = await fetch(`${SSE_PREFIX}/agent/${type}/stream`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+      signal,
     })
     if (resp.status === 404 || resp.status === 405) return false
     if (!resp.ok || !resp.body) {
@@ -166,11 +152,16 @@ export function useAgent() {
       throw new Error(message)
     }
     activity.phase = 'thinking'
-    await consumeSSE(resp, applyEvent)
+    await consumeAgentSSE(resp, (event, data) => {
+      applyEvent(event, data)
+      if (event === 'saved' && !disposed && onSaved) {
+        void Promise.resolve().then(onSaved).catch(toastError)
+      }
+    })
     return true
   }
 
-  async function run(type: string, msg: string, dramaId: number, episodeId: number, onDone?: () => void, model?: string, configId?: number) {
+  async function run(type: string, msg: string, dramaId: number, episodeId: number, onDone?: () => void | Promise<void>, model?: string, configId?: number, onSaved?: () => void | Promise<void>) {
     if (running.value) { toast.warning(i18n.global.t('composables.agent.busy')); return }
     running.value = true
     runningType.value = type
@@ -184,17 +175,27 @@ export function useAgent() {
       config_id: configId || undefined,
     }
 
+    controller = new AbortController()
     try {
-      const streamed = await tryStream(type, payload)
+      const streamed = await tryStream(type, payload, controller.signal, onSaved)
       if (!streamed) {
-        // 旧版后端：退化为一次性请求，面板只显示「思考中」
         activity.phase = 'thinking'
-        await api.post<any>(`/agent/${type}/chat`, payload)
+        const resp = await fetch(`${SSE_PREFIX}/agent/${type}/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        })
+        const json = await resp.json()
+        if (!resp.ok || json.code >= 400) throw new Error(json.message || `${resp.status}`)
       }
+      if (disposed || controller.signal.aborted) return
+      await onDone?.()
+      if (disposed || controller.signal.aborted) return
       activity.phase = 'done'
       toast.success(i18n.global.t('composables.agent.done'))
-      onDone?.()
     } catch (err: any) {
+      if (disposed || controller.signal.aborted) return
       activity.phase = 'error'
       activity.error = err?.message || String(err)
       toastError(err)
@@ -202,6 +203,7 @@ export function useAgent() {
       activity.active = false
       activity.elapsedMs = Date.now() - activity.startedAt
       stopTimer()
+      controller = null
       running.value = false
       runningType.value = null
     }

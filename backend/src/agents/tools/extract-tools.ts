@@ -211,6 +211,7 @@ const saveDedupCharacters = createTool({
           description: char.description || existing.description,
           appearance: char.appearance || existing.appearance,
           styling: char.styling || char.description || existing.styling,
+          finalPrompt: (char.appearance || char.styling || char.description) ? null : existing.finalPrompt,
           updatedAt: ts,
         }).where(eq(schema.characters.id, existing.id))
         await linkCharToEpisode(episodeId, existing.id)
@@ -281,6 +282,7 @@ const saveDedupScenes = createTool({
         await db.update(schema.scenes).set({
           prompt: scene.prompt || scene.description || existing.prompt,
           lighting: scene.lighting || existing.lighting,
+          finalPrompt: (scene.prompt || scene.description || scene.lighting) ? null : existing.finalPrompt,
           updatedAt: ts,
         }).where(eq(schema.scenes.id, existing.id))
         await linkSceneToEpisode(episodeId, existing.id)

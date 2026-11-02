@@ -523,6 +523,29 @@
     }
   },
   "episode": {
+    "logUi": {
+      "showDetails": "日志详情",
+      "hideDetails": "收起日志",
+      "savedBatches": "已保存 {n} 批",
+      "savedShots": "已写入 {n} 个分镜",
+      "calls": "工具执行 {n} 次",
+      "failures": "{n} 次失败",
+      "actions": "执行动作",
+      "grouped": "重复动作已合并",
+      "result": "查看返回结果",
+      "waiting": "等待任务开始",
+      "processing": "模型正在处理内容，等待本轮结果",
+      "nextBatch": "本批已保存，正在处理后续内容",
+      "syncing": "生成完成，正在更新工作台",
+      "tailOnly": "仅看最近输出",
+      "fullOutput": "查看全部输出",
+      "created": "新增",
+      "merged": "合并 / 复用",
+      "timeline": "实时执行记录",
+      "follow": "跟随最新",
+      "reconnect": "重新连接",
+      "disconnected": "日志连接已断开，任务状态以工作台为准"
+    },
     "liveLog": {
       "badge": "日志",
       "title": "{type}提取日志",

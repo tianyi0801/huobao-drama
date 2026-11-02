@@ -10,6 +10,7 @@ import { and, eq, isNull } from 'drizzle-orm'
 import { now } from '../../utils/response.js'
 import { logTaskProgress, logTaskSuccess } from '../../utils/task-logger.js'
 import { getDramaId, getEpisodeId } from '../context.js'
+import { STORYBOARD_BATCH_SIZE } from '../local-contract.js'
 import { resolveVoiceMentions } from '../../services/character-voice-references.js'
 
 async function validateVideoPromptVoices(prompt: string | undefined, dramaId: number, characterIds: number[] = []) {
@@ -261,10 +262,10 @@ const storyboardFields = z.object({
 
 const saveStoryboards = createTool({
   id: 'save_storyboards',
-  description: 'Save storyboards for this episode. Call in batches of at most 8 storyboards: the first batch must set replace_existing: true (clears all old storyboards for the episode, then writes), every following batch omits replace_existing (appends). Rows are upserted by shot_number, so overlapping batches and retries never create duplicates.',
+  description: `Save storyboards in batches of at most ${STORYBOARD_BATCH_SIZE}. Use only one save_storyboards call per response to keep output within model limits. For full regeneration, the first batch sets replace_existing: true; all later batches append without it. Never clear again after the first batch. Rows are upserted by shot_number.`,
   inputSchema: z.object({
     replace_existing: z.boolean().optional(),
-    storyboards: z.array(storyboardFields),
+    storyboards: z.array(storyboardFields).min(1).max(STORYBOARD_BATCH_SIZE),
   }),
   execute: async ({ storyboards, replace_existing }, context) => {
     const ids = requireIds(context)
@@ -278,9 +279,10 @@ const saveStoryboards = createTool({
       count: storyboards.length,
       shotNumbers: storyboards.map(sb => sb.shot_number).join(','),
     })
-    // Check all voice references before replace_existing can remove the previous storyboards.
+    // 整批校验完再删除旧分镜，避免错误绑定导致旧数据先被清空。
     for (const sb of storyboards) {
       await validateVideoPromptVoices(sb.video_prompt, dramaId, sb.character_ids)
+      await validateStoryboardBindings(episodeId, dramaId, sb.scene_id, sb.character_ids, sb.prop_ids)
     }
     if (replace_existing === true) {
       const existingStoryboardRows = await db.select().from(schema.storyboards)

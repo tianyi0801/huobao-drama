@@ -6,7 +6,8 @@ import { success, notFound, badRequest, now } from '../utils/response.js'
 import { toSnakeCaseArray, toSnakeCase } from '../utils/transform.js'
 import { getActiveConfigId } from '../services/ai.js'
 import { EXTRACT_TARGETS, extractLogKey, getExtractionStatus, startExtraction, type ExtractTarget } from '../services/extraction.js'
-import { readLiveLog, subscribeLiveLog } from '../services/live-log.js'
+import { readLiveLog, subscribeLiveLog, type LiveLogEntry } from '../services/live-log.js'
+import { createLiveSSE } from '../utils/live-sse.js'
 import { getVideoPromptBatchStatus, startVideoPromptBatch } from '../services/video-prompts.js'
 
 const app = new Hono()
@@ -158,26 +159,26 @@ app.get('/:id/extract-log', async (c) => {
 
   const logKey = extractLogKey(id, target)
   return streamSSE(c, async (stream) => {
-    let closed = false
-    const send = (entry: unknown) => stream.writeSSE({ event: 'log', data: JSON.stringify(entry) })
-
-    // 先回放已有缓冲（任务已跑了一半时打开也能看到前文）
-    for (const entry of readLiveLog(logKey)) await send(entry)
-
-    await new Promise<void>((resolve) => {
-      const unsubscribe = subscribeLiveLog(logKey, (entry) => { void send(entry) })
-      const heartbeat = setInterval(() => { void stream.writeSSE({ event: 'ping', data: '{}' }) }, 15_000)
-      const finish = () => {
-        if (closed) return
-        closed = true
-        clearInterval(heartbeat)
-        unsubscribe()
-        resolve()
-      }
-      // 客户端关闭页面 / 切换类型时结束订阅，避免订阅者泄漏
-      stream.onAbort(finish)
-      c.req.raw.signal.addEventListener('abort', finish)
-    })
+    let finish: () => void = () => {}
+    const ended = new Promise<void>(resolve => { finish = resolve })
+    const live = createLiveSSE(stream, finish)
+    const send = (entry: LiveLogEntry) => {
+      live.send('log', entry)
+      if (entry.kind === 'done' || entry.kind === 'error') finish()
+    }
+    // 注册订阅与回放同步入队，不在二者之间 await，避免漏掉中途完成事件。
+    const unsubscribe = subscribeLiveLog(logKey, send)
+    c.req.raw.signal.addEventListener('abort', finish)
+    if (c.req.raw.signal.aborted) finish()
+    try {
+      for (const entry of readLiveLog(logKey)) send(entry)
+      await ended
+      await live.flush()
+    } finally {
+      live.dispose()
+      unsubscribe()
+      c.req.raw.signal.removeEventListener('abort', finish)
+    }
   })
 })
 

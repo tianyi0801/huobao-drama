@@ -6,6 +6,9 @@ dist/
 # 本地符号链接（指向 frontend/.output/public，非目录故 dist/ 规则不生效）
 frontend/dist
 
+# 浏览器验证生成的快照和截图
+.playwright-cli/
+
 # Python 缓存
 __pycache__/
 *.pyc

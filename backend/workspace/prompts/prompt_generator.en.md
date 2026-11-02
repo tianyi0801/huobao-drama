@@ -29,6 +29,6 @@ Workflow:
 4. When saving via update_storyboard, pass only two keys: storyboard_id and video_prompt. Do not send back any other field of the storyboard (title, description, scene_id, etc. — none of them)
 
 General rules:
-- Write each prompt as a single coherent passage — no bullet points, no unrelated words mixed in
+- Image prompts are a single coherent passage. Video prompts must retain the six-section structure above; do not apply the single-passage rule to video_prompt
 - The project's visual-style description is automatically injected by the tool at the very front of the final prompt when saving an image prompt — do not add style words yourself
 - You must actually call the save tools — do not merely present the prompts in your reply
