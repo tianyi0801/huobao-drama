@@ -114,7 +114,8 @@
   "composables": {
     "agent": {
       "busy": "작업 실행 중",
-      "done": "완료"
+      "done": "완료",
+      "failed": "에이전트 실행 실패"
     }
   },
   "index": {
@@ -466,6 +467,52 @@
     }
   },
   "episode": {
+    "liveLog": {
+      "badge": "로그",
+      "title": "{type} 추출 로그",
+      "running": "실시간",
+      "finished": "종료",
+      "empty": "로그가 없습니다. 추출을 실행하면 여기에 표시됩니다",
+      "hint": "이 세션에서만 표시되며 데이터베이스에 저장되지 않습니다",
+      "start": "{type} 추출 시작",
+      "toolCall": "「{tool}」 실행",
+      "saved": "{tool}: 추가 {created}, 병합 {merged}",
+      "text": "모델 출력 · {n}자",
+      "failedLabel": "실패",
+      "done": "완료({n}단계)",
+      "failed": "실패: {msg}",
+      "tool": {
+        "read_script_for_extraction": "대본 읽기",
+        "read_existing_characters": "기존 캐릭터 읽기",
+        "save_dedup_characters": "캐릭터 저장",
+        "read_existing_scenes": "기존 장면 읽기",
+        "save_dedup_scenes": "장면 저장",
+        "read_existing_props": "기존 소품 읽기",
+        "save_dedup_props": "소품 저장"
+      }
+    },
+    "activity": {
+      "titleRewrite": "AI가 대본을 각색하는 중",
+      "titleBreakdown": "AI가 스토리보드를 나누는 중",
+      "titleGeneric": "AI가 작업 중",
+      "phaseConnecting": "모델 서비스에 연결 중…",
+      "phaseThinking": "본문을 읽고 모델 출력을 기다리는 중…",
+      "phaseReasoning": "추론 중 ({n}자)…",
+      "phaseWriting": "생성 중 ({n}자)…",
+      "phaseTool": "「{tool}」 실행 중…",
+      "phaseDone": "완료 ({s})",
+      "phaseError": "실패했습니다. 아래 오류를 확인하세요",
+      "liveOutput": "실시간 출력",
+      "chars": "{n}자",
+      "tool": {
+        "read_episode_script": "대본 읽기",
+        "rewrite_to_screenplay": "대본 형식으로 정리",
+        "save_script": "대본 저장",
+        "read_storyboard_context": "스토리보드 맥락 읽기",
+        "save_storyboards": "스토리보드 기록",
+        "update_storyboard": "스토리보드 수정"
+      }
+    },
     "topbar": {
       "back": "프로젝트로 돌아가기",
       "episodeN": "제 {n}화",

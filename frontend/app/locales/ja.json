@@ -114,7 +114,8 @@
   "composables": {
     "agent": {
       "busy": "処理を実行中です",
-      "done": "完了"
+      "done": "完了",
+      "failed": "エージェントの実行に失敗しました"
     }
   },
   "index": {
@@ -466,6 +467,52 @@
     }
   },
   "episode": {
+    "liveLog": {
+      "badge": "ログ",
+      "title": "{type}の抽出ログ",
+      "running": "リアルタイム",
+      "finished": "終了",
+      "empty": "ログはまだありません：抽出を実行するとここに表示されます",
+      "hint": "このセッション内のみ・データベースには保存されません",
+      "start": "{type}の抽出を開始",
+      "toolCall": "「{tool}」を実行",
+      "saved": "{tool}：新規 {created}、統合 {merged}",
+      "text": "モデル出力 · {n} 文字",
+      "failedLabel": "失敗",
+      "done": "完了（{n} ステップ）",
+      "failed": "失敗：{msg}",
+      "tool": {
+        "read_script_for_extraction": "脚本を読み込む",
+        "read_existing_characters": "既存キャラクターを読み込む",
+        "save_dedup_characters": "キャラクターを保存",
+        "read_existing_scenes": "既存シーンを読み込む",
+        "save_dedup_scenes": "シーンを保存",
+        "read_existing_props": "既存小道具を読み込む",
+        "save_dedup_props": "小道具を保存"
+      }
+    },
+    "activity": {
+      "titleRewrite": "AI が脚本を改写中",
+      "titleBreakdown": "AI が絵コンテを分割中",
+      "titleGeneric": "AI が処理中",
+      "phaseConnecting": "モデルサービスに接続中…",
+      "phaseThinking": "本文を読み込み、モデルの出力を待っています…",
+      "phaseReasoning": "推論中（{n} 文字）…",
+      "phaseWriting": "生成中（{n} 文字）…",
+      "phaseTool": "「{tool}」を実行中…",
+      "phaseDone": "完了（{s}）",
+      "phaseError": "失敗しました。下のエラーを確認してください",
+      "liveOutput": "リアルタイム出力",
+      "chars": "{n} 文字",
+      "tool": {
+        "read_episode_script": "脚本を読み込む",
+        "rewrite_to_screenplay": "脚本形式に整理",
+        "save_script": "脚本を保存",
+        "read_storyboard_context": "絵コンテ文脈を読み込む",
+        "save_storyboards": "絵コンテを書き込む",
+        "update_storyboard": "絵コンテを更新"
+      }
+    },
     "topbar": {
       "back": "プロジェクトに戻る",
       "episodeN": "第 {n} 話",

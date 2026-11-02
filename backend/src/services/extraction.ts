@@ -6,6 +6,7 @@
 import { mastra } from '../mastra/index.js'
 import { buildAgentRequestContext } from '../agents/context.js'
 import { logTaskError, logTaskProgress, logTaskStart, logTaskSuccess } from '../utils/task-logger.js'
+import { clearLiveLog, pushLiveLog } from './live-log.js'
 
 export type ExtractTarget = 'characters' | 'scenes' | 'props'
 export const EXTRACT_TARGETS: ExtractTarget[] = ['characters', 'scenes', 'props']
@@ -36,6 +37,12 @@ export function startExtraction(episodeId: number, dramaId: number, target: Extr
   tasks.set(key, task)
 
   logTaskStart('Extract', target, { episodeId, dramaId, model: opts.model || undefined, configId: opts.configId || undefined })
+
+  // 新一轮任务：清掉上一轮的内存日志，避免新旧混淆
+  const logKey = extractLogKey(episodeId, target)
+  clearLiveLog(logKey)
+  pushLiveLog(logKey, { kind: 'start' })
+
   ;(async () => {
     const agent = mastra.getAgent('extractor')
     if (!agent) throw new Error('提取 Agent 不可用')
@@ -58,6 +65,17 @@ export function startExtraction(episodeId: number, dramaId: number, target: Extr
           tools: tools.length ? tools.join(',') : undefined,
           text: (step?.text || '').slice(0, 200) || undefined,
         })
+
+        // 实时日志：工具调用 → 写入结果 → 模型输出片段
+        for (const tool of tools) pushLiveLog(logKey, { kind: 'tool', tool })
+        for (const tr of step?.toolResults || []) {
+          const toolName = tr?.toolName || tr?.payload?.toolName
+          const counts = readSaveCounts(tr)
+          if (counts) pushLiveLog(logKey, { kind: 'saved', tool: toolName, ...counts })
+        }
+        const text = String(step?.text || '').trim()
+        // 带上实际内容，前端才能显示「模型说了什么」而不只是字数
+        if (text) pushLiveLog(logKey, { kind: 'text', chars: text.length, text: text.slice(0, 400) })
       },
     })
   })()
@@ -71,14 +89,30 @@ export function startExtraction(episodeId: number, dramaId: number, target: Extr
         toolCalls: toolNames.join(',') || undefined,
         reply: (result?.text || '').slice(0, 300) || undefined,
       })
+      pushLiveLog(logKey, { kind: 'done', steps: result?.steps?.length })
     })
     .catch((err: any) => {
       task.status = 'error'
       task.finished_at = new Date().toISOString()
       task.error = err?.message || '提取失败'
       logTaskError('Extract', target, { episodeId, error: err?.message })
+      pushLiveLog(logKey, { kind: 'error', message: task.error })
     })
   return true
+}
+
+/** 实时日志键：前端按「集 × 类型」订阅 */
+export const extractLogKey = (episodeId: number, target: string) => `extract:${episodeId}:${target}`
+
+/** 从工具结果里取出「新增/合并」数量（save_dedup_* 系列返回 created/merged） */
+function readSaveCounts(result: any) {
+  const data = result?.payload?.result ?? result?.result ?? result
+  if (!data || typeof data !== 'object') return null
+  if (typeof data.created !== 'number' && typeof data.merged !== 'number') return null
+  return {
+    created: typeof data.created === 'number' ? data.created : 0,
+    merged: typeof data.merged === 'number' ? data.merged : 0,
+  }
 }
 
 /** 查询某集三类资产的提取任务状态（未启动过的类型为 null） */

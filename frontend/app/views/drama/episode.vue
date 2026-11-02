@@ -235,9 +235,9 @@
               </button>
             </div>
           </div>
-          <div v-else-if="rn && rt === 'script_rewriter'" class="step-loading">
-            <Loader2 :size="24" class="animate-spin" style="color:var(--accent)" />
-            <div class="loading-text">{{ t('episode.script.rewriting') }}</div>
+          <!-- 改写中：实时展示 AI 在做什么（思考 / 调工具 / 输出），不再是纯转圈 -->
+          <div v-else-if="rn && rt === 'script_rewriter'" class="step-loading agent-live-stage">
+            <AgentActivityPanel :activity="agentActivity" :agent-type="rt" />
           </div>
           <textarea v-else class="fill-textarea" v-model="localScript" :placeholder="t('episode.script.scriptPlaceholder')" />
         </div>
@@ -263,17 +263,24 @@
               <span class="dim" style="font-size:12px">{{ t('episode.prod.assets') }}</span>
               <span class="tag mono">{{ t('episode.prod.readyCount', { ready: assetReadyCount, total: assetTotalCount }) }}</span>
               <div class="ml-auto flex gap-1 asset-bar-actions">
-                <button
-                  v-for="et in EXTRACT_TARGETS"
-                  :key="et.key"
-                  class="btn btn-sm asset-btn-extract"
-                  :disabled="isExtracting(et.key)"
-                  @click="doExtract(et.key)"
-                >
-                  <Loader2 v-if="isExtracting(et.key)" :size="11" class="animate-spin" />
-                  <svg v-else width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                  {{ (et.key === 'characters' ? chars.length : et.key === 'scenes' ? scenes.length : propItems.length) ? t('episode.prod.reextract', { type: et.label }) : t('episode.prod.extract', { type: et.label }) }}
-                </button>
+                <template v-for="et in EXTRACT_TARGETS" :key="et.key">
+                  <button
+                    class="btn btn-sm asset-btn-extract"
+                    :disabled="isExtracting(et.key)"
+                    @click="doExtract(et.key)"
+                  >
+                    <Loader2 v-if="isExtracting(et.key)" :size="11" class="animate-spin" />
+                    <svg v-else width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    {{ (et.key === 'characters' ? chars.length : et.key === 'scenes' ? scenes.length : propItems.length) ? t('episode.prod.reextract', { type: et.label }) : t('episode.prod.extract', { type: et.label }) }}
+                  </button>
+                  <!-- 提取过程实时日志：点击展开，内容只在内存里，不进数据库 -->
+                  <LiveLogPopover
+                    :episode-id="epId"
+                    :target="et.key"
+                    :label="et.label"
+                    :running="isExtracting(et.key)"
+                  />
+                </template>
                 <span class="asset-bar-divider" />
                 <button class="btn btn-sm asset-btn-batch" @click="batchCharImages">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
@@ -518,6 +525,12 @@
                 </button>
               </div>
             </div>
+            <!-- 拆分镜中：实时展示 AI 在做什么（读取上下文 / 写入分镜 / 输出文本） -->
+            <AgentActivityPanel
+              v-if="rt === 'storyboard_breaker'"
+              :activity="agentActivity"
+              :agent-type="rt"
+            />
             <div v-if="!sbs.length" class="step-empty video-task-empty-state">
               <div class="empty-visual">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><rect x="2" y="2" width="20" height="20" rx="2.5"/><line x1="7" y1="8" x2="7" y2="16"/><line x1="10" y1="8" x2="10" y2="16"/><line x1="13" y1="8" x2="13" y2="16"/></svg>
@@ -1549,7 +1562,7 @@ const storedPanel = (() => {
 // 首个 refresh 时若已恢复面板位置，跳过按内容自动重置 scriptStep
 let panelRestored = !!storedPanel
 const panel = ref(['production', 'export'].includes(storedPanel?.panel) ? storedPanel.panel : 'script')
-const { running: rn, runningType: rt, run: runAgent } = useAgent()
+const { running: rn, runningType: rt, activity: agentActivity, run: runAgent } = useAgent()
 
 const localRaw = ref(''), localScript = ref('')
 const rawContent = computed(() => episode.value?.content || '')
@@ -4461,6 +4474,9 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   flex: 1; gap: 12px;
 }
+/* AI 实时活动面板自带上左对齐布局，这里只让容器铺满宽度 */
+.agent-live-stage { align-items: stretch; justify-content: flex-start; padding: 12px 0; overflow-y: auto; }
+.agent-live-stage > :deep(.agent-live) { width: 100%; }
 .loading-text { font-size: 13px; color: var(--text-2); }
 
 .storyboard-ref-list {

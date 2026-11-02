@@ -114,7 +114,8 @@
   "composables": {
     "agent": {
       "busy": "操作执行中",
-      "done": "完成"
+      "done": "完成",
+      "failed": "AI 执行失败"
     }
   },
   "index": {
@@ -522,6 +523,52 @@
     }
   },
   "episode": {
+    "liveLog": {
+      "badge": "日志",
+      "title": "{type}提取日志",
+      "running": "实时",
+      "finished": "已结束",
+      "empty": "暂无日志：点「提取{type}」后这里会实时显示过程",
+      "hint": "仅本次会话内可见，不写入数据库",
+      "start": "开始提取{type}",
+      "toolCall": "调用「{tool}」",
+      "saved": "{tool}：新增 {created}，合并 {merged}",
+      "text": "模型输出 · {n} 字",
+      "failedLabel": "失败",
+      "done": "完成（{n} 轮）",
+      "failed": "失败：{msg}",
+      "tool": {
+        "read_script_for_extraction": "读取剧本",
+        "read_existing_characters": "读取已有角色",
+        "save_dedup_characters": "保存角色",
+        "read_existing_scenes": "读取已有场景",
+        "save_dedup_scenes": "保存场景",
+        "read_existing_props": "读取已有道具",
+        "save_dedup_props": "保存道具"
+      }
+    },
+    "activity": {
+      "titleRewrite": "AI 正在改写剧本",
+      "titleBreakdown": "AI 正在拆分分镜",
+      "titleGeneric": "AI 正在工作",
+      "phaseConnecting": "正在连接模型服务…",
+      "phaseThinking": "正在读取内容并思考，等待模型开始输出…",
+      "phaseReasoning": "正在推理（已输出 {n} 字思考内容）…",
+      "phaseWriting": "正在输出内容（已生成 {n} 字）…",
+      "phaseTool": "正在执行「{tool}」…",
+      "phaseDone": "完成，用时 {s}",
+      "phaseError": "执行失败，详见下方错误信息",
+      "liveOutput": "实时输出",
+      "chars": "{n} 字",
+      "tool": {
+        "read_episode_script": "读取剧本",
+        "rewrite_to_screenplay": "整理为格式化剧本",
+        "save_script": "保存剧本",
+        "read_storyboard_context": "读取分镜上下文",
+        "save_storyboards": "写入分镜",
+        "update_storyboard": "更新分镜"
+      }
+    },
     "topbar": {
       "back": "返回项目",
       "episodeN": "第 {n} 集",

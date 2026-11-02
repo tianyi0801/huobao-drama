@@ -114,7 +114,8 @@
   "composables": {
     "agent": {
       "busy": "Operation in progress",
-      "done": "Done"
+      "done": "Done",
+      "failed": "Agent failed"
     }
   },
   "index": {
@@ -522,6 +523,52 @@
     }
   },
   "episode": {
+    "liveLog": {
+      "badge": "Log",
+      "title": "{type} extraction log",
+      "running": "Live",
+      "finished": "Finished",
+      "empty": "No logs yet — run the extraction to see live progress",
+      "hint": "Visible in this session only, not stored in the database",
+      "start": "Started extracting {type}",
+      "toolCall": "Running “{tool}”",
+      "saved": "{tool}: {created} added, {merged} merged",
+      "text": "Model output · {n} chars",
+      "failedLabel": "Failed",
+      "done": "Done ({n} steps)",
+      "failed": "Failed: {msg}",
+      "tool": {
+        "read_script_for_extraction": "Read script",
+        "read_existing_characters": "Read existing characters",
+        "save_dedup_characters": "Save characters",
+        "read_existing_scenes": "Read existing scenes",
+        "save_dedup_scenes": "Save scenes",
+        "read_existing_props": "Read existing props",
+        "save_dedup_props": "Save props"
+      }
+    },
+    "activity": {
+      "titleRewrite": "AI is rewriting the script",
+      "titleBreakdown": "AI is splitting storyboards",
+      "titleGeneric": "AI is working",
+      "phaseConnecting": "Connecting to the model service…",
+      "phaseThinking": "Reading the content and waiting for model output…",
+      "phaseReasoning": "Reasoning… ({n} chars)",
+      "phaseWriting": "Generating content ({n} chars)…",
+      "phaseTool": "Running “{tool}”…",
+      "phaseDone": "Done in {s}",
+      "phaseError": "Failed — see the error below",
+      "liveOutput": "Live output",
+      "chars": "{n} chars",
+      "tool": {
+        "read_episode_script": "Read script",
+        "rewrite_to_screenplay": "Structure as screenplay",
+        "save_script": "Save script",
+        "read_storyboard_context": "Read storyboard context",
+        "save_storyboards": "Write storyboards",
+        "update_storyboard": "Update storyboard"
+      }
+    },
     "topbar": {
       "back": "Back to Project",
       "episodeN": "Episode {n}",

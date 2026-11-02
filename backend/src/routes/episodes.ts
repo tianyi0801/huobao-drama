@@ -1,10 +1,12 @@
 import { Hono } from 'hono'
+import { streamSSE } from 'hono/streaming'
 import { and, eq, isNull } from 'drizzle-orm'
 import { db, getInsertId, schema } from '../db/index.js'
 import { success, notFound, badRequest, now } from '../utils/response.js'
 import { toSnakeCaseArray, toSnakeCase } from '../utils/transform.js'
 import { getActiveConfigId } from '../services/ai.js'
-import { EXTRACT_TARGETS, getExtractionStatus, startExtraction, type ExtractTarget } from '../services/extraction.js'
+import { EXTRACT_TARGETS, extractLogKey, getExtractionStatus, startExtraction, type ExtractTarget } from '../services/extraction.js'
+import { readLiveLog, subscribeLiveLog } from '../services/live-log.js'
 import { getVideoPromptBatchStatus, startVideoPromptBatch } from '../services/video-prompts.js'
 
 const app = new Hono()
@@ -142,6 +144,41 @@ app.post('/:id/extract', async (c) => {
 app.get('/:id/extract-status', async (c) => {
   const id = Number(c.req.param('id'))
   return success(c, getExtractionStatus(id))
+})
+
+// GET /episodes/:id/extract-log?target=characters — 提取过程的实时日志（SSE）
+// 纯内存、不持久化：连接时先回放当前缓冲，再持续推送新条目；任务结束/关页面即销毁
+app.get('/:id/extract-log', async (c) => {
+  const id = Number(c.req.param('id'))
+  const target = c.req.query('target') as ExtractTarget
+  if (!EXTRACT_TARGETS.includes(target)) return badRequest(c, 'target 必须是 characters / scenes / props')
+
+  c.header('Cache-Control', 'no-cache, no-transform')
+  c.header('X-Accel-Buffering', 'no')
+
+  const logKey = extractLogKey(id, target)
+  return streamSSE(c, async (stream) => {
+    let closed = false
+    const send = (entry: unknown) => stream.writeSSE({ event: 'log', data: JSON.stringify(entry) })
+
+    // 先回放已有缓冲（任务已跑了一半时打开也能看到前文）
+    for (const entry of readLiveLog(logKey)) await send(entry)
+
+    await new Promise<void>((resolve) => {
+      const unsubscribe = subscribeLiveLog(logKey, (entry) => { void send(entry) })
+      const heartbeat = setInterval(() => { void stream.writeSSE({ event: 'ping', data: '{}' }) }, 15_000)
+      const finish = () => {
+        if (closed) return
+        closed = true
+        clearInterval(heartbeat)
+        unsubscribe()
+        resolve()
+      }
+      // 客户端关闭页面 / 切换类型时结束订阅，避免订阅者泄漏
+      stream.onAbort(finish)
+      c.req.raw.signal.addEventListener('abort', finish)
+    })
+  })
 })
 
 // POST /episodes/:id/generate-video-prompts — 异步批量为缺少视频提示词的分镜生成（立即返回，前端轮询状态）
