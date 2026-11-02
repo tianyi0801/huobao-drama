@@ -1,0 +1,741 @@
+{
+  "1": {
+    "inputs": {
+      "fl2va_model": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+      "ref2va_model": "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+      "text_encoder": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "video_vae": "minimax_h3_video_vae_int8_convrot.safetensors",
+      "audio_vae": "minimax_h3_audio_vae_fp32.safetensors"
+    },
+    "class_type": "gosick_233_MiniMaxH3EasyLoader",
+    "_meta": {
+      "title": "MiniMax H3 Easy 加载器"
+    }
+  },
+  "2": {
+    "inputs": {
+      "mode": "ref2va",
+      "prompt": "这个是全身照片@图片1，这个是@图片2中景，这个是近景@图片3；让参考图里的这个女生跳脱衣舞",
+      "resolution": "540P",
+      "aspect_ratio": "9:16",
+      "width": 864,
+      "height": 480,
+      "seconds": 5,
+      "advanced": false,
+      "fps": 24,
+      "keyframe_role": "first",
+      "ref_image_size": "1k",
+      "reference_mention_mode": "index",
+      "media_manifest": "[{\"id\":\"de3e5602-491f-450a-af3a-500f9fcc5985\",\"media_type\":\"image\",\"filename\":\"IMG_9896.PNG\",\"subfolder\":\"minimax_h3_v114\",\"storage_type\":\"input\"},{\"id\":\"3bfe0139-d777-44ce-88c5-3b97a32f49cd\",\"media_type\":\"image\",\"filename\":\"IMG_9897.PNG\",\"subfolder\":\"minimax_h3_v114\",\"storage_type\":\"input\"},{\"id\":\"c9c594a0-ce2a-4cad-90ec-2cf8bb213828\",\"media_type\":\"image\",\"filename\":\"IMG_9898.PNG\",\"subfolder\":\"minimax_h3_v114\",\"storage_type\":\"input\"}]",
+      "continuation_config": "{}",
+      "second_pass_enabled": true,
+      "h3_bundle": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "gosick_233_MiniMaxH3EasyV114",
+    "_meta": {
+      "title": "MiniMax H3 Easy v1.14"
+    }
+  },
+  "4": {
+    "inputs": {
+      "model": [
+        "178",
+        0
+      ],
+      "conditioning": [
+        "148",
+        0
+      ]
+    },
+    "class_type": "BasicGuider",
+    "_meta": {
+      "title": "基本引导器"
+    }
+  },
+  "5": {
+    "inputs": {
+      "scheduler": "simple",
+      "steps": [
+        "191",
+        0
+      ],
+      "denoise": 1,
+      "model": [
+        "178",
+        0
+      ]
+    },
+    "class_type": "BasicScheduler",
+    "_meta": {
+      "title": "基本调度器"
+    }
+  },
+  "6": {
+    "inputs": {
+      "noise_seed": 432452970127585
+    },
+    "class_type": "RandomNoise",
+    "_meta": {
+      "title": "种子"
+    }
+  },
+  "7": {
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "K采样器选择"
+    }
+  },
+  "8": {
+    "inputs": {
+      "noise": [
+        "6",
+        0
+      ],
+      "guider": [
+        "4",
+        0
+      ],
+      "sampler": [
+        "7",
+        0
+      ],
+      "sigmas": [
+        "5",
+        0
+      ],
+      "latent_image": [
+        "13",
+        1
+      ]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "自定义采样器（高级）"
+    }
+  },
+  "9": {
+    "inputs": {
+      "samples": [
+        "8",
+        0
+      ],
+      "vae": [
+        "13",
+        2
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE解码"
+    }
+  },
+  "10": {
+    "inputs": {
+      "samples": [
+        "8",
+        1
+      ],
+      "vae": [
+        "13",
+        3
+      ]
+    },
+    "class_type": "VAEDecodeAudio",
+    "_meta": {
+      "title": "VAE解码（音频）"
+    }
+  },
+  "11": {
+    "inputs": {
+      "fps": [
+        "13",
+        4
+      ],
+      "bit_depth": 8,
+      "color_space": "sRGB",
+      "codec": "none",
+      "images": [
+        "9",
+        0
+      ],
+      "audio": [
+        "10",
+        0
+      ]
+    },
+    "class_type": "CreateVideo",
+    "_meta": {
+      "title": "创建视频"
+    }
+  },
+  "12": {
+    "inputs": {
+      "开启二采": true,
+      "二采时保存一采": true,
+      "filename_prefix": "一采/1c",
+      "format": "auto",
+      "codec": "auto",
+      "一采视频": [
+        "11",
+        0
+      ]
+    },
+    "class_type": "gosick_233_MiniMaxH3ConditionalFirstPassSaveVideo",
+    "_meta": {
+      "title": "一采（按需保存）"
+    }
+  },
+  "13": {
+    "inputs": {
+      "h3_context": [
+        "2",
+        1
+      ]
+    },
+    "class_type": "gosick_233_MiniMaxH3EasyOutput",
+    "_meta": {
+      "title": "MiniMax H3 Easy 输出"
+    }
+  },
+  "34": {
+    "inputs": {
+      "video": [
+        "188",
+        0
+      ]
+    },
+    "class_type": "gosick_233_MiniMaxH3AutoUnload",
+    "_meta": {
+      "title": "gosick_233 · MiniMax H3 Auto Unload"
+    }
+  },
+  "86": {
+    "inputs": {
+      "attention": "comfy kitchen attention",
+      "model": [
+        "391",
+        0
+      ]
+    },
+    "class_type": "ModelAttentionBackend",
+    "_meta": {
+      "title": "模型注意力后端"
+    }
+  },
+  "148": {
+    "inputs": {
+      "conditioning": [
+        "13",
+        0
+      ],
+      "clip": [
+        "1",
+        1
+      ]
+    },
+    "class_type": "H3FreeTextEncoder",
+    "_meta": {
+      "title": "释放文本编码器显存（保持开启）"
+    }
+  },
+  "178": {
+    "inputs": {
+      "max_resolution": 512,
+      "jpeg_quality": 80,
+      "suppress_default_preview": true,
+      "preview_frames": [
+        "2",
+        2
+      ],
+      "preview_fps": 8,
+      "tiny_vae": "taeh3.safetensors",
+      "model": [
+        "86",
+        0
+      ]
+    },
+    "class_type": "ModelPreviewOverrideKJ",
+    "_meta": {
+      "title": "一采实时预览"
+    }
+  },
+  "179": {
+    "inputs": {
+      "av_latent": [
+        "291",
+        0
+      ]
+    },
+    "class_type": "LTXVSeparateAVLatent",
+    "_meta": {
+      "title": "分离 AV 潜空间"
+    }
+  },
+  "180": {
+    "inputs": {
+      "model_name": "h3_upscaler_lms_v0.1_fp32.safetensors",
+      "mode": "scale by multiplier",
+      "mode.scale": [
+        "266",
+        0
+      ],
+      "align": 32,
+      "enable_chunking": true,
+      "device": "cuda",
+      "precision": "fp32",
+      "temporal_chunk_frames": "12",
+      "latent": [
+        "238",
+        0
+      ]
+    },
+    "class_type": "gosick_233_MinimaxH3LatentUpscaler3DV114",
+    "_meta": {
+      "title": "gosick_233 · MiniMax H3 潜空间放大 v1.14"
+    }
+  },
+  "181": {
+    "inputs": {
+      "video_latent": [
+        "180",
+        0
+      ],
+      "audio_latent": [
+        "179",
+        1
+      ]
+    },
+    "class_type": "LTXVConcatAVLatent",
+    "_meta": {
+      "title": "拼接 AV 潜空间"
+    }
+  },
+  "188": {
+    "inputs": {
+      "开启保存二采": true,
+      "filename_prefix": "二采/2c",
+      "format": "auto",
+      "codec": "auto",
+      "second_pass_enabled": [
+        "213",
+        1
+      ],
+      "video": [
+        "213",
+        0
+      ]
+    },
+    "class_type": "gosick_233_ConditionalSecondPassSaveV114",
+    "_meta": {
+      "title": "二采（仅开启时保存）"
+    }
+  },
+  "190": {
+    "inputs": {
+      "value": 2
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "二采步数"
+    }
+  },
+  "191": {
+    "inputs": {
+      "value": 4
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "一采步数"
+    }
+  },
+  "192": {
+    "inputs": {
+      "value": 3
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "二采分块"
+    }
+  },
+  "213": {
+    "inputs": {
+      "开启二采": true,
+      "一采视频": [
+        "11",
+        0
+      ],
+      "二采视频": [
+        "302",
+        0
+      ]
+    },
+    "class_type": "gosick_233_MiniMaxH3SecondPassSwitch",
+    "_meta": {
+      "title": "二采总开关"
+    }
+  },
+  "238": {
+    "inputs": {
+      "latent": [
+        "179",
+        0
+      ],
+      "h3_bundle": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "gosick_233_ReleaseFirstPassV114",
+    "_meta": {
+      "title": "一采模型内存/显存释放 v1.14"
+    }
+  },
+  "266": {
+    "inputs": {
+      "value": 1.5
+    },
+    "class_type": "PrimitiveFloat",
+    "_meta": {
+      "title": "二采倍率"
+    }
+  },
+  "291": {
+    "inputs": {
+      "h3_context": [
+        "2",
+        1
+      ],
+      "latent": [
+        "8",
+        1
+      ]
+    },
+    "class_type": "gosick_233_PrepareSecondV114",
+    "_meta": {
+      "title": "本段一采送高清化（清除续写遮罩）"
+    }
+  },
+  "292": {
+    "inputs": {
+      "branch": "first",
+      "save_first": true,
+      "filename_prefix": "一采合并/1h",
+      "h3_context": [
+        "2",
+        1
+      ],
+      "latent": [
+        "8",
+        0
+      ],
+      "video": [
+        "11",
+        0
+      ]
+    },
+    "class_type": "gosick_233_SaveChainV114",
+    "_meta": {
+      "title": "一采合并保存"
+    }
+  },
+  "293": {
+    "inputs": {
+      "branch": "second",
+      "save_first": true,
+      "filename_prefix": "二采合并/2h",
+      "h3_context": [
+        "2",
+        1
+      ],
+      "latent": [
+        "305",
+        0
+      ],
+      "video": [
+        "302",
+        0
+      ],
+      "handover_video": [
+        "11",
+        0
+      ]
+    },
+    "class_type": "gosick_233_SaveChainV114",
+    "_meta": {
+      "title": "二采合并保存"
+    }
+  },
+  "294": {
+    "inputs": {
+      "max_resolution": 512,
+      "jpeg_quality": 80,
+      "suppress_default_preview": true,
+      "preview_frames": [
+        "2",
+        2
+      ],
+      "preview_fps": 8,
+      "tiny_vae": "none",
+      "model": [
+        "300",
+        0
+      ]
+    },
+    "class_type": "ModelPreviewOverrideKJ",
+    "_meta": {
+      "title": "二采实时预览"
+    }
+  },
+  "298": {
+    "inputs": {
+      "model": [
+        "294",
+        0
+      ],
+      "conditioning": [
+        "300",
+        1
+      ]
+    },
+    "class_type": "BasicGuider",
+    "_meta": {
+      "title": "二采独立引导"
+    }
+  },
+  "299": {
+    "inputs": {
+      "h3_context": [
+        "2",
+        1
+      ],
+      "second_pass_video_latent": [
+        "180",
+        0
+      ]
+    },
+    "class_type": "gosick_233_SecondPassConditioningV114",
+    "_meta": {
+      "title": "二采续写锚帧条件（单帧／多帧）"
+    }
+  },
+  "300": {
+    "inputs": {
+      "model": [
+        "306",
+        0
+      ],
+      "conditioning": [
+        "299",
+        0
+      ],
+      "latent": [
+        "181",
+        0
+      ]
+    },
+    "class_type": "gosick_233_ReleaseBeforeSamplingV114",
+    "_meta": {
+      "title": "二采前显存清理 v1.14"
+    }
+  },
+  "301": {
+    "inputs": {
+      "unet_name": "DasiwaMinimaxH3_dasiwaHybridV1.safetensors",
+      "weight_dtype": "default",
+      "first_pass_finished": [
+        "238",
+        1
+      ]
+    },
+    "class_type": "gosick_233_SecondModelLoaderV114",
+    "_meta": {
+      "title": "二采模型加载（释放一采后）v1.14"
+    }
+  },
+  "302": {
+    "inputs": {
+      "fps": [
+        "13",
+        4
+      ],
+      "bit_depth": 8,
+      "color_space": "sRGB",
+      "codec": "none",
+      "images": [
+        "311",
+        0
+      ],
+      "audio": [
+        "303",
+        0
+      ]
+    },
+    "class_type": "CreateVideo",
+    "_meta": {
+      "title": "创建视频"
+    }
+  },
+  "303": {
+    "inputs": {
+      "samples": [
+        "305",
+        0
+      ],
+      "vae": [
+        "13",
+        3
+      ]
+    },
+    "class_type": "VAEDecodeAudio",
+    "_meta": {
+      "title": "VAE解码（音频）"
+    }
+  },
+  "304": {
+    "inputs": {
+      "attention": "comfy kitchen attention",
+      "model": [
+        "370",
+        0
+      ]
+    },
+    "class_type": "ModelAttentionBackend",
+    "_meta": {
+      "title": "二采 Comfy Kitchen Attention"
+    }
+  },
+  "305": {
+    "inputs": {
+      "bypass_tiling": false,
+      "tile_axis": "auto",
+      "n_tiles": [
+        "192",
+        0
+      ],
+      "tile_overlap": 8,
+      "max_size_for_no_tile": 24,
+      "target_frames": 17,
+      "frame_padding_mode": "replicate_last",
+      "debug": false,
+      "noise": [
+        "6",
+        0
+      ],
+      "guider": [
+        "298",
+        0
+      ],
+      "sampler": [
+        "7",
+        0
+      ],
+      "sigmas": [
+        "312",
+        0
+      ],
+      "latent_image": [
+        "300",
+        2
+      ]
+    },
+    "class_type": "gosick_233_H3TiledSampler",
+    "_meta": {
+      "title": "二采分块高清化"
+    }
+  },
+  "306": {
+    "inputs": {
+      "chunks": 2,
+      "seq_threshold": 4096,
+      "model": [
+        "307",
+        0
+      ]
+    },
+    "class_type": "MiniMaxChunkFeedForward",
+    "_meta": {
+      "title": "二采 Chunk FeedForward"
+    }
+  },
+  "307": {
+    "inputs": {
+      "head_chunks": 2,
+      "model": [
+        "304",
+        0
+      ]
+    },
+    "class_type": "MiniMaxLowVRAMAttention",
+    "_meta": {
+      "title": "二采 LowVRAM Attention"
+    }
+  },
+  "311": {
+    "inputs": {
+      "samples": [
+        "305",
+        0
+      ],
+      "vae": [
+        "13",
+        2
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE解码"
+    }
+  },
+  "312": {
+    "inputs": {
+      "scheduler": "simple",
+      "steps": [
+        "190",
+        0
+      ],
+      "denoise": 0.2,
+      "model": [
+        "300",
+        0
+      ]
+    },
+    "class_type": "BasicScheduler",
+    "_meta": {
+      "title": "基本调度器"
+    }
+  },
+  "370": {
+    "inputs": {
+      "lora_name": "minimax_h3_taomate_3step_lora_avg_rank_19_bf16.safetensors",
+      "strength_model": 0.9,
+      "model": [
+        "301",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "LoRA加载器（仅模型）"
+    }
+  },
+  "391": {
+    "inputs": {
+      "lora_name": "minimax_h3_ref2v_lightx2v_turbo_4step_v0.1_resized_avg_rank_20_bf16.safetensors",
+      "strength_model": 1,
+      "model": [
+        "2",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "LoRA加载器（仅模型）"
+    }
+  }
+}

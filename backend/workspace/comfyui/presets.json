@@ -1,0 +1,442 @@
+{
+  "version": 1,
+  "presets": [
+    {
+      "id": "qwen-image-2.1-t2i",
+      "label": "Qwen Image 2.1 文生图",
+      "kind": "image",
+      "slot": "image",
+      "apiFile": "qwen-image-2.1-t2i.api.json",
+      "workflowFile": "workflows/huobao-qwen-t2i.workflow.json",
+      "description": "纯文生图（不支持参考图）。Prompt Enhancer 关闭时 prompt 直接写入 TextEncodeQwenImage21，文本增强分支会被剪枝，不再加载 9B 模型。",
+      "template": {
+        "name": "Qwen Image 2.1 文生图",
+        "outputNodes": [
+          "461"
+        ],
+        "bindings": [
+          {
+            "source": "prompt",
+            "when": {
+              "prompt_enhancer": false
+            },
+            "targets": [
+              {
+                "node": "459:452",
+                "input": "prompt"
+              }
+            ]
+          },
+          {
+            "source": "prompt",
+            "when": {
+              "prompt_enhancer": true
+            },
+            "targets": [
+              {
+                "node": "459:471",
+                "input": "prompt"
+              }
+            ]
+          },
+          {
+            "source": "negative_prompt",
+            "targets": [
+              {
+                "node": "459:452",
+                "input": "negative_prompt"
+              }
+            ]
+          },
+          {
+            "source": "width",
+            "targets": [
+              {
+                "node": "459:456",
+                "input": "width"
+              }
+            ]
+          },
+          {
+            "source": "height",
+            "targets": [
+              {
+                "node": "459:456",
+                "input": "height"
+              }
+            ]
+          },
+          {
+            "source": "seed",
+            "targets": [
+              {
+                "node": "459:458",
+                "input": "seed"
+              }
+            ]
+          },
+          {
+            "source": "filename_prefix",
+            "targets": [
+              {
+                "node": "461",
+                "input": "filename_prefix"
+              }
+            ]
+          }
+        ],
+        "options": [
+          {
+            "id": "prompt_enhancer",
+            "label": "提示词增强 (Prompt Enhancer)",
+            "type": "boolean",
+            "default": false,
+            "targets": [
+              {
+                "node": "459:474",
+                "input": "switch"
+              }
+            ],
+            "hint": "ComfyUI 内置的提示词增强：开启后先用本地 Qwen3.5 9B 把提示词扩写成整段英文再出图，会明显增加耗时（实测约慢 3~8 倍，本机 20 秒级会变成 100 秒以上），且会自行补全你未写明的内容；关闭时该分支被剪掉，直接用原提示词出图"
+          },
+          {
+            "id": "steps",
+            "label": "采样步数",
+            "type": "number",
+            "default": 25,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "targets": [
+              {
+                "node": "459:458",
+                "input": "steps"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "qwen-image-2.1-edit",
+      "label": "Qwen Image 2.1 图片编辑（参考图）",
+      "kind": "image",
+      "slot": "imageEdit",
+      "apiFile": "qwen-image-2.1-edit.api.json",
+      "workflowFile": "workflows/huobao-qwen-edit.workflow.json",
+      "description": "支持 1-2 张参考图的图片编辑：图 1 走 470 LoadImage，图 2 走 475 LoadImage。只有 1 张参考图时第二路槽位会被删除。",
+      "template": {
+        "name": "Qwen Image 2.1 图片编辑",
+        "outputNodes": [
+          "461"
+        ],
+        "bindings": [
+          {
+            "source": "prompt",
+            "when": {
+              "prompt_enhancer": false
+            },
+            "targets": [
+              {
+                "node": "459:474",
+                "input": "prompt"
+              }
+            ]
+          },
+          {
+            "source": "prompt",
+            "when": {
+              "prompt_enhancer": true
+            },
+            "targets": [
+              {
+                "node": "459:500",
+                "input": "prompt"
+              }
+            ]
+          },
+          {
+            "source": "negative_prompt",
+            "targets": [
+              {
+                "node": "459:474",
+                "input": "negative_prompt"
+              }
+            ]
+          },
+          {
+            "source": "width",
+            "targets": [
+              {
+                "node": "459:456",
+                "input": "width"
+              }
+            ]
+          },
+          {
+            "source": "height",
+            "targets": [
+              {
+                "node": "459:456",
+                "input": "height"
+              }
+            ]
+          },
+          {
+            "source": "seed",
+            "targets": [
+              {
+                "node": "459:458",
+                "input": "seed"
+              }
+            ]
+          },
+          {
+            "source": "images",
+            "index": 0,
+            "targets": [
+              {
+                "node": "470",
+                "input": "image"
+              }
+            ]
+          },
+          {
+            "source": "images",
+            "index": 1,
+            "optional": true,
+            "targets": [
+              {
+                "node": "475",
+                "input": "image"
+              }
+            ]
+          },
+          {
+            "source": "filename_prefix",
+            "targets": [
+              {
+                "node": "461",
+                "input": "filename_prefix"
+              }
+            ]
+          }
+        ],
+        "options": [
+          {
+            "id": "prompt_enhancer",
+            "label": "提示词增强 (Prompt Enhancer)",
+            "type": "boolean",
+            "default": false,
+            "targets": [
+              {
+                "node": "459:484",
+                "input": "switch"
+              }
+            ],
+            "hint": "ComfyUI 内置的提示词增强：开启后先用本地 Qwen3.5 9B 按参考图改写编辑指令再出图，会明显增加耗时（实测约慢 3~8 倍），且会自行补全你未写明的内容；关闭时该分支被剪掉，直接用原编辑指令出图"
+          },
+          {
+            "id": "steps",
+            "label": "采样步数",
+            "type": "number",
+            "default": 25,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "targets": [
+              {
+                "node": "459:458",
+                "input": "steps"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "minimax-h3-ref2va",
+      "label": "MiniMax H3 参考生视频",
+      "kind": "video",
+      "slot": "video",
+      "apiFile": "minimax-h3-ref2va.api.json",
+      "workflowFile": "workflows/huobao-minimax-h3.workflow.json",
+      "description": "Ref2VA 多模态参考生视频（图片/视频/音频素材清单）。默认二采合并保存节点 293 取最终成片，并保留 34 AutoUnload 以在结束后释放显存。",
+      "template": {
+        "name": "MiniMax H3 参考生视频",
+        "outputNodes": [
+          "293",
+          "188",
+          "292",
+          "34"
+        ],
+        "bindings": [
+          {
+            "source": "prompt",
+            "targets": [
+              {
+                "node": "2",
+                "input": "prompt"
+              }
+            ]
+          },
+          {
+            "source": "width",
+            "targets": [
+              {
+                "node": "2",
+                "input": "width"
+              }
+            ]
+          },
+          {
+            "source": "height",
+            "targets": [
+              {
+                "node": "2",
+                "input": "height"
+              }
+            ]
+          },
+          {
+            "source": "resolution",
+            "targets": [
+              {
+                "node": "2",
+                "input": "resolution"
+              }
+            ]
+          },
+          {
+            "source": "aspect_ratio",
+            "targets": [
+              {
+                "node": "2",
+                "input": "aspect_ratio"
+              }
+            ]
+          },
+          {
+            "source": "duration_seconds",
+            "targets": [
+              {
+                "node": "2",
+                "input": "seconds"
+              }
+            ]
+          },
+          {
+            "source": "fps",
+            "targets": [
+              {
+                "node": "2",
+                "input": "fps"
+              }
+            ]
+          },
+          {
+            "source": "seed",
+            "targets": [
+              {
+                "node": "6",
+                "input": "noise_seed"
+              }
+            ]
+          },
+          {
+            "source": "media",
+            "encoding": "json",
+            "targets": [
+              {
+                "node": "2",
+                "input": "media_manifest"
+              }
+            ]
+          },
+          {
+            "source": "filename_prefix",
+            "targets": [
+              {
+                "node": "293",
+                "input": "filename_prefix"
+              }
+            ]
+          }
+        ],
+        "options": [
+          {
+            "id": "first_pass_steps",
+            "label": "一采步数",
+            "type": "number",
+            "default": 4,
+            "min": 1,
+            "max": 50,
+            "step": 1,
+            "targets": [
+              {
+                "node": "191",
+                "input": "value"
+              }
+            ]
+          },
+          {
+            "id": "second_pass",
+            "label": "开启二采（分块高清化）",
+            "type": "boolean",
+            "default": true,
+            "targets": [
+              {
+                "node": "2",
+                "input": "second_pass_enabled"
+              },
+              {
+                "node": "12",
+                "input": "开启二采"
+              },
+              {
+                "node": "213",
+                "input": "开启二采"
+              },
+              {
+                "node": "188",
+                "input": "开启保存二采"
+              }
+            ],
+            "hint": "一采档位由界面「清晰度」决定，二采按倍率放大（720P 一采 + 1.5 倍 = 1080P 成片）。关闭后不会产出 293，需把输出节点换成 292"
+          },
+          {
+            "id": "second_pass_steps",
+            "label": "二采步数",
+            "type": "number",
+            "default": 2,
+            "min": 1,
+            "max": 50,
+            "step": 1,
+            "targets": [
+              {
+                "node": "190",
+                "input": "value"
+              }
+            ]
+          },
+          {
+            "id": "second_pass_scale",
+            "label": "二采倍率",
+            "type": "number",
+            "default": 1.5,
+            "min": 1,
+            "max": 3,
+            "step": 0.05,
+            "targets": [
+              {
+                "node": "266",
+                "input": "value"
+              }
+            ]
+          }
+        ],
+        "description": "Ref2VA 多模态参考生视频（图片/视频/音频素材清单）。默认二采合并保存节点 293 取最终成片，并保留 34 AutoUnload 以在结束后释放显存。"
+      }
+    }
+  ]
+}
