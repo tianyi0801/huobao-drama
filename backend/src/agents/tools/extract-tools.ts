@@ -205,13 +205,16 @@ const saveDedupCharacters = createTool({
       if (existing) {
         // 归一化命中：括号定位/别名等近名视作同一角色复用，避免重复创建
         if (matchedViaNorm) logTaskProgress('ExtractTool', 'save-characters-reuse', { episodeId, dramaId, extracted: char.name, reused: existing.name })
-        // 已存在：合并信息，保留 ID
+        // 重提仅补齐空字段，保持项目级身份与妆造稳定
+        const appearance = existing.appearance || char.appearance || ''
+        const styling = existing.styling || char.styling || ''
+        const visualChanged = appearance !== (existing.appearance || '') || styling !== (existing.styling || '')
         await db.update(schema.characters).set({
-          role: char.role || existing.role,
-          description: char.description || existing.description,
-          appearance: char.appearance || existing.appearance,
-          styling: char.styling || char.description || existing.styling,
-          finalPrompt: (char.appearance || char.styling || char.description) ? null : existing.finalPrompt,
+          role: existing.role || char.role,
+          description: existing.description || char.description,
+          appearance,
+          styling,
+          finalPrompt: visualChanged ? null : existing.finalPrompt,
           updatedAt: ts,
         }).where(eq(schema.characters.id, existing.id))
         await linkCharToEpisode(episodeId, existing.id)
@@ -223,7 +226,7 @@ const saveDedupCharacters = createTool({
           role: char.role || '',
           description: char.description || '',
           appearance: char.appearance || '',
-          styling: char.styling || char.description || '',
+          styling: char.styling || '',
           dramaId,
           createdAt: ts,
           updatedAt: ts,
@@ -278,11 +281,14 @@ const saveDedupScenes = createTool({
         || (normLocation ? scenesInProject.find(s => normalizeLocation(s.location) === normLocation && s.time === (scene.time || '')) : undefined)
 
       if (existing) {
-        // 已存在完全匹配的场景：关联并补齐描述/光影
+        // 重提仅补齐空字段，不重置已确定的场景布局与光影
+        const prompt = existing.prompt || scene.prompt || scene.description || ''
+        const lighting = existing.lighting || scene.lighting || ''
+        const visualChanged = prompt !== (existing.prompt || '') || lighting !== (existing.lighting || '')
         await db.update(schema.scenes).set({
-          prompt: scene.prompt || scene.description || existing.prompt,
-          lighting: scene.lighting || existing.lighting,
-          finalPrompt: (scene.prompt || scene.description || scene.lighting) ? null : existing.finalPrompt,
+          prompt,
+          lighting,
+          finalPrompt: visualChanged ? null : existing.finalPrompt,
           updatedAt: ts,
         }).where(eq(schema.scenes.id, existing.id))
         await linkSceneToEpisode(episodeId, existing.id)
@@ -384,11 +390,12 @@ const saveDedupProps = createTool({
       if (existing) {
         // 归一化命中：括号定位/别名等近名视作同一道具复用
         if (matchedViaNorm) logTaskProgress('ExtractTool', 'save-props-reuse', { episodeId, dramaId, extracted: prop.name, reused: existing.name })
-        // 已存在：合并信息，保留 ID；物品外貌变更后旧的最终提示词失效
+        // 重提只补齐空字段，保持道具外观及已保存参考提示词稳定
+        const description = existing.description || prop.description || ''
         await db.update(schema.props).set({
-          type: prop.type || existing.type,
-          description: prop.description || existing.description,
-          finalPrompt: prop.description ? null : existing.finalPrompt,
+          type: existing.type || prop.type,
+          description,
+          finalPrompt: description !== (existing.description || '') ? null : existing.finalPrompt,
           updatedAt: ts,
         }).where(eq(schema.props.id, existing.id))
         await linkPropToEpisode(episodeId, existing.id)

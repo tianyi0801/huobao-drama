@@ -6,7 +6,7 @@ import { generateImage, generateVideo, recoverVideoTask } from '../services/gene
 import { safeTaskError } from '../services/video-download.js'
 import { getActiveConfig, getConfigById, resolveGenerationConfigId } from '../services/ai.js'
 import { getComfyConfig } from '../services/comfyui/config.js'
-import { buildContinuityPromptSuffix, resolvePreviousShotFrame } from '../services/storyboard-continuity.js'
+import { appendVideoPromptSection } from '../services/video-prompt-structure.js'
 import { getDramaStylePrompt } from '../services/style-preset.js'
 import { resolveDramaImageSize } from '../services/image-size.js'
 import { resolveStoryboardVoiceReferences } from '../services/character-voice-references.js'
@@ -178,20 +178,6 @@ app.post('/', async (c) => {
       const referenceError = validateVideoRequest(videoBody, effectiveConfig?.provider)
       if (referenceError) return badRequest(c, referenceError)
 
-      // 镜头衔接：同场景相邻分镜把「上一段尾帧」作为额外参考，避免机位朝向跳变。
-      // 仅本地 ComfyUI 生效（云端厂商的参考图语义不同，且需公网可达地址）。
-      if (effectiveConfig?.provider === 'comfyui'
-        && getComfyConfig().continuityReference
-        && body.storyboard_id) {
-        const previous = await resolvePreviousShotFrame(Number(body.storyboard_id))
-        const existing = Array.isArray(videoBody.reference_image_urls) ? videoBody.reference_image_urls : []
-        // 留出余量，避免叠加后超出上游素材上限
-        if (previous && existing.length < 12) {
-          const imageIndex = existing.length + 1
-          videoBody.reference_image_urls = [...existing, previous.framePath]
-          videoBody.prompt = `${videoBody.prompt || ''}${buildContinuityPromptSuffix(imageIndex)}`
-        }
-      }
     }
 
     logTaskStart('TaskAPI', 'generate', {
@@ -203,12 +189,12 @@ app.post('/', async (c) => {
     })
     logTaskPayload('TaskAPI', 'request body', body)
 
-    // 视频生成时把项目视觉风格词注入提示词最前方（与图片侧的自动注入保持一致口径）
+    // H3视觉风格写入画面节，保留六节顺序与声音节边界
     let videoPrompt = videoBody?.prompt
     if (type === 'video' && String(videoPrompt || '').trim()) {
       const dramaId = body.drama_id ?? storyboardDramaId ?? null
       const stylePrompt = await getDramaStylePrompt(dramaId)
-      if (stylePrompt) videoPrompt = `${stylePrompt}，\n${videoPrompt}`
+      if (stylePrompt) videoPrompt = appendVideoPromptSection(String(videoPrompt), 'detailed_description', stylePrompt, true)
     }
 
     // 未显式指定尺寸时按项目画面比例 + 集清晰度档推导，避免竖屏项目出横图

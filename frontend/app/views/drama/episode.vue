@@ -837,7 +837,7 @@
                           :value="selectedSb.duration || 5"
                           type="number"
                           min="2"
-                          max="8"
+                          max="12"
                           class="input video-duration-input"
                           @change="onVideoDurationChange"
                         />
@@ -3138,11 +3138,12 @@ async function genVideoPrompt(sb) {
   videoPromptGeneratingIds.value.push(sb.id)
   try {
     await api.post(`/agent/prompt_generator/chat`, {
-      message: `请为分镜 #${idx}(ID:${sb.id})生成视频提示词(video_prompt)。视频模型:${label},请根据该模型的特性和时长限制生成。
+      storyboard_id: sb.id,
+      message: `请为分镜 #${idx}(ID:${sb.id})生成视频提示词(video_prompt)。视频模型:${label},请遵循本地 ComfyUI 视频提示词契约。
 
 该分镜信息:时长 ${sb.duration || 5}s;场景:${getSceneName(sb) || '未绑定'};角色:${charNames};道具:${propNames}。
 
-请先调用 read_storyboard_context 获取该分镜的画面描述(含【镜头N】子镜头与台词/旁白)、氛围及时长,据此生成 video_prompt,必须是 H3 原生六段结构(小节名固定、顺序不可变):subject_definitions(每个出场人物一行 <Subject N> 是 @角色名：参考图可见的外貌)、shot_summary(一句话讲清谁·在哪·做什么·结果)、reference_usage(逐张声明用途并明确不提供构图与姿态;不可省略)、detailed_description([Shot N] 起始秒-结束秒：景别/角度/运镜 + 动作 + 台词)、overall_soundscape、non_diegetic_music(无则 N/A);段落内允许多镜头切镜但不跨场景,用 @角色名/@场景名/@道具名 引用素材;然后调用 update_storyboard 保存到分镜 ID:${sb.id}。只更新 video_prompt 字段,不要改动其他字段,不要重新拆分整集。`,
+先调用 read_storyboard_context 读取 description、atmosphere、duration 和实际绑定素材，按系统的本地 ComfyUI 视频提示词契约生成六节内容。默认一个连续镜头；保留全部动作、原句对白及原有旁白，时间轴总长等于该分镜 duration。主角与配角均写清身份、位置与清晰脸部；对白只写一次，声音节列说话白名单，无对白时明确无任何人声，不新增配音或配乐。没有图片的主体用普通名称描述，不虚构 @ 素材引用。调用 update_storyboard 保存到分镜 ID:${sb.id}，参数仅 storyboard_id 与 video_prompt，不改其他字段，不重新拆分整集。`,
       drama_id: dramaId,
       episode_id: epId.value,
       model: chatModelOverride() || undefined,
@@ -3564,25 +3565,32 @@ function getShotReferenceIndexMap(sb) {
 function resolveVideoPromptRefs(sb) {
   const prompt = sb.video_prompt || sb.videoPrompt || ''
   const map = getShotReferenceIndexMap(sb)
-  const names = Object.keys(map).sort((a, b) => b.length - a.length)
-  if (!names.length) return prompt
+  const names = [
+    getStoryboardScene(sb)?.location,
+    ...getStoryboardCharacters(sb).map(char => char.name),
+    ...getStoryboardProps(sb).map(prop => prop.name),
+  ].filter(Boolean).sort((a, b) => b.length - a.length)
   return prompt.replace(/@([^\s@#]+)/g, (m, raw) => {
+    if (/^(图片|视频|音频)\d+/.test(raw)) return m
     for (const name of names) {
       if (raw.startsWith(name)) {
+        if (!map[name] || names.filter(candidate => candidate === name).length > 1) {
+          throw new Error(t('episode.inspector.missingReference', { reference: name }))
+        }
         return `@图片${map[name]}${name}${raw.slice(name.length)}`
       }
     }
-    return m
+    throw new Error(t('episode.inspector.missingReference', { reference: raw }))
   })
 }
 
 // 分镜时长（视频生成参数区直接编辑并保存到分镜）：
-// 本地视频模型 5 秒最稳、8 秒为硬上限（更长会明显掉质量且耗时激增）
+// 本地 H3 时长编辑范围为2—12秒，默认5秒，与分镜提示词的12秒上限保持一致
 function onVideoDurationChange(e) {
   const sb = selectedSb.value
   if (!sb) return
   const min = 2
-  const max = 8
+  const max = 12
   let v = Math.round(Number(e.target.value))
   if (!Number.isFinite(v)) v = Number(sb.duration || 5)
   v = Math.min(max, Math.max(min, v))
@@ -3636,11 +3644,18 @@ async function genVid(sb, opts = {}) {
   // 恢复已有任务不需要配置；只有真正提交新视频任务时才校验引擎就绪
   if (!(await ensureVideoEngine())) return
   const referenceImages = getShotReferenceImages(sb)
+  let prompt
+  try {
+    prompt = resolveVideoPromptRefs(sb)
+  } catch (e) {
+    toastError(e)
+    return
+  }
   // 参考素材完全来自分镜绑定的角色/场景/道具图片
   const params = {
     storyboard_id: sb.id,
     drama_id: dramaId,
-    prompt: resolveVideoPromptRefs(sb),
+    prompt,
     duration: Number(sb.duration || 5),
     aspect_ratio: dramaAspectRatio.value,
     generate_audio: true,

@@ -46,15 +46,16 @@ const saveCharacterFinalPrompt = createTool({
   id: 'save_character_final_prompt',
   description: '保存为角色创作的三视图最终提示词。项目视觉风格会由工具自动拼接，prompt 参数中不要包含风格词。',
   inputSchema: z.object({
-    character_id: z.number(),
-    prompt: z.string().describe('角色三视图最终提示词（使用会话语言指令指定的目标语言，不含风格词）'),
+    character_id: z.number().int().positive(),
+    prompt: z.string().trim().min(1).describe('角色三视图最终提示词（使用会话语言指令指定的目标语言，不含风格词）'),
   }),
   execute: async ({ character_id, prompt }, context) => {
     const dramaId = getDramaId(context?.requestContext)
     if (!dramaId) return { error: 'Missing dramaId in request context' }
     const [c] = await db.select().from(schema.characters)
       .where(eq(schema.characters.id, character_id))
-    if (!c) return { error: 'Character not found' }
+    if (!c || c.dramaId !== dramaId || c.deletedAt) return { error: '角色不属于当前项目或已删除' }
+    if (!prompt.trim()) return { error: '角色提示词不能为空' }
 
     const stylePrompt = await getDramaStylePrompt(dramaId)
     const finalPrompt = stylePrompt ? `${stylePrompt}, ${prompt}` : prompt
@@ -100,15 +101,16 @@ const saveSceneFinalPrompt = createTool({
   id: 'save_scene_final_prompt',
   description: '保存为场景创作的固定视角（前景/中景/后景）最终提示词。项目视觉风格会由工具自动拼接，prompt 参数中不要包含风格词。',
   inputSchema: z.object({
-    scene_id: z.number(),
-    prompt: z.string().describe('场景固定视角最终提示词（使用会话语言指令指定的目标语言，不含风格词）'),
+    scene_id: z.number().int().positive(),
+    prompt: z.string().trim().min(1).describe('场景固定视角最终提示词（使用会话语言指令指定的目标语言，不含风格词）'),
   }),
   execute: async ({ scene_id, prompt }, context) => {
     const dramaId = getDramaId(context?.requestContext)
     if (!dramaId) return { error: 'Missing dramaId in request context' }
     const [s] = await db.select().from(schema.scenes)
       .where(eq(schema.scenes.id, scene_id))
-    if (!s) return { error: 'Scene not found' }
+    if (!s || s.dramaId !== dramaId || s.deletedAt) return { error: '场景不属于当前项目或已删除' }
+    if (!prompt.trim()) return { error: '场景提示词不能为空' }
 
     const stylePrompt = await getDramaStylePrompt(dramaId)
     const finalPrompt = stylePrompt ? `${stylePrompt}, ${prompt}` : prompt
@@ -153,15 +155,16 @@ const savePropFinalPrompt = createTool({
   id: 'save_prop_final_prompt',
   description: '保存为道具创作的白底单品最终提示词。项目视觉风格会由工具自动拼接，prompt 参数中不要包含风格词。',
   inputSchema: z.object({
-    prop_id: z.number(),
-    prompt: z.string().describe('道具白底单品最终提示词（使用会话语言指令指定的目标语言，不含风格词）'),
+    prop_id: z.number().int().positive(),
+    prompt: z.string().trim().min(1).describe('道具白底单品最终提示词（使用会话语言指令指定的目标语言，不含风格词）'),
   }),
   execute: async ({ prop_id, prompt }, context) => {
     const dramaId = getDramaId(context?.requestContext)
     if (!dramaId) return { error: 'Missing dramaId in request context' }
     const [p] = await db.select().from(schema.props)
       .where(eq(schema.props.id, prop_id))
-    if (!p) return { error: 'Prop not found' }
+    if (!p || p.dramaId !== dramaId || p.deletedAt) return { error: '道具不属于当前项目或已删除' }
+    if (!prompt.trim()) return { error: '道具提示词不能为空' }
 
     const stylePrompt = await getDramaStylePrompt(dramaId)
     const finalPrompt = stylePrompt ? `${stylePrompt}, ${prompt}` : prompt

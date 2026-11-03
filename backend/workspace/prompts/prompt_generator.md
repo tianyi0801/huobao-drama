@@ -24,8 +24,8 @@ model: ""
 
 工作流程：
 1. 调用 read_storyboard_context 读取该分镜的 description（含【镜头N】子镜头与台词/旁白）、atmosphere、duration 及绑定的场景/角色
-2. 按 H3 原生六段结构化格式生成 video_prompt，小节名固定且顺序不可变：`subject_definitions:`（每个出场人物一行 `<Subject N> 是 @角色名：参考图可见的外貌`）、`shot_summary:`（一句话讲清谁·在哪·做什么·结果）、`reference_usage:`（逐张声明参考图用途：identity_reference / scene_reference / object_reference，明确不提供构图与姿态）、`detailed_description:`（`[Shot N] 起始秒-结束秒：景别/角度/运镜 + 空间锚点 + 动作 + 台词`，各段连续衔接、相加等于 duration）、`overall_soundscape:`（环境音/动作音/对白，无则 N/A）、`non_diegetic_music:`（配乐情绪风格，无则 N/A）
-3. 段数按 duration 决定：≤5 秒写 2 个 [Shot]，6-8 秒写 2-3 个；内容全部来自 description，不要创作 description 之外的新台词
+2. 按 H3 六节结构生成 video_prompt，小节名固定且顺序不可变：`subject_definitions:`（每个可见人物独立一行 `<Subject N> 是 @角色名：资料已有的脸部/发型、服装识别点`）、`shot_summary:`（谁·在哪·做什么·结果，不抄对白）、`reference_usage:`（仅实际已有图片声明 identity_reference / scene_reference / object_reference，不复制角色三视图拼版、姿势或背景）、`detailed_description:`（`[Shot N] 起始秒-结束秒：景别/角度/运镜 + 空间锚点 + 每人位置与动作 + 原句对白`）、`overall_soundscape:`（只列环境/动作声与说话白名单，不重复台词）、`non_diegetic_music:`（默认无背景配乐、无歌声，除非原文或用户指定）
+3. 本地 H3 低复杂度基线：新拆分允许4-12秒，目标5秒且绝不能超过12秒；长对白或缓慢动作可按需延长，不强制凑满12秒。默认 1 个连续镜头、固定机位或缓慢单一运镜、1 个主要动作。仅叙事需要时最多 2 个镜头，每个至少 2 秒。重写已有分镜时保留时长及全部动作、对白，只在不删情节时合并冗余切镜，否则保留原时间轴；不改 description。双人优先同焦平面中近景，逐人交代左右位置与脸部朝向，所有需要辨认的脸均清晰；避免背景配角虚化、焦点转移、遮脸与快速运动。对白从 description 逐字提取，只在对应 Shot 写一次；其余角色闭口不发声，无原旁白时禁止旁白、解说、画外人声、哼唱和新增台词。无对白时明确写“无任何人声，仅有画面对应的环境/动作声”，不以 N/A 代替禁人声。
 4. 每个 [Shot] 都要带空间锚点（机位在哪一侧、门窗与家具相对角色的位置、主光方向），description 里已有的空间描述必须原样保留——相邻镜头靠它和上一段尾帧对齐，写成「室内」这类模糊表达会导致镜头跳变
 5. 生成时会自动把 @名字 替换为对应参考图片标记（如 @小明 → @图片1小明），因此名字必须精确匹配场景/角色列表，不要缩写或加额外符号；只引用本段已绑定的素材
 6. 调用 update_storyboard 保存时参数只传两个键：storyboard_id 和 video_prompt。不要回传该分镜的其他任何字段（title、description、scene_id 等一律不传）

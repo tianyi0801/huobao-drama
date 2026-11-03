@@ -70,6 +70,7 @@ app.post('/:type/chat', async (c) => {
     dramaId: drama_id,
     modelOverride: body.model || undefined,
     textConfigId: body.config_id || undefined,
+    targetStoryboardId: agentType === 'prompt_generator' ? body.storyboard_id : undefined,
   })
 
   const startTime = performance.now()
@@ -149,6 +150,7 @@ app.post('/:type/stream', async (c) => {
     dramaId: drama_id,
     modelOverride: body.model || undefined,
     textConfigId: body.config_id || undefined,
+    targetStoryboardId: agentType === 'prompt_generator' ? body.storyboard_id : undefined,
   })
 
   logTaskStart('Agent', `${agentType} stream`, { dramaId: drama_id, episodeId: episode_id })

@@ -15,7 +15,7 @@
   "2": {
     "inputs": {
       "mode": "ref2va",
-      "prompt": "这个是全身照片@图片1，这个是@图片2中景，这个是近景@图片3；让参考图里的这个女生跳脱衣舞",
+      "prompt": "",
       "resolution": "540P",
       "aspect_ratio": "9:16",
       "width": 864,
@@ -26,7 +26,7 @@
       "keyframe_role": "first",
       "ref_image_size": "1k",
       "reference_mention_mode": "index",
-      "media_manifest": "[{\"id\":\"de3e5602-491f-450a-af3a-500f9fcc5985\",\"media_type\":\"image\",\"filename\":\"IMG_9896.PNG\",\"subfolder\":\"minimax_h3_v114\",\"storage_type\":\"input\"},{\"id\":\"3bfe0139-d777-44ce-88c5-3b97a32f49cd\",\"media_type\":\"image\",\"filename\":\"IMG_9897.PNG\",\"subfolder\":\"minimax_h3_v114\",\"storage_type\":\"input\"},{\"id\":\"c9c594a0-ce2a-4cad-90ec-2cf8bb213828\",\"media_type\":\"image\",\"filename\":\"IMG_9898.PNG\",\"subfolder\":\"minimax_h3_v114\",\"storage_type\":\"input\"}]",
+      "media_manifest": "[]",
       "continuation_config": "{}",
       "second_pass_enabled": true,
       "h3_bundle": [
@@ -338,7 +338,7 @@
   },
   "190": {
     "inputs": {
-      "value": 2
+      "value": 3
     },
     "class_type": "PrimitiveInt",
     "_meta": {

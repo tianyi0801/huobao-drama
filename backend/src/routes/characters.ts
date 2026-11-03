@@ -94,11 +94,9 @@ function characterImagePrompt(char: typeof schema.characters.$inferSelect, style
     char.name,
     char.appearance || char.description || '人物立绘',
     char.styling || '',
-    '16:9 横版角色定妆照',
-    '半身角色海报构图',
-    '正面',
-    '高质量',
-    '白色背景',
+    '16:9横版角色参考图，左侧正脸特写，右侧正面、侧面、背面三张等高全身视图',
+    '所有视图为同一身份、同一服装和妆造；正脸五官清晰，完整展示头顶与鞋底',
+    '纯白背景、均匀中性光、固定视角，不添加海报文字、剧情背景或动态构图；参考图版式与清晰度优先于风格中的构图光影指令',
   ].filter(Boolean).join(', ')
 }
 

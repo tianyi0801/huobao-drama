@@ -9,7 +9,9 @@ import { getAbsolutePath } from '../utils/storage.js'
 import { downloadVideo, safeTaskError } from './video-download.js'
 import { prepareReferenceAudio, resolveReferenceAudioUrls } from './reference-audio.js'
 import { getActiveConfig, getConfigById } from './ai.js'
-import { waitForScenePredecessor } from './storyboard-continuity.js'
+import { waitForScenePredecessor, resolvePreviousShotFrame, buildContinuityPromptSuffix } from './storyboard-continuity.js'
+import { getComfyConfig } from './comfyui/config.js'
+import { appendVideoPromptSection } from './video-prompt-structure.js'
 import { now } from '../utils/response.js'
 import { downloadFile, fetchImageAsCompressedDataUrl, generateImageThumb, readImageAsCompressedDataUrl, readImageAsDataUrl, saveBase64Image } from '../utils/storage.js'
 import { extractVideoPoster } from '../utils/video-poster.js'
@@ -234,6 +236,18 @@ async function processTask(id: number, config: AIConfig) {
         .set({ stage: 'queued', updatedAt: now() })
         .where(eq(schema.sysTask.id, id))
       const wait = await waitForScenePredecessor(id, record.storyboardId)
+      if (!wait.timedOut && config.provider === 'comfyui' && getComfyConfig().continuityReference && record.storyboardId) {
+        const previous = await resolvePreviousShotFrame(record.storyboardId)
+        const images = Array.isArray(params.referenceImageUrls) ? params.referenceImageUrls : []
+        if (previous && images.length < 12) {
+          const imageIndex = images.indexOf(previous.framePath) + 1 || images.length + 1
+          if (!images.includes(previous.framePath)) params.referenceImageUrls = [...images, previous.framePath]
+          record.prompt = appendVideoPromptSection(record.prompt || '', 'reference_usage',
+            `continuity_reference: ${buildContinuityPromptSuffix(imageIndex).trim()}`)
+          await db.update(schema.sysTask).set({ prompt: record.prompt, params: JSON.stringify(params), updatedAt: now() })
+            .where(eq(schema.sysTask.id, id))
+        }
+      }
       await db.update(schema.sysTask)
         .set({ stage: 'submitting', updatedAt: now() })
         .where(eq(schema.sysTask.id, id))
@@ -273,9 +287,10 @@ async function processTask(id: number, config: AIConfig) {
       const resolvedImageUrl = await normalizeVideoReferenceUrl(params.imageUrl)
       const resolvedFirstFrameUrl = await normalizeVideoReferenceUrl(params.firstFrameUrl)
       const resolvedLastFrameUrl = await normalizeVideoReferenceUrl(params.lastFrameUrl)
-      const resolvedReferenceImageUrls = await normalizeVideoReferenceUrls(params.referenceImageUrls)
-      // 本地 ComfyUI 引擎自己把素材上传进 input 目录，不需要公网可达地址
+      // 按编号引用的本地素材清单禁止删项或去重，否则角色身份会错位
       const localEngine = config.provider === 'comfyui'
+      const resolvedReferenceImageUrls = await normalizeVideoReferenceUrls(params.referenceImageUrls, localEngine)
+      // 本地 ComfyUI 引擎自己把素材上传进 input 目录，不需要公网可达地址
       // 视频使用公网地址；短音色按厂商能力使用 data URL 或公网地址。
       const resolvedReferenceVideoUrls = localEngine
         ? dedupeMediaList(params.referenceVideoUrls)
@@ -702,11 +717,17 @@ async function normalizeVideoReferenceUrl(value: string | null | undefined): Pro
   return raw
 }
 
-async function normalizeVideoReferenceUrls(refs: string[] | null | undefined): Promise<string[]> {
+export async function normalizeVideoReferenceUrls(refs: string[] | null | undefined, preserveIndices = false): Promise<string[]> {
   if (!Array.isArray(refs) || !refs.length) return []
-  const normalized = await Promise.all(
-    Array.from(new Set(refs.map((item) => String(item || '').trim()).filter(Boolean))).map((item) => normalizeVideoReferenceUrl(item)),
-  )
+  const items = refs.map(item => String(item || '').trim())
+  if (preserveIndices) {
+    if (items.some(item => !item)) throw new Error('参考图清单存在空项，请补齐素材后重试，不能自动移动图片编号')
+    if (new Set(items).size !== items.length) throw new Error('参考图清单存在重复素材，请为各角色使用独立参考图')
+    const normalized = await Promise.all(items.map(item => normalizeVideoReferenceUrl(item)))
+    if (normalized.some(item => !item)) throw new Error('参考图读取失败，请重新上传缺失图片，不能删项后继续生成')
+    return normalized as string[]
+  }
+  const normalized = await Promise.all(Array.from(new Set(items.filter(Boolean))).map(item => normalizeVideoReferenceUrl(item)))
   return normalized.filter((item): item is string => !!item)
 }
 

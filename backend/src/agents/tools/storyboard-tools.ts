@@ -12,6 +12,7 @@ import { logTaskProgress, logTaskSuccess } from '../../utils/task-logger.js'
 import { getDramaId, getEpisodeId } from '../context.js'
 import { STORYBOARD_BATCH_SIZE } from '../local-contract.js'
 import { resolveVoiceMentions } from '../../services/character-voice-references.js'
+import { validateVideoPromptTimeline } from '../../services/video-prompt-structure.js'
 
 async function validateVideoPromptVoices(prompt: string | undefined, dramaId: number, characterIds: number[] = []) {
   if (!prompt?.includes('#')) return
@@ -254,7 +255,7 @@ const storyboardFields = z.object({
   video_prompt: z.string().optional(),
   bgm_prompt: z.string().optional(),
   sound_effect: z.string().optional(),
-  duration: z.number().optional(),
+  duration: z.number().int().min(4).max(12).optional(),
   scene_id: z.number().nullable().optional(),
   character_ids: z.array(z.number()).optional(),
   prop_ids: z.array(z.number()).optional(),
@@ -281,7 +282,11 @@ const saveStoryboards = createTool({
     })
     // 整批校验完再删除旧分镜，避免错误绑定导致旧数据先被清空。
     for (const sb of storyboards) {
+      if (sb.duration != null && (!Number.isInteger(sb.duration) || sb.duration < 4 || sb.duration > 12)) {
+        throw new Error('新拆分分镜时长必须为4—12的整数秒')
+      }
       await validateVideoPromptVoices(sb.video_prompt, dramaId, sb.character_ids)
+      if (sb.video_prompt) validateVideoPromptTimeline(sb.video_prompt, sb.duration ?? 5)
       await validateStoryboardBindings(episodeId, dramaId, sb.scene_id, sb.character_ids, sb.prop_ids)
     }
     if (replace_existing === true) {
@@ -419,6 +424,7 @@ const updateStoryboard = createTool({
           .map(link => link.propId)
 
     await validateVideoPromptVoices(fields.video_prompt, dramaId, currentCharacterIds)
+    if (fields.video_prompt) validateVideoPromptTimeline(fields.video_prompt, fields.duration ?? storyboard.duration ?? 5)
     await validateStoryboardBindings(
       episodeId,
       dramaId,
@@ -453,7 +459,27 @@ const updateStoryboard = createTool({
       characterIds: 'character_ids' in fields ? (fields.character_ids || []).join(',') : undefined,
       propIds: 'prop_ids' in fields ? (fields.prop_ids || []).join(',') : undefined,
     })
-    return { message: `Storyboard ${storyboard_id} updated` }
+    return { message: `Storyboard ${storyboard_id} updated`, storyboard_id, updated_fields: Object.keys(fields) }
+  },
+})
+
+export const updateVideoPrompt = createTool({
+  id: 'update_storyboard',
+  description: '只更新指定分镜的 video_prompt，禁止修改描述、时长、绑定或其他字段。',
+  inputSchema: z.object({
+    storyboard_id: z.number().int().positive(),
+    video_prompt: z.string().trim().min(1),
+  }).strict(),
+  execute: async (input, context) => {
+    if (Object.keys(input).some(key => key !== 'storyboard_id' && key !== 'video_prompt')) {
+      return { error: '视频提示词任务只允许 storyboard_id 与 video_prompt 两个字段' }
+    }
+    if (!input.video_prompt?.trim()) return { error: '视频提示词不能为空' }
+    const targetId = context?.requestContext?.get('targetStoryboardId' as never)
+    if (typeof targetId === 'number' && input.storyboard_id !== targetId) {
+      return { error: `本次只允许更新分镜 ${targetId}` }
+    }
+    return updateStoryboard.execute!(input, context)
   },
 })
 

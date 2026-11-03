@@ -1,0 +1,187 @@
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import fs from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
+import http from 'node:http'
+import { eq } from 'drizzle-orm'
+import { appendVideoPromptSection, validateVideoPromptTimeline } from '../src/services/video-prompt-structure.js'
+
+const root = await fs.mkdtemp(path.join(os.tmpdir(), 'huobao-local-quality-'))
+process.env.SQLITE_PATH = path.join(root, 'test.sqlite3')
+process.env.HUOBAO_DATA_DIR = root
+process.env.STORAGE_PATH = path.join(root, 'static')
+process.env.WORKSPACE_PATH = path.resolve(import.meta.dirname, '../workspace')
+process.env.MYSQL_AUTO_IMPORT = 'false'
+const { db, schema } = await import('../src/db/index.js')
+const { buildAgentRequestContext } = await import('../src/agents/context.js')
+const { registerAgentTools, assertAgentSaved } = await import('../src/agents/execution.js')
+const { storyboardTools, updateVideoPrompt } = await import('../src/agents/tools/storyboard-tools.js')
+const { imagePromptTools } = await import('../src/agents/tools/image-prompt-tools.js')
+const { extractTools } = await import('../src/agents/tools/extract-tools.js')
+const { normalizeVideoReferenceUrls, generateVideo } = await import('../src/services/generation.js')
+const { resolvePreviousShotFrame } = await import('../src/services/storyboard-continuity.js')
+const { saveComfyConfig } = await import('../src/services/comfyui/config.js')
+const { buildTemplateFromPreset } = await import('../src/services/comfyui/presets.js')
+const ts = new Date().toISOString()
+const times = { createdAt: ts, updatedAt: ts }
+const drama = db.insert(schema.dramas).values({ title: '本地质量回归', ...times }).returning().get()
+const episode = db.insert(schema.episodes).values({ dramaId: drama.id, episodeNumber: 1, title: '测试集', ...times }).returning().get()
+const rc = buildAgentRequestContext({ dramaId: drama.id, episodeId: episode.id })
+const prompt = (timeline = '[Shot 1] 0.0-5.0秒：固定窗边中景。') => [
+  'subject_definitions: N/A', 'shot_summary: 窗边雨景', 'reference_usage: N/A',
+  `detailed_description:\n${timeline}`, 'overall_soundscape: 无任何人声，仅雨声。', 'non_diegetic_music: 无背景配乐、无歌声。',
+].join('\n')
+const call = (tool: any, input: any, requestContext = rc) => tool.execute(input, { requestContext })
+const makeShot = (number: number, fields: any = {}) => db.insert(schema.storyboards).values({
+  episodeId: episode.id, storyboardNumber: number, description: '窗边雨景', videoPrompt: prompt(), duration: 5, ...times, ...fields,
+}).returning().get()
+const a = makeShot(1)
+const b = makeShot(2)
+
+test('六节风格与衔接注入保持声音节干净，时间轴不受影响', () => {
+  let text = appendVideoPromptSection(prompt(), 'detailed_description', '柔和写实色彩')
+  text = appendVideoPromptSection(text, 'reference_usage', 'continuity_reference: @图片1为上一镜头尾帧')
+  assert.ok(text.startsWith('subject_definitions:'))
+  assert.ok(text.indexOf('continuity_reference:') < text.indexOf('detailed_description:'))
+  assert.ok(text.indexOf('柔和写实色彩') < text.indexOf('overall_soundscape:'))
+  assert.ok(!text.slice(text.indexOf('non_diegetic_music:')).includes('尾帧'))
+  assert.doesNotThrow(() => validateVideoPromptTimeline(text, 5))
+  assert.equal(appendVideoPromptSection('历史纯文本', 'detailed_description', '风格', true), '风格，\n历史纯文本')
+})
+
+test('时间轴拒绝时长不符、重叠、空缺、错号及重复小节，兼容历史纯文本', () => {
+  assert.throws(() => validateVideoPromptTimeline(prompt(), 12), /修改时长后/)
+  for (const timeline of ['[Shot 1] 0-3秒：雨。\n[Shot 2] 2-5秒：雨。', '[Shot 1] 1-5秒：雨。',
+    '[Shot 2] 0-5秒：雨。', '[Shot 1] 0-2秒：雨。\n[Shot 2] 3-5秒：雨。', '[Shot 1] 没有时间']) {
+    assert.throws(() => validateVideoPromptTimeline(prompt(timeline), 5), /时间|编号/)
+  }
+  assert.throws(() => validateVideoPromptTimeline(`${prompt()}\noverall_soundscape: 雨声`, 5), /六节/)
+  assert.doesNotThrow(() => validateVideoPromptTimeline(prompt('[Shot 1] 0-2.5: 雨。\n[Shot 2] 2.5-5: 雨。'), 5))
+  assert.doesNotThrow(() => validateVideoPromptTimeline('历史纯文本', 15))
+})
+
+test('提示词窄工具保护目标分镜与字段，保存回执不能用旧值冒充', async () => {
+  const target = buildAgentRequestContext({ dramaId: drama.id, episodeId: episode.id, targetStoryboardId: a.id })
+  const tools = registerAgentTools({ updateVideoPrompt, ...imagePromptTools })
+  assert.equal(updateVideoPrompt.inputSchema.safeParse({ storyboard_id: a.id, video_prompt: prompt(), duration: 12 }).success, false)
+  assert.ok((await call(tools.update_storyboard, { storyboard_id: a.id, video_prompt: prompt(), description: '错误覆盖' }, target)).error)
+  assert.ok((await call(tools.update_storyboard, { storyboard_id: b.id, video_prompt: prompt() }, target)).error)
+  assert.ok((await call(tools.save_character_final_prompt, { character_id: 1, prompt: '误调用' }, target)).error)
+  assert.throws(() => assertAgentSaved('prompt_generator', {}, target), /没有成功/)
+  await assert.rejects(call(tools.update_storyboard, { storyboard_id: a.id, video_prompt: prompt('[Shot 1] 0-12秒：雨。') }, target), /时长/)
+  const saved = await call(tools.update_storyboard, { storyboard_id: a.id, video_prompt: prompt() }, target)
+  assert.equal(saved.storyboard_id, a.id)
+  assert.doesNotThrow(() => assertAgentSaved('prompt_generator', {}, target))
+  const after = db.select().from(schema.storyboards).where(eq(schema.storyboards.id, a.id)).get()!
+  assert.equal(after.description, a.description)
+  assert.equal(after.duration, a.duration)
+  const incremental = buildAgentRequestContext({ dramaId: drama.id, episodeId: episode.id })
+  await call(registerAgentTools(storyboardTools).update_storyboard, { storyboard_id: b.id, atmosphere: '柔和' }, incremental)
+  assert.doesNotThrow(() => assertAgentSaved('storyboard_breaker', {}, incremental))
+})
+
+test('新拆分非法时长在清除旧分镜之前被拒绝', async () => {
+  for (const duration of [3, 13, 5.5]) {
+    assert.equal(storyboardTools.saveStoryboards.inputSchema.safeParse({ storyboards: [{ shot_number: 1, duration }] }).success, false)
+    const result = await call(storyboardTools.saveStoryboards, { replace_existing: true, storyboards: [{ shot_number: 1, duration }] })
+    assert.ok(result.error, '框架schema校验失败应返回错误回执')
+  }
+  assert.ok(db.select().from(schema.storyboards).where(eq(schema.storyboards.id, a.id)).get())
+})
+
+test('重提三类资产只补空字段，不覆盖既有身份、不把背景故事当妆造', async () => {
+  const char = db.insert(schema.characters).values({ name: '小明', dramaId: drama.id, appearance: '短发', styling: '蓝外套', finalPrompt: '已保存角色图提示词', ...times }).returning().get()
+  const scene = db.insert(schema.scenes).values({ location: '书房', time: '日', dramaId: drama.id, prompt: '窗在左侧', lighting: '自然光', finalPrompt: '已保存场景图提示词', ...times }).returning().get()
+  const prop = db.insert(schema.props).values({ name: '钥匙', dramaId: drama.id, description: '铜制', finalPrompt: '已保存道具图提示词', ...times }).returning().get()
+  await call(extractTools.saveDedupCharacters, { characters: [{ name: '小明', appearance: '长发', styling: '红外套', description: '人物背景' }, { name: '小红', description: '人物背景' }] })
+  await call(extractTools.saveDedupScenes, { scenes: [{ location: '书房', time: '日', prompt: '窗在右侧', lighting: '灯光' }] })
+  await call(extractTools.saveDedupProps, { props: [{ name: '钥匙', description: '银制' }] })
+  const after = db.select().from(schema.characters).where(eq(schema.characters.id, char.id)).get()!
+  assert.equal(after.appearance, '短发'); assert.equal(after.styling, '蓝外套'); assert.equal(after.finalPrompt, char.finalPrompt)
+  const added = db.select().from(schema.characters).all().find(row => row.name === '小红')!
+  assert.equal(added.styling, '')
+  assert.equal(db.select().from(schema.scenes).where(eq(schema.scenes.id, scene.id)).get()!.finalPrompt, scene.finalPrompt)
+  assert.equal(db.select().from(schema.props).where(eq(schema.props.id, prop.id)).get()!.finalPrompt, prop.finalPrompt)
+})
+
+test('指定角色提取不能跨类型写入或读取场景道具', async () => {
+  const scoped = buildAgentRequestContext({ dramaId: drama.id, episodeId: episode.id, extractTarget: 'characters' })
+  const tools = registerAgentTools(extractTools)
+  assert.ok((await call(tools.save_dedup_props, { props: [{ name: '禁止新增物品' }] }, scoped)).error)
+  assert.ok((await call(tools.read_existing_scenes, {}, scoped)).error)
+  assert.equal(db.select().from(schema.props).all().some(row => row.name === '禁止新增物品'), false)
+  await call(tools.save_dedup_characters, { characters: [] }, scoped)
+  assert.doesNotThrow(() => assertAgentSaved('extractor', {}, scoped))
+})
+
+test('资产最终提示词拒绝跨项目及已删除资产保存', async () => {
+  const other = db.insert(schema.dramas).values({ title: '其他项目', ...times }).returning().get()
+  for (const [table, tool, key, fields] of [
+    [schema.characters, imagePromptTools.saveCharacterFinalPrompt, 'character_id', { name: '其他角色' }],
+    [schema.scenes, imagePromptTools.saveSceneFinalPrompt, 'scene_id', { location: '其他场景', time: '日', prompt: '无人物场景' }],
+    [schema.props, imagePromptTools.savePropFinalPrompt, 'prop_id', { name: '其他道具' }],
+  ] as const) {
+    for (const deleted of [false, true]) {
+      const row = db.insert(table as any).values({ ...fields, dramaId: deleted ? drama.id : other.id, deletedAt: deleted ? ts : null, ...times }).returning().get() as any
+      assert.ok((await call(tool, { [key]: row.id, prompt: '不能保存' })).error)
+    }
+  }
+})
+
+test('本地参考图归一化禁止缺图删项和重复去重，保持顺序', async () => {
+  const image = 'data:image/png;base64,YQ=='
+  const second = 'data:image/png;base64,Yg=='
+  assert.deepEqual(await normalizeVideoReferenceUrls([image, second], true), [image, second])
+  await assert.rejects(normalizeVideoReferenceUrls(['static/missing.png', image, second], true), /读取失败/)
+  await assert.rejects(normalizeVideoReferenceUrls([image, '', second], true), /空项/)
+  await assert.rejects(normalizeVideoReferenceUrls([image, image, second], true), /重复/)
+})
+
+test('镜头衔接等待前段完成后才取新尾帧，跨场景或失败不复用旧图', { timeout: 10_000 }, async () => {
+  const scene = db.insert(schema.scenes).values({ location: '窗边', time: '日', prompt: '窗在左侧，无人物', dramaId: drama.id, ...times }).returning().get()
+  const previous = makeShot(10, { sceneId: scene.id, videoUrl: 'static/videos/old.mp4' })
+  const current = makeShot(11, { sceneId: scene.id })
+  const before = db.insert(schema.sysTask).values({ type: 'video', storyboardId: previous.id, status: 'processing', ...times }).returning().get()
+  await fs.mkdir(path.join(root, 'static/videos'), { recursive: true })
+  await fs.writeFile(path.join(root, 'static/videos/new_lastframe.jpg'), Buffer.alloc(2048, 1))
+  let submitted: any
+  const server = http.createServer(async (req, res) => {
+    const chunks = []
+    for await (const chunk of req) chunks.push(chunk)
+    res.setHeader('Content-Type', 'application/json')
+    if (req.url === '/upload/image') {
+      res.end(JSON.stringify({ name: 'reference.png', subfolder: 'test', type: 'input' }))
+    } else if (req.url === '/prompt') {
+      submitted = JSON.parse(Buffer.concat(chunks).toString()).prompt
+      res.writeHead(400).end('{"error":"离线测试完成"}')
+    } else res.end('{}')
+  })
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  try {
+    saveComfyConfig({ enabled: true, url: `http://127.0.0.1:${(server.address() as any).port}`, video: buildTemplateFromPreset('minimax-h3-ref2va'), continuityReference: true })
+    const id = await generateVideo({ storyboardId: current.id, dramaId: drama.id, prompt: prompt(), duration: 5 })
+    await new Promise(resolve => setTimeout(resolve, 100))
+    assert.equal(submitted, undefined)
+    db.update(schema.storyboards).set({ videoUrl: 'static/videos/new.mp4' }).where(eq(schema.storyboards.id, previous.id)).run()
+    db.update(schema.sysTask).set({ status: 'completed' }).where(eq(schema.sysTask.id, before.id)).run()
+    const deadline = Date.now() + 6000
+    while (Date.now() < deadline && db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id)).get()?.status === 'processing') {
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+    assert.ok(submitted)
+    const saved = db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id)).get()!
+    assert.match(saved.params!, /new_lastframe/)
+    assert.doesNotMatch(saved.params!, /old_lastframe/)
+    assert.match(submitted['2'].inputs.prompt, /continuity_reference:.*@图片1/)
+    assert.ok(submitted['2'].inputs.prompt.indexOf('continuity_reference:') < submitted['2'].inputs.prompt.indexOf('detailed_description:'))
+    db.update(schema.sysTask).set({ status: 'failed' }).where(eq(schema.sysTask.id, before.id)).run()
+    assert.equal(await resolvePreviousShotFrame(current.id), null)
+    db.update(schema.sysTask).set({ status: 'completed' }).where(eq(schema.sysTask.id, before.id)).run()
+    makeShot(12, { sceneId: null })
+    const returnedScene = makeShot(13, { sceneId: scene.id })
+    assert.equal(await resolvePreviousShotFrame(returnedScene.id), null)
+  } finally { await new Promise<void>(resolve => server.close(() => resolve())) }
+})
+
+test.after(async () => { db.$client.close(); await fs.rm(root, { recursive: true, force: true }) })

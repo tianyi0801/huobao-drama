@@ -10,7 +10,7 @@ description: Rules and methods for extracting characters, scenes, and props
 Extracted character fields (corresponding one-to-one with the `save_dedup_characters` tool parameters):
 - **name** (required): the character's full name
 - **role**: the character's positioning — protagonist / supporting / extra
-- **appearance**: appearance description (300-500 characters) — gender, age impression, facial features, physique, bearing. **Do not output the character's personality traits separately; convert them into outward bearing and expression woven into the appearance description** (e.g. "cold personality" should be written as "a cold gaze, a restrained expression, rarely smiling")
+- **appearance**: concise appearance description based on known facts, without a minimum length or invented details to reach 300-500 characters — gender, age impression, facial features, physique, bearing. **Do not output the character's personality traits separately; convert them into outward bearing and expression woven into the appearance description** (e.g. "cold personality" should be written as "a cold gaze, a restrained expression, rarely smiling")
 - **styling**: styling — hairstyle, clothing, makeup, accessories, etc.
 - **description**: backstory and character relationships (optional supplement)
 
@@ -30,7 +30,7 @@ Both of the following conditions must be met — neither is optional:
 1. **Directly drives the plot**: the item's appearance, handover, damage, or discovery triggers a plot turn (e.g. a murder weapon, a token, a key document, a love-token gift, key evidence).
 2. **Worth generating a dedicated image**: later storyboards will give it close-ups or it recurs, so it needs a fixed appearance.
 
-**Three self-check questions** (ask and answer for yourself for each candidate prop; if any answer is "no", drop it):
+**Three self-check questions** (ask and answer for yourself for each candidate prop; if any answer is "yes", drop it):
 - (1) Does the plot still hold if it is removed? → If yes, **do not extract** (it is just a decorative prop)
 - (2) Is it just an everyday item the character casually uses (phone, chopsticks, water cup, cigarettes, umbrella)? → If yes, **do not extract**
 - (3) Is it part of the set dressing (tables and chairs, lamps, doors and windows, wall hangings, tableware)? → If yes, **do not extract** (these belong in the scene description)

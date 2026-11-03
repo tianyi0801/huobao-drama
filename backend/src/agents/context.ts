@@ -10,6 +10,7 @@ export interface AgentRequestContextValues {
   saveReceipts?: AgentSaveReceipt[]
   onSave?: (receipt: AgentSaveReceipt) => void
   extractTarget?: string
+  targetStoryboardId?: number
   episodeId: number
   dramaId: number
   modelOverride?: string
@@ -25,6 +26,7 @@ export function buildAgentRequestContext(values: AgentRequestContextValues): Req
   rc.set('saveReceipts', [])
   if (values.onSave) rc.set('onSave', values.onSave)
   if (values.extractTarget) rc.set('extractTarget', values.extractTarget)
+  if (values.targetStoryboardId) rc.set('targetStoryboardId', values.targetStoryboardId)
   if (values.modelOverride) rc.set('modelOverride', values.modelOverride)
   if (values.textConfigId) rc.set('textConfigId', values.textConfigId)
   // 语言在构建处统一解析：4 条链路（chat/提取/图片提示词/视频提示词）都经过这里，

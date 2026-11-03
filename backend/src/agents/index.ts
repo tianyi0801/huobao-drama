@@ -12,7 +12,7 @@ import { getTextConfig, getTextProviderBaseUrl, getConfigById } from '../service
 import { logTaskProgress } from '../utils/task-logger.js'
 import { scriptTools } from './tools/script-tools.js'
 import { extractTools } from './tools/extract-tools.js'
-import { storyboardTools } from './tools/storyboard-tools.js'
+import { storyboardTools, updateVideoPrompt } from './tools/storyboard-tools.js'
 import { imagePromptTools } from './tools/image-prompt-tools.js'
 import { loadAgentSkills, skillWorkspaces } from './skills.js'
 import { loadAgentPromptFile, loadBasePromptFile } from './prompts.js'
@@ -79,7 +79,7 @@ export const DEFAULT_PROMPTS: Record<string, { name: string; instructions: strin
     name: '分镜拆解',
     instructions: `你是资深影视分镜师，擅长将剧本拆解为分镜方案，并直接产出可供视频生成使用的提示词。
 
-核心定义：一个分镜 = 一个「分镜段落」= 一个视频生成任务。每个段落 4-8 秒（目标 5 秒，硬上限 8 秒），内部承载 2-3 个子镜头；子镜头之间可以切镜（换景别/角度/对象），但不跨场景。
+核心定义：一个分镜 = 一个「分镜段落」= 一个视频生成任务。针对本地 H3 / RTX 4060 Ti 8GB 显存、32GB 内存，新拆分段落 4-12 秒（目标 5 秒），默认1个连续镜头、1个主要动作；仅叙事必要时最多2个镜头，每个至少2秒，不跨场景。主角与配角都写清身份、位置和脸部朝向，优先同焦平面中近景，不虚化剧情人物。
 
 工作流程：
 1. 调用 read_storyboard_context 读取剧本、角色列表、场景列表、道具列表
@@ -96,16 +96,16 @@ export const DEFAULT_PROMPTS: Record<string, { name: string; instructions: strin
 - character_ids：当前段落涉及的角色 ID 列表，可以为空，也可以包含多个角色；必须从 characters 中选择
 - prop_ids：当前段落出现的关键道具 ID 列表（道具在画面中被看到、使用或特写时绑定），可以为空；必须从 props 中选择
 - scene_id：若可匹配到 scenes 中已有场景，必须填写正确 scene_id；无匹配时置空
-- duration：段落总时长，整数秒；目标 5 秒，允许 4-8 秒，绝不能超过 8 秒
+- duration：段落总时长，整数秒；目标 5 秒，允许 4-12 秒，绝不能超过 12 秒；长对白或缓慢动作可按需延长到9-12秒，不强制凑满12秒
 - description：画面描述，按【镜头1】【镜头2】…逐子镜头描述观众实际看到和听到的内容——画面（谁+具体动作+肢体细节+表情）写在前；该子镜头有台词时以「角色名说：「台词」」写在对应【镜头N】内，旁白写「旁白：内容」
 - atmosphere：氛围、光线、色调、环境感受
 - video_prompt：该段落的视频生成提示词（规则见下）
 
 时长规则（硬约束）：
-- 单段上限 8 秒：本地视频模型 5 秒最稳定，超过 8 秒明显掉质量，宁可多切几段也不要把一段拉长
-- 总量锚定：目标总时长 = 剧本字数 ÷ 500字/分钟，段落数 ≈ 目标总时长 ÷ 5.5秒，允许 ±20% 浮动
-- 节奏分层：过渡段（赶路/空镜/转场）4-5 秒；叙事段 5-6 秒；爆点段（特写/规则揭示/情感爆发/反转）6-8 秒，靠子镜头节奏而不是时长来强化
-- 台词容量：段内台词与旁白总字数 ≤ (duration − 2) × 4.5 字/秒（5 秒约 13 字、8 秒约 27 字），装不下的台词拆到下一个段落
+- 本轮新拆分采用5秒优先、12秒段落上限的低复杂度策略，不是 H3 模型时长能力的硬上限；宁可拆到相邻段落，也不要把一段塞满
+- 总量软参考：剧本字数 ÷ 500 × 60 得到估算秒数，不设段数或±20%硬指标；按各段自然发话、动作与停顿累加。同一因果链可拆成连续相邻段落，以空间锚点与动作承接保持关系，不删剧情来凑段数
+- 节奏分层：过渡段4-5秒，叙事段5-8秒，长对白或缓慢动作段9-12秒，用停顿、表情、单一动作强化，不靠频繁切镜
+- 台词容量：段内台词与旁白总字数 ≤ (duration − 2) × 4.5 字/秒（5 秒约 13 字、12 秒约 45 字），装不下的台词拆到下一个段落
 - 空间连续性：同一场景内的相邻段落必须共享同一套空间锚点（机位方向、门窗与家具的相对位置、光源方向），并在 description 里写清楚；只有切换到新场景时才重新建立空间
 
 video_prompt 规则（硬约束，H3 六段结构）：
@@ -113,12 +113,12 @@ video_prompt 规则（硬约束，H3 六段结构）：
 - subject_definitions：每个出场人物一行 <Subject N> 是 @角色名：外貌，只写本段实际出场的人
 - shot_summary：一句话讲清「谁·在哪·做什么·结果」
 - reference_usage：逐条声明参考图用途与边界（identity_reference / scene_reference / object_reference），明确不提供构图与姿态；这一节不可省略
-- detailed_description：[Shot N] 起始秒-结束秒：景别/角度/运镜 + 空间锚点 + 动作 + 台词；duration ≤5 秒写 2 个 [Shot]、6-8 秒写 2-3 个，各段相加等于 duration，切镜点对齐【镜头N】结构；台词从 description 提取，不要创作新台词
-- 空间锚点：机位在哪一侧、门窗与家具相对角色的位置、主光方向；description 里已有的空间描述必须原样保留，相邻镜头靠它和上一段尾帧对齐
-- overall_soundscape：环境音/动作音/对白，无则 N/A；non_diegetic_music：配乐情绪风格，无则 N/A
+- detailed_description：[Shot N] 起始秒-结束秒：景别/角度/运镜 + 空间锚点 + 每人位置与动作 + 原句对白；默认1个连续镜头，必要时最多2个，每个至少2秒，各段相加等于 duration；原句对白仅在对应 Shot 写一次
+- 空间锚点：机位、门窗与家具相对角色的位置、主光方向；description 已有空间描述必须保留，不为清晰度删情节
+- overall_soundscape：环境/动作声与说话白名单，不重复台词，其他角色闭口不发声；无对白时明确无任何人声，无原旁白则禁止旁白、解说、画外人声与哼唱；non_diegetic_music 默认无背景配乐、无歌声，除非原文或用户指定
 - 提到场景用 @场景名、提到角色用 @角色名，名字必须与 read_storyboard_context 返回的列表完全一致
 - 一个段落内允许切镜（换景别/角度/对象），但不跨场景
-- 用户消息中会告知本次视频模型，按该模型的时长限制调整写法；未告知时按 4-8 秒（目标 5 秒）处理
+- 用户消息中会告知本次视频模型，按该模型的时长限制调整写法；未告知时按 4-12 秒（目标 5 秒）处理
 
 额外要求：
 - 优先复用 read_storyboard_context 返回的 scene_id，不要凭空创造新场景
@@ -149,8 +149,8 @@ video_prompt 规则（硬约束，H3 六段结构）：
 
 工作流程：
 1. 调用 read_storyboard_context 读取该分镜的 description（含【镜头N】子镜头与台词/旁白）、atmosphere、duration 及绑定的场景/角色
-2. 按 H3 原生六段结构化格式生成 video_prompt，小节名固定且顺序不可变：subject_definitions（每个出场人物一行 <Subject N> 是 @角色名：参考图可见的外貌）、shot_summary（一句话讲清谁·在哪·做什么·结果）、reference_usage（逐张声明用途：identity_reference / scene_reference / object_reference，并明确不提供构图与姿态）、detailed_description（[Shot N] 起始秒-结束秒：景别/角度/运镜 + 空间锚点 + 动作 + 台词，各段连续衔接、相加等于 duration）、overall_soundscape（环境音/动作音/对白，无则 N/A）、non_diegetic_music（配乐情绪风格，无则 N/A）
-3. 段数按 duration 决定：≤5 秒写 2 个 [Shot]，6-8 秒写 2-3 个；内容全部来自 description，不要创作 description 之外的新台词
+2. 按 H3 六节结构生成 video_prompt：subject_definitions（每个可见人物独立身份与资料已有识别点）、shot_summary（谁·在哪·做什么·结果，不重复对白）、reference_usage（实际参考用途，不复制角色拼版、姿势、背景）、detailed_description（连续时间轴、空间锚点、每人位置与动作，原句对白仅写一次）、overall_soundscape（环境/动作声与说话白名单，其他人物闭口不发声，无对白时明确无任何人声）、non_diegetic_music（默认无背景配乐、无歌声，除非原文或用户指定）
+3. 默认1个连续镜头，叙事必要时最多2个，每个至少2秒；重写已有分镜时保留 duration 和全部动作/对白，只在不删情节时合并冗余切镜，否则保留原时间轴。逐人明确位置、朝向与清晰脸部，不虚化配角，保留原有旁白，不新增旁白、解说、画外人声或哼唱。细则以本地 ComfyUI 视频提示词契约为准
 4. 每个 [Shot] 都要带空间锚点（机位在哪一侧、门窗与家具相对角色的位置、主光方向），description 里已有的空间描述必须原样保留——相邻镜头靠它和上一段尾帧对齐
 5. 生成时会自动把 @名字 替换为对应参考图片标记（如 @小明 → @图片1小明），因此名字必须精确匹配场景/角色列表，不要缩写或加额外符号
 6. 调用 update_storyboard 保存时参数只传两个键：storyboard_id 和 video_prompt。不要回传该分镜的其他任何字段（title、description、scene_id 等一律不传）
@@ -363,7 +363,7 @@ const AGENT_TOOLS: Record<string, Record<string, any>> = {
   prompt_generator: {
     ...imagePromptTools,
     readStoryboardContext: storyboardTools.readStoryboardContext,
-    updateStoryboard: storyboardTools.updateStoryboard,
+    updateStoryboard: updateVideoPrompt,
   },
 }
 

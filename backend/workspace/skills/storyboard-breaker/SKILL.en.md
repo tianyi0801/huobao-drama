@@ -9,17 +9,17 @@ description: Professional rules for storyboard breakdown — splitting a script 
 
 One storyboard = one **storyboard segment** = one video-generation task.
 
-- Each segment is **4-8 seconds** long and internally carries **2-3 sub-shots**
-- Cuts between sub-shots **are allowed**: change shot size, angle, or subject, joined with hard cuts
-- Sub-shots **never cross scenes**: a segment takes place in a single scene (`scene_id` is a segment-level binding)
-- Each sub-shot is 2-6 seconds, focused on one visual unit (one action, one reaction, one close-up)
+- Local H3 baseline: **4-12 integer seconds, target 5, never exceed 12**; longer dialogue may use 9-12 without padding
+- Default **one continuous shot and one main action**, static camera or one slow movement; only when necessary use at most two shots, each at least 2 seconds
+- Never cross scenes (`scene_id` is segment-level); preserve the entire plot and original speech
+- Two characters should share the focal plane; specify each identity, position, face direction and action. Both faces must remain clear, including supporting characters, without shallow-depth background blur
 
 ## Breakdown Process (Four Steps)
 
 1. Call `read_storyboard_context` to read the script, characters, scenes, props, and existing storyboard summaries
-2. **Beat identification**: first identify the script's narrative beats — markers such as [Opening] [Trigger] [Climax] [Resolution], or narrative turning points (location changes, rule reveals, emotional eruptions, reversals). **Beat boundaries force a segment cut**; group sub-shots within the same beat into the same segment where possible, and do not scatter a causal chain (setup-event-reaction) across different segments
-3. **Total-volume anchoring**: target total duration = script character count ÷ 500 characters/minute; segment count ≈ target total duration ÷ 5.5 seconds, with ±20% tolerance. Do not significantly overshoot or undershoot
-4. **Split sub-shots within each segment**: cut sub-shots at action-change points, viewpoint-change points, and subject-change points; after filling in all fields for each segment, call `save_storyboards` in batches of at most 2 segments, with only one save call per response. Full regeneration: only the first batch uses `replace_existing: true`; subsequent batches append. Explicit incremental edits never clear existing shots. Save every batch before finishing
+2. **Identify beats**: split at narrative boundaries. A causal chain can continue across adjacent segments using stable spatial anchors and action continuity; duration and dialogue capacity take priority over keeping the chain in one segment
+3. **Estimate duration**: script character count ÷ 500 × 60 yields only a rough seconds estimate, not a count or ±20% quota. Sum natural speech, actions and pauses; never delete plot to fit an estimate
+4. **Design simple shots**: default one shot; cut only when necessary. Save complete fields in batches of at most 2 segments, one save call per response. Full regeneration uses `replace_existing: true` only in the first batch; subsequent batches append. Explicit incremental updates never clear old shots. Finish only after all required saves
 
 ## Pacing-Tier Durations
 
@@ -28,12 +28,12 @@ Determine duration by the segment's function — do not use one size for all:
 | Segment type | Duration | Notes |
 |---|---|---|
 | Transition segment | 4-5 s | Traveling, empty shots, environment establishment, transitions |
-| Narrative segment | 5-6 s | Regular plot advancement, dialogue |
-| Payoff segment | 6-8 s | Close-ups, rule reveals, emotional eruptions, reversals; slower sub-shot pacing, a single sub-shot may hold for 4-6 s |
+| Narrative segment | 5-8 s | Plot advancement, dialogue |
+| Longer dialogue or slow action | 9-12 s | Natural speech, pauses and one main action; no quota-driven cuts |
 
-## Dialogue Duration Floor (Hard Rule)
+## Dialogue Capacity
 
-**Segment duration ≥ total character count of dialogue and narration within the segment (the part written in description) ÷ 4.5 characters/second + 2 seconds of performance headroom**
+Allow natural speaking time and approximately 2 seconds of performance headroom. Chinese 4.5 characters/second is only a reference; do not impose it as an English speech rate.
 
 Dialogue that does not fit must be moved to the next segment; cramming unperformable dialogue into one segment is not allowed.
 
@@ -48,7 +48,7 @@ Dialogue that does not fit must be moved to the next segment; cramming unperform
 7. **Visual description** `description`: describe sub-shot by sub-shot as `【镜头1】…【镜头2】…` what the audience actually sees and hears — the visuals (who + specific action + body-language details + expression) come first; when a sub-shot has dialogue, write it inside the corresponding `【镜头N】` as "CharacterName says: "line"", and narration as "Narration: content"
 8. **Visual result** `result`: the immediate consequence at the end of the segment + visual details
 9. **Atmosphere** `atmosphere`: lighting + color tone + sound + overall mood
-10. **Duration** `duration`: total segment duration 4-8 seconds, and it must satisfy the dialogue duration floor
+10. **Duration** `duration`: 4-12 integer seconds, target 5, never exceed 12, with natural speech capacity
 11. **Scene binding**: if it can be matched to an existing scene, `scene_id` must be filled in
 12. **Character binding**: fill in `character_ids`, binding 0 to multiple characters involved in this segment
 13. **Prop binding**: fill in `prop_ids`, binding 0 to multiple key props appearing in this segment
@@ -77,7 +77,7 @@ Dialogue that does not fit must be moved to the next segment; cramming unperform
 
 ## Quality Requirements
 
-- `description` should be human-readable, describing sub-shot by sub-shot what the audience actually sees and hears; dialogue/narration is written directly inside the corresponding `【镜头N】`
-- `image_prompt` should highlight the single-frame composition, character appearance, environment, and lighting (corresponding to the segment's first sub-shot)
-- `bgm_prompt` and `sound_effect` may be concise phrases, but must not be as vague as just "tense" or "sad"
-- To make adjustments, call `update_storyboard` to modify the specific segment
+- Default to `【镜头1】` with exact positions, faces and actions. Use the six sections for `video_prompt`, with an independent Subject for every visible character; use @ references only for actual available images
+- Original dialogue appears once in its Shot. overall_soundscape lists permitted speakers and environmental/action sounds; other characters remain silent. Without original narration add no narrator or off-screen voice; without dialogue/narration explicitly state no human voices
+- non_diegetic_music defaults to no music and no singing unless explicitly requested; do not design sound from atmosphere alone
+- Use only the save tool schema fields. Incremental `update_storyboard` edits never clear the episode

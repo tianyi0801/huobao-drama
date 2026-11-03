@@ -19,6 +19,7 @@ import { getComfyConfig } from '../comfyui/config.js'
 import { buildSubmission, type ComfyJobContext } from '../comfyui/template.js'
 import { stageMany, taskSubfolder } from '../comfyui/staging.js'
 import { resolveSeed, viewUrl } from './comfyui-image.js'
+import { validateVideoPromptTimeline } from '../video-prompt-structure.js'
 
 const VIDEO_EXTENSIONS = ['.mp4', '.webm', '.mov', '.mkv']
 
@@ -166,6 +167,14 @@ export class ComfyUiVideoAdapter implements VideoProviderAdapter {
     if (!comfy.enabled) throw new Error('本地算力已关闭，请到「设置 → 本地算力」启用')
     const template = comfy.video
     if (!template) throw new Error('当前没有可用的「视频」工作流模板，请到设置页导入')
+    const isH3 = Object.values(template.api).some(node => node.class_type.includes('MiniMaxH3EasyV'))
+    const rawPrompt = String(record.prompt || '').trim()
+    const prompt = isH3 ? rawPrompt.replace(/（音色参考音频(\d+)）/g, '（音色参考@音频$1）') : rawPrompt
+    if (isH3 && !prompt) throw new Error('本地 H3 视频提示词不能为空，请先生成或填写分镜提示词')
+    if (isH3) validateVideoPromptTimeline(prompt, Number(record.duration ?? 5))
+    if (isH3 && /@(?!图片\d+|视频\d+|音频\d+)[^\s@#]+/.test(prompt)) {
+      throw new Error('H3 提示词存在未解析的素材引用，请检查角色、场景、道具是否已绑定且有参考图')
+    }
 
     const client = new ComfyClient(comfy.url)
     const subfolder = taskSubfolder(comfy.uploadSubfolder, record.id ?? 'video', 'vid')
@@ -173,10 +182,14 @@ export class ComfyUiVideoAdapter implements VideoProviderAdapter {
     const referenceImages = parseJsonArray(record.referenceImageUrls)
     const referenceVideos = parseJsonArray(record.referenceVideoUrls)
     const referenceAudios = parseJsonArray(record.referenceAudioUrls)
-    // 首尾帧追加在参考图之后：@图片N 只引用前面的参考图，追加不会打乱序号
+    if (isH3 && new Set(referenceImages).size !== referenceImages.length) {
+      throw new Error('H3 参考图重复会改变图片编号，请为每个角色使用独立参考图并去除重复素材')
+    }
+    // 首尾帧追加在参考图之后，重复帧不再追加，避免暂存去重改变序号
     const imageSources = [...referenceImages]
-    if (record.firstFrameUrl) imageSources.push(String(record.firstFrameUrl))
-    if (record.lastFrameUrl) imageSources.push(String(record.lastFrameUrl))
+    for (const frame of [record.firstFrameUrl, record.lastFrameUrl]) {
+      if (frame && !imageSources.includes(String(frame))) imageSources.push(String(frame))
+    }
 
     const [stagedImages, stagedVideos, stagedAudios] = await Promise.all([
       stageMany(client, imageSources, 'image', subfolder),
@@ -185,6 +198,15 @@ export class ComfyUiVideoAdapter implements VideoProviderAdapter {
     ])
     // 清单顺序 = @图片N 的序号来源，图片必须整体排在最前
     const media = [...stagedImages, ...stagedVideos, ...stagedAudios].map(item => item.manifest)
+    if (isH3) {
+      const counts = { 图片: stagedImages.length, 视频: stagedVideos.length, 音频: stagedAudios.length }
+      for (const match of prompt.matchAll(/@(图片|视频|音频)(\d+)/g)) {
+        const index = Number(match[2])
+        if (index < 1 || index > counts[match[1] as keyof typeof counts]) {
+          throw new Error(`H3 素材引用 ${match[0]} 超出实际清单，请检查缺图、素材绑定与编号`)
+        }
+      }
+    }
 
     // 界面「清晰度」是成片目标；二采开启时一采按倍率回退，关闭时一采直接等于目标
     const secondPassOn = readOption(template, comfy.optionValues, 'second_pass', true) !== false
@@ -199,7 +221,7 @@ export class ComfyUiVideoAdapter implements VideoProviderAdapter {
     const dimensions = computeVideoDimensions(firstPassResolution, aspectRatio)
 
     const context: ComfyJobContext = {
-      prompt: String(record.prompt || ''),
+      prompt,
       resolution: firstPassResolution,
       aspectRatio,
       width: dimensions.width,

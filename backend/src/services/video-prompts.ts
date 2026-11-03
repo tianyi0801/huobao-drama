@@ -58,7 +58,7 @@ export async function startVideoPromptBatch(
     if (!agent) throw new Error('视频提示词 Agent 不可用')
     for (const sb of pending) {
       const requestContext = buildAgentRequestContext({
-        episodeId, dramaId, modelOverride: opts.model || undefined, textConfigId: opts.configId || undefined,
+        episodeId, dramaId, targetStoryboardId: sb.id, modelOverride: opts.model || undefined, textConfigId: opts.configId || undefined,
       })
       task.current_storyboard_id = sb.id
       logTaskProgress('VideoPrompt', 'batch-shot', { episodeId, storyboardId: sb.id, index: task.completed + task.failed + 1, total: task.total })
@@ -66,7 +66,7 @@ export async function startVideoPromptBatch(
         const result = await agent.generate([{
           role: 'user',
           content: `请为分镜 #${sb.storyboardNumber}(ID:${sb.id})生成视频提示词(video_prompt)。视频模型:${videoLabel},请根据该模型的特性和时长限制生成。
-请先调用 read_storyboard_context 获取该分镜的画面描述(含【镜头N】子镜头与台词/旁白)、氛围及时长，据此生成 video_prompt，必须是 H3 原生六段结构(小节名固定、顺序不可变)：subject_definitions(每个出场人物一行 <Subject N> 是 @角色名：参考图可见的外貌)、shot_summary(一句话讲清谁·在哪·做什么·结果)、reference_usage(逐张声明用途 identity_reference/scene_reference/object_reference 并明确不提供构图与姿态；不可省略)、detailed_description([Shot N] 起始秒-结束秒：景别/角度/运镜 + 动作 + 台词，≤5 秒写 2 个 [Shot]、6-8 秒写 2-3 个，各段相加等于 duration，切镜点对齐【镜头N】结构)、overall_soundscape(环境音/动作音/对白，无则 N/A)、non_diegetic_music(配乐情绪风格，无则 N/A)。段落内允许多镜头切镜但不跨场景，用 @角色名/@场景名/@道具名 引用素材。然后调用 update_storyboard 保存到分镜 ID:${sb.id}。update_storyboard 参数只传 storyboard_id 和 video_prompt 两个键,不要回传该分镜的其他任何字段,不要重新拆分整集。`,
+先调用 read_storyboard_context 获取该分镜的 description、atmosphere、duration 和绑定素材，按本地 ComfyUI 视频提示词契约的六节结构生成。默认1个连续镜头，不为了段数切镜；只在不删情节时合并冗余切镜，否则保留原时间轴。主角、配角均有独立身份和清晰脸部，明确每人位置与动作。原句对白只在对应 Shot 写一次，声音节列说话白名单；无对白时明确无任何人声，不新增配音或配乐。用 @角色名/@场景名/@道具名 引用实际素材。调用 update_storyboard 保存到分镜 ID:${sb.id}，参数只传 storyboard_id 和 video_prompt；不改描述、时长、绑定，不重新拆分整集。`,
         }], { maxSteps: 8, requestContext })
         assertAgentSaved('prompt_generator', result, requestContext)
         // 以本次保存回执与实际落库为准，旧值非空不代表本次成功

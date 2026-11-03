@@ -307,6 +307,74 @@ test('视频适配器：媒体清单顺序与 @图片N 对齐，解析出视频�
   }
 })
 
+test('H3 保留原工作流的一采二采音轨及12秒时长，不额外切换静音', async () => {
+  const mock = await startMockComfy()
+  try {
+    const template = buildTemplateFromPreset('minimax-h3-ref2va')
+    assert.equal(template.api['2'].inputs.prompt, '')
+    assert.equal(template.api['2'].inputs.media_manifest, '[]')
+    assert.equal(template.options?.find(option => option.id === 'second_pass_steps')?.default, 3)
+    assert.equal(template.options?.find(option => option.id === 'second_pass_scale')?.default, 1.5)
+    const adapter = new ComfyUiVideoAdapter()
+    for (const secondPass of [false, true]) {
+      saveComfyConfig({ enabled: true, url: mock.url, video: template, optionValues: { second_pass: secondPass } })
+      const request = await adapter.buildGenerateRequest(
+        { provider: 'comfyui', baseUrl: mock.url, apiKey: '', model: 'local' },
+        { id: 12, prompt: '固定机位，人物缓慢点头。', duration: 12 } as any,
+      )
+      const graph = (request.body as any).prompt
+      assert.equal(graph['2'].inputs.seconds, 12)
+      const outputs = Object.values(graph).filter((node: any) => node.class_type === 'CreateVideo') as any[]
+      assert.ok(outputs.length > 0)
+      for (const output of outputs) assert.ok('audio' in output.inputs)
+      assert.ok(Object.values(graph).some((node: any) => node.class_type === 'VAEDecodeAudio'))
+    }
+    assert.ok('audio' in template.api['11'].inputs)
+    assert.ok('audio' in template.api['302'].inputs)
+  } finally { await mock.close() }
+})
+
+test('H3 音色转换为显式音频引用，编号独立于图片且不重复对白', async () => {
+  const mock = await startMockComfy()
+  try {
+    saveComfyConfig({ enabled: true, url: mock.url, video: buildTemplateFromPreset('minimax-h3-ref2va') })
+    const { resolveVoiceMentions } = await import('../src/services/character-voice-references.ts')
+    const audio = `data:audio/wav;base64,${Buffer.from('测试用音频字节').toString('base64')}`
+    const resolved = resolveVoiceMentions('@图片1小明抬头，#小明说：「早上好。」', [{ name: '小明', voiceAudioUrl: audio }])
+    const request = await new ComfyUiVideoAdapter().buildGenerateRequest(
+      { provider: 'comfyui', baseUrl: mock.url, apiKey: '', model: 'local' },
+      { prompt: resolved.prompt, referenceImageUrls: JSON.stringify([`data:image/png;base64,${PNG_1PX.toString('base64')}`]),
+        referenceAudioUrls: JSON.stringify(resolved.audioUrls), generateAudio: true, duration: 5 } as any,
+    )
+    const graph = (request.body as any).prompt
+    assert.equal(graph['2'].inputs.prompt, '@图片1小明抬头，小明（音色参考@音频1）说：「早上好。」')
+    assert.deepEqual(JSON.parse(graph['2'].inputs.media_manifest).map((m: any) => m.media_type), ['image', 'audio'])
+    assert.equal(graph['2'].inputs.prompt.split('早上好。').length - 1, 1)
+  } finally { await mock.close() }
+})
+
+test('H3 阻止空提示词、未解析引用、重复参考图及越界编号提交', async () => {
+  const mock = await startMockComfy()
+  try {
+    saveComfyConfig({ enabled: true, url: mock.url, video: buildTemplateFromPreset('minimax-h3-ref2va') })
+    const adapter = new ComfyUiVideoAdapter()
+    const config = { provider: 'comfyui', baseUrl: mock.url, apiKey: '', model: 'local' }
+    const image = `data:image/png;base64,${PNG_1PX.toString('base64')}`
+    for (const prompt of ['', '   ']) {
+      await assert.rejects(adapter.buildGenerateRequest(config, { prompt } as any), /提示词不能为空/)
+    }
+    await assert.rejects(adapter.buildGenerateRequest(config, { prompt: '@未绑定配角点头。' } as any), /未解析/)
+    await assert.rejects(adapter.buildGenerateRequest(config,
+      { prompt: '@图片2配角点头。', referenceImageUrls: JSON.stringify([image, image]) } as any), /参考图重复/)
+    assert.equal(mock.calls.length, 0, '空提示词和无效身份引用不应触发素材上传')
+    for (const prompt of ['@图片0点头。', '@图片2点头。', '@音频1说话。', '@视频1移动。']) {
+      await assert.rejects(adapter.buildGenerateRequest(config,
+        { prompt, referenceImageUrls: JSON.stringify([image]) } as any), /超出实际清单/)
+    }
+    assert.equal(mock.calls.some(call => call.route === '/prompt'), false)
+  } finally { await mock.close() }
+})
+
 test('本地算力关闭时不再回落云端配置', async () => {
   saveComfyConfig({ enabled: false })
   const config = getComfyConfig()

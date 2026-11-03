@@ -9,7 +9,7 @@
  *
  * 只在同场景内衔接：跨场景本来就该换环境，把上一场带过来反而是错的。
  */
-import { and, eq, isNotNull, lt, desc, inArray } from 'drizzle-orm'
+import { and, eq, isNull, lt, desc, inArray } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { extractVideoLastFrame } from '../utils/video-lastframe.js'
 import { logTaskProgress, logTaskWarn } from '../utils/task-logger.js'
@@ -44,7 +44,7 @@ export async function waitForScenePredecessor(
     episodeId: schema.storyboards.episodeId,
     sceneId: schema.storyboards.sceneId,
     number: schema.storyboards.storyboardNumber,
-  }).from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
+  }).from(schema.storyboards).where(and(eq(schema.storyboards.id, storyboardId), isNull(schema.storyboards.deletedAt)))
 
   if (!current?.episodeId || current.sceneId == null || current.number == null) {
     return { waitedMs: 0, timedOut: false }
@@ -55,6 +55,7 @@ export async function waitForScenePredecessor(
     .where(and(
       eq(schema.storyboards.episodeId, current.episodeId),
       eq(schema.storyboards.sceneId, current.sceneId),
+      isNull(schema.storyboards.deletedAt),
       lt(schema.storyboards.storyboardNumber, current.number),
     ))
 
@@ -122,27 +123,31 @@ export async function resolvePreviousShotFrame(
     episodeId: schema.storyboards.episodeId,
     sceneId: schema.storyboards.sceneId,
     number: schema.storyboards.storyboardNumber,
-  }).from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
+  }).from(schema.storyboards).where(and(eq(schema.storyboards.id, storyboardId), isNull(schema.storyboards.deletedAt)))
 
   if (!current?.episodeId) return null
   if (current.sceneId == null || current.number == null) return null
 
-  // 同集 + 同场景 + 序号更小 + 已有视频，取序号最大的那条
+  // 只取紧邻的未删除分镜，不跨过异场景或尚未出片的中间镜头
   const [previous] = await db.select({
     id: schema.storyboards.id,
+    sceneId: schema.storyboards.sceneId,
     videoUrl: schema.storyboards.videoUrl,
     number: schema.storyboards.storyboardNumber,
   }).from(schema.storyboards)
     .where(and(
       eq(schema.storyboards.episodeId, current.episodeId),
-      eq(schema.storyboards.sceneId, current.sceneId),
-      isNotNull(schema.storyboards.videoUrl),
+      isNull(schema.storyboards.deletedAt),
       lt(schema.storyboards.storyboardNumber, current.number),
     ))
     .orderBy(desc(schema.storyboards.storyboardNumber))
     .limit(1)
 
-  if (!previous?.videoUrl) return null
+  if (!previous?.videoUrl || previous.sceneId !== current.sceneId) return null
+  const [latest] = await db.select({ status: schema.sysTask.status }).from(schema.sysTask)
+    .where(and(eq(schema.sysTask.type, 'video'), eq(schema.sysTask.storyboardId, previous.id)))
+    .orderBy(desc(schema.sysTask.id)).limit(1)
+  if (latest && latest.status !== 'completed') return null
   // 只处理本地文件；远程 URL 需要先下载，暂不参与衔接
   if (!previous.videoUrl.startsWith('static/')) return null
 

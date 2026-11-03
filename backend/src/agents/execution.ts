@@ -16,6 +16,19 @@ export function registerAgentTools(tools: Record<string, any>): Record<string, a
       inputSchema: tool.inputSchema,
       outputSchema: tool.outputSchema,
       execute: async (input: any, context: any) => {
+        const rc = context?.requestContext as RequestContext | undefined
+        const targetId = rc?.get('targetStoryboardId' as never)
+        const extractTarget = rc?.get('extractTarget' as never)
+        if (typeof extractTarget === 'string' && (name.startsWith('read_existing_') || name.startsWith('save_dedup_'))) {
+          if (name !== `read_existing_${extractTarget}` && name !== `save_dedup_${extractTarget}`) {
+            return { error: `本次只允许提取 ${extractTarget}` }
+          }
+        }
+        if (typeof targetId === 'number' && (name.startsWith('save_') || name === 'update_storyboard')) {
+          if (name !== 'update_storyboard' || input.storyboard_id !== targetId) {
+            return { error: `本次只允许更新分镜 ${targetId} 的视频提示词` }
+          }
+        }
         const result = await tool.execute(input, context)
         if ((name.startsWith('save_') || name === 'update_storyboard') && result && !result.error) {
           const rc = context?.requestContext as RequestContext | undefined
@@ -59,8 +72,13 @@ export function assertAgentSaved(type: string, result: any, rc: RequestContext<a
   const receipts = (rc.get('saveReceipts' as never) as AgentSaveReceipt[] | undefined) || []
   const saved = receipts.some(({ tool, result: output }) => {
     if (type === 'script_rewriter') return tool === 'save_script' && output.word_count > 0
-    if (type === 'storyboard_breaker') return tool === 'save_storyboards' && output.count > 0
+    if (type === 'storyboard_breaker') return (tool === 'save_storyboards' && output.count > 0)
+      || (tool === 'update_storyboard' && output.storyboard_id > 0 && output.updated_fields?.length > 0)
     if (type === 'extractor') return target ? tool === `save_dedup_${target}` : tool.startsWith('save_dedup_')
+    const targetId = rc.get('targetStoryboardId' as never)
+    if (type === 'prompt_generator' && typeof targetId === 'number') {
+      return tool === 'update_storyboard' && output.storyboard_id === targetId && output.updated_fields?.includes('video_prompt')
+    }
     return tool.startsWith('save_') || tool === 'update_storyboard'
   })
   if (!saved) throw new Error('AI 本次没有成功调用保存工具，数据未更新；请检查日志中的工具错误，不要把模型回复当作完成')
