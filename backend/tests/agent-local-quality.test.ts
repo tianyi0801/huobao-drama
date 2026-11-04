@@ -5,7 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import http from 'node:http'
 import { eq } from 'drizzle-orm'
-import { appendVideoPromptSection, validateVideoPromptTimeline } from '../src/services/video-prompt-structure.js'
+import { appendVideoPromptSection, injectStyleOpening, validateVideoPromptTimeline } from '../src/services/video-prompt-structure.js'
 
 const root = await fs.mkdtemp(path.join(os.tmpdir(), 'huobao-local-quality-'))
 process.env.SQLITE_PATH = path.join(root, 'test.sqlite3')
@@ -20,7 +20,7 @@ const { storyboardTools, updateVideoPrompt } = await import('../src/agents/tools
 const { imagePromptTools } = await import('../src/agents/tools/image-prompt-tools.js')
 const { extractTools } = await import('../src/agents/tools/extract-tools.js')
 const { normalizeVideoReferenceUrls, generateVideo } = await import('../src/services/generation.js')
-const { resolvePreviousShotFrame } = await import('../src/services/storyboard-continuity.js')
+const { resolvePreviousShotFrame, buildContinuityPromptSuffix } = await import('../src/services/storyboard-continuity.js')
 const { saveComfyConfig } = await import('../src/services/comfyui/config.js')
 const { buildTemplateFromPreset } = await import('../src/services/comfyui/presets.js')
 const ts = new Date().toISOString()
@@ -28,9 +28,13 @@ const times = { createdAt: ts, updatedAt: ts }
 const drama = db.insert(schema.dramas).values({ title: '本地质量回归', ...times }).returning().get()
 const episode = db.insert(schema.episodes).values({ dramaId: drama.id, episodeNumber: 1, title: '测试集', ...times }).returning().get()
 const rc = buildAgentRequestContext({ dramaId: drama.id, episodeId: episode.id })
-const prompt = (timeline = '[Shot 1] 0.0-5.0秒：固定窗边中景。') => [
-  'subject_definitions: N/A', 'shot_summary: 窗边雨景', 'reference_usage: N/A',
-  `detailed_description:\n${timeline}`, 'overall_soundscape: 无任何人声，仅雨声。', 'non_diegetic_music: 无背景配乐、无歌声。',
+const prompt = (timeline = '[Shot 1] A fixed medium shot frames rain on the window.') => [
+  'subject_definitions: N/A',
+  'summary: [reference generation] The target video shows rain on a window in one continuous shot.',
+  'retention_analysis: N/A',
+  `detailed_description:\n${timeline}`,
+  'overall_soundscape: Soft rain patters against the window throughout the shot.',
+  'non_diegetic_music: N/A',
 ].join('\n')
 const call = (tool: any, input: any, requestContext = rc) => tool.execute(input, { requestContext })
 const makeShot = (number: number, fields: any = {}) => db.insert(schema.storyboards).values({
@@ -39,25 +43,36 @@ const makeShot = (number: number, fields: any = {}) => db.insert(schema.storyboa
 const a = makeShot(1)
 const b = makeShot(2)
 
-test('六节风格与衔接注入保持声音节干净，时间轴不受影响', () => {
-  let text = appendVideoPromptSection(prompt(), 'detailed_description', '柔和写实色彩')
-  text = appendVideoPromptSection(text, 'reference_usage', 'continuity_reference: @图片1为上一镜头尾帧')
-  assert.ok(text.startsWith('subject_definitions:'))
-  assert.ok(text.indexOf('continuity_reference:') < text.indexOf('detailed_description:'))
-  assert.ok(text.indexOf('柔和写实色彩') < text.indexOf('overall_soundscape:'))
-  assert.ok(!text.slice(text.indexOf('non_diegetic_music:')).includes('尾帧'))
+test('官方六节的风格与衔接注入保持声音节干净，时间轴不受影响', () => {
+  const style = 'high-quality 3D CG animation still, modern game-engine cinematic render, crisp detailed textures, volumetric lighting, avoid flat lighting, avoid anime line art'
+  const styled = injectStyleOpening(prompt(), style)
+  assert.ok(styled.startsWith('subject_definitions:'))
+  assert.match(styled, /The target video uses high-quality 3D CG animation still/)
+  assert.ok(styled.indexOf('The target video uses') < styled.indexOf('[Shot 1]'))
+  assert.doesNotMatch(styled, /avoid/)
+  const text = appendVideoPromptSection(styled, 'retention_analysis', buildContinuityPromptSuffix(1).trim())
+  assert.ok(text.indexOf('weak_reference') < text.indexOf('detailed_description:'))
+  assert.ok(!text.slice(text.indexOf('overall_soundscape:')).includes('weak_reference'))
   assert.doesNotThrow(() => validateVideoPromptTimeline(text, 5))
   assert.equal(appendVideoPromptSection('历史纯文本', 'detailed_description', '风格', true), '风格，\n历史纯文本')
 })
 
-test('时间轴拒绝时长不符、重叠、空缺、错号及重复小节，兼容历史纯文本', () => {
-  assert.throws(() => validateVideoPromptTimeline(prompt(), 12), /修改时长后/)
-  for (const timeline of ['[Shot 1] 0-3秒：雨。\n[Shot 2] 2-5秒：雨。', '[Shot 1] 1-5秒：雨。',
-    '[Shot 2] 0-5秒：雨。', '[Shot 1] 0-2秒：雨。\n[Shot 2] 3-5秒：雨。', '[Shot 1] 没有时间']) {
-    assert.throws(() => validateVideoPromptTimeline(prompt(timeline), 5), /时间|编号/)
+test('官方时间轴拒绝错误切镜与重复小节，兼容旧式起止秒及纯文本', () => {
+  assert.doesNotThrow(() => validateVideoPromptTimeline(prompt(), 5))
+  for (const timeline of [
+    '[Shot 1] A fixed medium shot.\n[Shot 2] At 00:02.000, the shot cuts to a close-up.\n[Shot 3] At 00:01.000, the shot cuts back.',
+    '[Shot 2] At 00:02.000, the shot cuts to a close-up.',
+    '[Shot 1] At 00:01.000, the shot cuts to a close-up.',
+    '[Shot 1] A fixed medium shot.\n[Shot 2] the shot cuts to a close-up.',
+    '[Shot 1] A fixed medium shot.\n[Shot 2] At 00:06.000, the shot cuts away.',
+  ]) {
+    assert.throws(() => validateVideoPromptTimeline(prompt(timeline), 5), /时间|编号|切镜|时间戳/)
   }
-  assert.throws(() => validateVideoPromptTimeline(`${prompt()}\noverall_soundscape: 雨声`, 5), /六节/)
-  assert.doesNotThrow(() => validateVideoPromptTimeline(prompt('[Shot 1] 0-2.5: 雨。\n[Shot 2] 2.5-5: 雨。'), 5))
+  assert.throws(() => validateVideoPromptTimeline(`${prompt()}\noverall_soundscape: rain`, 5), /六节/)
+  const legacy = ['subject_definitions: N/A', 'shot_summary: 窗边雨景', 'reference_usage: N/A',
+    'detailed_description:\n[Shot 1] 0-2.5: 雨。\n[Shot 2] 2.5-5: 雨。', 'overall_soundscape: 雨声。', 'non_diegetic_music: N/A'].join('\n')
+  assert.doesNotThrow(() => validateVideoPromptTimeline(legacy, 5))
+  assert.throws(() => validateVideoPromptTimeline(legacy, 12), /修改时长后/)
   assert.doesNotThrow(() => validateVideoPromptTimeline('历史纯文本', 15))
 })
 
@@ -173,8 +188,8 @@ test('镜头衔接等待前段完成后才取新尾帧，跨场景或失败不�
     const saved = db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id)).get()!
     assert.match(saved.params!, /new_lastframe/)
     assert.doesNotMatch(saved.params!, /old_lastframe/)
-    assert.match(submitted['2'].inputs.prompt, /continuity_reference:.*@图片1/)
-    assert.ok(submitted['2'].inputs.prompt.indexOf('continuity_reference:') < submitted['2'].inputs.prompt.indexOf('detailed_description:'))
+    assert.match(submitted['2'].inputs.prompt, /@图片1: weak_reference/)
+    assert.ok(submitted['2'].inputs.prompt.indexOf('weak_reference') < submitted['2'].inputs.prompt.indexOf('detailed_description:'))
     db.update(schema.sysTask).set({ status: 'failed' }).where(eq(schema.sysTask.id, before.id)).run()
     assert.equal(await resolvePreviousShotFrame(current.id), null)
     db.update(schema.sysTask).set({ status: 'completed' }).where(eq(schema.sysTask.id, before.id)).run()

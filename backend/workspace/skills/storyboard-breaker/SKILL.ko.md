@@ -77,7 +77,7 @@ description: 스토리보드 분할 전문 규범 — 대본을 여러 서브 �
 
 ## 품질 요구 사항
 
-- 기본 `【镜头1】`에 각 인물의 위치, 선명한 얼굴과 동작을 적습니다. `video_prompt`는6절이며 보이는 인물마다 독립Subject를 사용하고 실제 이미지가 있을 때만@로 참조합니다
-- 원문 대사는 해당Shot에 한 번만 씁니다. overall_soundscape는 발화 허용 인물과 환경·동작 소리만 적고 다른 인물은 발성하지 않습니다. 원래 내레이션이 없으면 새 해설이나 화면 밖 목소리를 추가하지 않으며 대사와 내레이션이 없으면 사람 목소리 없음을 명시합니다
-- non_diegetic_music는 요청이 없으면 음악과 노래 없음입니다. atmosphere만 보고 소리를 추가하지 않습니다
+- 기본 `【镜头1】`에 각 인물의 위치, 선명한 얼굴과 동작을 적습니다. `video_prompt`는 MiniMax 공식 Ref2VA 6절(subject_definitions / summary / retention_analysis / detailed_description / overall_soundscape / non_diegetic_music)을 영어로 작성하며 보이는 인물마다 독립 <Subject N>을 사용하고 실제 이미지가 있을 때만 @로 참조합니다
+- 원문 대사는 해당 Shot에 <d>[Chinese] ...</d> 형태로 한 번만 쓰고 발화자에게 안정적인 (Sx)를 붙입니다. overall_soundscape는 1~4문장의 영어로 환경·동작 소리만 적으며 발화 허용 목록이나 대사 반복은 금지합니다
+- retention_analysis는 공식 마커(fully_preserved / partially_preserved / attribute_transfer / weak_reference)만 사용합니다. non_diegetic_music는 요청이 없으면 N/A이며 atmosphere만 보고 소리를 추가하지 않습니다
 - 저장 도구schema의 필드만 사용합니다. 증분 `update_storyboard`에서 전체 화를 비우지 않습니다

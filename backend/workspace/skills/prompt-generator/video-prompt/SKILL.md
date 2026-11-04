@@ -1,118 +1,92 @@
 ---
 name: video-prompt
-description: 视频提示词规范 — 用 H3 原生六段结构化格式，把分镜段落转成参考生视频提示词
+description: 视频提示词规范 — 按 MiniMax 官方 Ref2VA Full-Reference 六节结构，把分镜段落转成参考生视频提示词
 ---
 
 # 视频提示词（分镜段落 → video_prompt）
 
-H3 的原生提示词是**分段结构化**格式：把人物身份、镜头概述、参考图用途、逐段动作、声音分成固定小节。模型对「谁是谁」「参考图提供什么」「这一秒在干什么」不再靠猜。
+本项目本地视频工作流是 MiniMax H3 **Ref2VA（参考生视频）**。官方为这个模式定义了专用六节结构，
+字段名、顺序、时间轴、对白与关系标记都是模型识别结构的锚点，必须原样输出。
 
-直接写一段自然语言描述也能出片，但人物归属、参考图用途、声音设计全靠模型猜，稳定性明显更差。**必须按下面的六段格式输出。**
+> 依据：MiniMax 官方 `MiniMax-AI/MiniMax-H3 → skills/h3-prompt-writing/references/ref-en.txt`
+> （Full-Reference Mode Rewrite Output Format Guide）。工作流贴士也写明「AI生成提示词可以生成为官方模板格式的提示词，对于生成视频乱说话很有用」。
+> 项目早期自造的 `shot_summary` / `reference_usage` / `identity_reference` / 中文正文 / `[Shot 1] 0.0-5.0秒` 均非官方格式，已废弃。
 
-## 输出格式（小节名固定、顺序不可变）
+## 输出格式（六节名固定、顺序不可变）
 
 ```
 subject_definitions:
-<Subject 1> 是 @小明：资料已有的短发、方脸、深色夹克。
-<Subject 2> 是 @小红：资料已有的齐肩发、圆脸、浅色外套。
+<Subject 1> is the young man in @小明, with short black hair, a square face, and a dark jacket.
+<Subject 2> is the café interior in @咖啡馆, with an exposed brick wall and a window behind the counter.
 
-shot_summary:
-@咖啡馆内，@小明迎接@小红，@小红点头。
+summary:
+[reference generation] The target video shows <Subject 1> greeting <Subject 2>'s visitor in a single continuous shot inside <Subject 2>.
 
-reference_usage:
-<Subject 1>（@小明）: identity_reference — 身份与服装，不复制拼版、姿势或背景。
-<Subject 2>（@小红）: identity_reference — 身份与服装，不复制拼版、姿势或背景。
-@咖啡馆: scene_reference — 空间与陈设，不决定机位。
+retention_analysis:
+<Subject 1> (appears in [Shot 1]): fully_preserved - his face, short black hair and dark jacket are retained.
+<Subject 2> (appears in [Shot 1]): fully_preserved - the brick wall and the window behind the counter are retained.
 
 detailed_description:
-[Shot 1] 0.0-5.0秒：平视双人中近景，固定机位，窗在两人身后偏左。@小明在画面左，@小红在右，两人同距镜头、脸部均清晰，@小红始终闭口。0.5-2.5秒小明说：「你终于来了。」随后@小红点头，机位和焦点不变。
+The target video uses a realistic cinematic style with soft indoor lighting.
+[Shot 1] A medium two-shot places <Subject 1> on the left and a visitor on the right at the same distance from a static camera, with the window behind them slightly to the left. Both faces are clearly visible. <Subject 1> (S1) turns toward the visitor and says, <d>[Chinese] 你终于来了。</d> He then closes his lips while the visitor nods once. The camera holds a static shot with no cuts.
 
 overall_soundscape:
-轻微室内环境声。说话白名单：小明，仅按上述原句发声；小红不发声，无旁白、无画外人声、无其他对白。
+Quiet indoor café room tone with a faint cup clink and soft footsteps on the wooden floor.
 
 non_diegetic_music:
-无背景配乐、无歌声。
+N/A
 ```
 
-小节名（`subject_definitions:` 等）**保持英文原样**，这是模型的结构锚点；小节正文跟随本次会话的内容语言指令。
+## 硬性规则
 
-## 各小节的硬性规则
+**语言**：六节正文一律用**英文**；只有 `<d>` 内的对白/歌词、以及画面里可见的文字保留原语言（本项目为中文）。
+这条是格式硬要求，不受会话目标语言指令影响；会话语言只影响图片提示词与对话回复。
 
-**subject_definitions** —— 解决「谁是谁」
+**六节职责**：
 
-- 每个可见人物独立一行 `<Subject N> 是 @角色名：外貌`，主角与配角同等明确，不用“另一个人”“背景人物”替代身份
-- 从文字资料提取每人2—3个可靠识别点：脸部/发型、服装颜色与形制。没有视觉输入时不能声称看过参考图，不补编五官、鞋或配饰
-- 场景有参考图时在 reference_usage 声明，不占 Subject 编号
-- 只写本段实际出场的人，不加路人；画面左右位置、距离、朝向与动作在 detailed_description 逐人交代
-- 双人戏优先同一焦平面的平视中近景，两张脸均清晰可辨且不过小；避免浅景深、背景配角虚化、焦点转移、遮脸和快速运动。已有构图有明确业务作用时保留，不为清晰度删情节
+- `subject_definitions:` 每个需要跟踪的可见内容一行，用 `<Subject N>` 定义可复用主体（人物、场景、物件、服装、风格），
+  写明来源参考与必须保持的特征。`<Picture N>` / `<Video N>` / `<Audio N>` 是官方标签，本项目由 `@图片N` 在运行时转换，
+  **不要手写**这些编号标签；只有图片本身作为首帧/构图锚点时才在正文里用自然语言说明。
+- `summary:` 一段英文，必须以方括号任务类型前缀开头。默认 `[reference generation]`；
+  有首尾帧时用 `[keyframe completion + reference generation]`；多类型用 ` + ` 连接。
+  用已定义的 `<Subject N>` 说明主体、镜头流程与参考关系，不引入新标签，不抄对白。
+- `retention_analysis:` 每个参考标签一行，**必须使用官方固定关系标记**：
+  可见内容 `fully_preserved` / `partially_preserved` / `attribute_transfer` / `weak_reference`；
+  音频 `fully_copy` / `partially_copy` / `reference` / `weak_reference`。
+  格式为 `<Subject 1> (appears in [Shot 1]): fully_preserved - ...`。禁止自造 `identity_reference` / `scene_reference` / `object_reference` / `continuity_reference`。
+- `detailed_description:` 正文主体。风格句（1—2 句英文）必须写在 `[Shot 1]` **之前**，由系统自动注入，不要自己写风格词。
+  `[Shot 1]` **不带时间戳**；后续镜头写 `[Shot 2] At 00:03.000, the shot cuts to ...`，切镜时间严格递增且小于 duration。
+  每个镜头写清构图、主体外观与位置、环境与光线、动作与状态变化、运镜（类型 + 幅度 + 速度）、当前声音、参考内容生效点。
+  描述要具体可见，不能退化成剧情摘要或参考关系清单。官方建议 350—500 英文词；本项目 5 秒单镜头不必硬凑字数，但信息必须完整。
+- `overall_soundscape:` 1—4 句英文，只写环境音与物理动作声（风、雨、脚步、碰撞、呼吸），**不重复对白、不写音乐**；
+  只有全静音才写 `N/A`。「说话白名单」和成串的否定句不是官方写法，禁止使用。
+- `non_diegetic_music:` 1—3 句英文，只写观众能听到而角色听不到的配乐（乐器、速度、节奏、动态）；
+  **没有配乐就写 `N/A`**，不要写「无背景配乐、无歌声」这类中文否定句。
 
-**shot_summary** —— 解决「这段要发生什么」
+**素材引用**：只写 `@角色名` / `@场景名` / `@道具名`，名字必须与 `read_storyboard_context` 返回的列表完全一致。
+前端按「场景 → 角色 → 道具」自动编号成 `@图片N名字`（如 @小明 → @图片2小明），节点运行时再转成 H3 的 `<Picture N>` 标签。
+不要手写 `@图片1`、`<Picture 1>` 等编号；只引用本段已绑定的素材。
 
-- 一句话，包含主体、地点、动作、结果，不超过 50 字
-- 不要写情绪形容词，写可见的结果
+**对白与说话人**：
+- 台词放进 `<d>[Chinese] 原句</d>`，逐字来自 `description`，只在对应 Shot 写一次，不新增台词、旁白或解说。
+- 实际发声者按出现顺序分配稳定 ID `(S1)`、`(S2)`，写成 `<Subject 1> (S1) ... says, <d>[Chinese] ...</d>`；
+  不发声的角色**不分配** `(Sx)`，用 `keeps lips closed` 之类的可见描写表达闭口。
+- 有可用音色的角色在对白处写 `#角色名`（后端会转成 `@音频N` 音色参考）；没有音色就用角色姓名描述说话人。
+- 画外音固定写 `says in an off-screen voiceover`，并说明画面中人物嘴唇保持闭合。
+- 画面中可见的招牌、字幕等文字用英文双引号逐字写出。
 
-**reference_usage** —— 解决「参考图提供什么」
+**时间轴与镜头**：
+- 默认 1 个连续镜头，固定机位或缓慢单一运镜、1 个主要动作；叙事确需切镜时最多 2 个，每个至少 2 秒，不跨场景。
+- 新拆分优先 5 秒，允许 4—12 秒且绝不超过 12 秒；重写已有分镜时保留 duration 与全部动作/对白。
+- 每个 Shot 都要有空间锚点（机位在哪一侧、门窗与家具相对角色的位置、主光方向）；`description` 已有的空间描述必须原样保留对应的英文表达。
+- 双人戏优先同焦平面平视中近景，逐人交代左右位置、距离、朝向与独立动作，所有需要辨认的脸清晰可见；
+  避免浅景深、背景人物虚化、遮脸、焦点转移与快速运动。
 
-这是参考生视频最关键的一节，**不可省略**。逐条声明每张参考图的用途边界：
+**内容来源**：`description` 是画面、动作、台词、旁白的唯一来源；`atmosphere` 只用于补光线与色调；
+角色外貌只取已有文字资料，不能声称看过参考图；不虚构资产、场景事实或剧情动作。
 
-- `<Subject N>（@角色名）: identity_reference` —— 只给身份与服装，**不提供构图、姿态、背景、画风**
-- `@场景名: scene_reference` —— 只给空间与陈设，**不提供机位、人物位置**
-- `@道具名: object_reference` —— 只给物件外观
-
-不写这一节，模型很容易把参考图整张当成首帧或背景，人物会站成参考图里的姿势。
-
-**detailed_description** —— 解决「每一秒发生什么」
-
-- 每个镜头写 `[Shot N] 起始秒-结束秒：内容`
-- 内容按此顺序：景别/角度/运镜 → 空间锚点 → 角色@引用 + 具体动作 + 肢体细节 + 表情 → 台词
-- **每段必须带空间锚点**：机位在空间的哪一侧、门窗与主要家具相对角色的位置、主光方向（如「窗户在小明身后偏左」）。同一段落内只能有一套锚点，不许中途改变房间布局
-- description 里已有空间描述时必须原样保留，不要改写成「室内」「房间」这类模糊表达——这是相邻镜头衔接的唯一文字依据
-- 动作动词必须具体可见（走、转身、抬头、攥紧、停顿），情绪一律转成可见描写
-- 已有可用音色的角色用「#角色名说：「台词」」；没有音色时用真实角色姓名写对白，不虚构 # 引用；画面身份仍用 @角色名，旁白写「旁白：内容」
-- 时间从 0.0 开始，各段连续衔接、无重叠无空缺，总和等于 duration
-
-**overall_soundscape** —— 解决「听到什么」
-
-- 只写画面对应的环境/动作声与说话白名单；完整对白只在 detailed_description 写一次，本节不再次抄写
-- 明确谁可以说话、谁全程闭口不发声；无原旁白则禁止旁白、解说、画外人声、哼唱、临时对白，不读出 Subject 标签或参考说明
-- 无对白/旁白时明确写“无任何人声，仅有画面对应的环境/动作声”；全静音要求写“全程静音”，不要把 N/A 当作禁人声开关
-- #角色名仅用于原文实际说话且有可用音色的角色，音色只参考说话者的声音，不复述参考音频内容；仅有动作的角色不写 # 引用
-- 提示词约束不保证音轨绝无幻觉；按原工作流输出声音，通过准确的原句对白、说话白名单与音色引用降低额外配音风险，不靠堆砌否定词
-
-**non_diegetic_music** —— 配乐
-
-- 默认写“无背景配乐、无歌声”；仅原文或用户明确指定才写配乐，不按氛围自行添加，尤其不要加入有歌词的音乐
-
-## 参考素材引用
-
-- **只写 `@角色名` / `@场景名` / `@道具名`，不要自己写 `@图片2` 这类序号**——图片编号由前端按「场景 → 角色 → 道具」顺序自动生成并注入（如 `@小明` → `@图片2小明`），模型拿不到也不需要知道真实序号
-- 写错序号会导致人物挂错参考图，务必只写名字
-- 名字必须与 `read_storyboard_context` 返回的场景/角色/道具列表完全一致，不要缩写、不要加后缀
-- 只引用本段落已绑定的场景/角色/道具，不要跨段借用
-- `<Subject N>` 的 N 按本段出场顺序从 1 开始编号，与 `@名字` 的书写顺序保持一致
-
-## 时间轴与篇幅
-
-- RTX 4060 Ti 8GB / 32GB 内存的本地 H3 基线：默认1个连续镜头、1个主要动作；只有叙事必要时最多2个镜头，每个至少2秒，避免快速切镜与复杂多人运动
-- 新拆分优先5秒，允许4-12秒且绝不能超过12秒；长对白或缓慢动作可按需延长到9-12秒，不强制凑满12秒；已有分镜保留 duration 和全部业务动作/对白，只在不删情节时合并冗余切镜，否则保留原时间轴，不修改 description
-- 时间从0.0开始，连续无重叠、无空缺，总长等于 duration；台词按自然语速分配，只在原句过长时由拆分阶段分到相邻任务，不在提示词重写时删台词或偷偷延长时长
-- 每人2—3个可靠识别点，每个镜头只写必要空间、动作与对白；保持精炼，但不设400字硬上限挤掉配角身份或说话白名单
-- 输出前自检：每个可见人物都有独立身份、正确参考、明确位置及动作；原句对白只出现一次；不说话的人明确不发声；配乐未被擅自添加
-
-## 内容来源
-
-- `description` 是画面、动作、台词、旁白的唯一来源，不要创作 description 之外的新台词
-- `atmosphere` 只用于补各段的氛围、光线与色调
-- 角色外貌来自已提供文字资料；只有真实视觉输入才能提取图片事实，不凭地址声称看过图。资产 image_url 为空时用普通姓名，不写 @ 素材引用
-- 空间锚点沿用 description 与场景资料；缺失时可设计简单机位、左右位置和距离，不新增剧情动作、资产或场景事实
-
-## 禁止事项
-
-- 跨场景切换、闪回（一个段落只发生在一个场景内）
-- 引用列表之外的场景/角色/道具名
-- 漏写 `reference_usage` 小节
-- 抽象心理描写、文学化比喻（模型只认可见画面）
-- 语言与会话语言指令不符
+**禁止事项**：跨场景切换与闪回；引用列表之外的素材名；漏写六节或改节名；
+抽象心理描写与文学比喻；在声音节抄对白；自造关系标记；把风格词写在 `[Shot 1]` 之后。
 
 ## 保存
 

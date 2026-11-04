@@ -108,15 +108,15 @@ export const DEFAULT_PROMPTS: Record<string, { name: string; instructions: strin
 - 台词容量：段内台词与旁白总字数 ≤ (duration − 2) × 4.5 字/秒（5 秒约 13 字、12 秒约 45 字），装不下的台词拆到下一个段落
 - 空间连续性：同一场景内的相邻段落必须共享同一套空间锚点（机位方向、门窗与家具的相对位置、光源方向），并在 description 里写清楚；只有切换到新场景时才重新建立空间
 
-video_prompt 规则（硬约束，H3 六段结构）：
-- video_prompt 必须是六段结构化文本，小节名固定、顺序不可变：subject_definitions / shot_summary / reference_usage / detailed_description / overall_soundscape / non_diegetic_music
-- subject_definitions：每个出场人物一行 <Subject N> 是 @角色名：外貌，只写本段实际出场的人
-- shot_summary：一句话讲清「谁·在哪·做什么·结果」
-- reference_usage：逐条声明参考图用途与边界（identity_reference / scene_reference / object_reference），明确不提供构图与姿态；这一节不可省略
-- detailed_description：[Shot N] 起始秒-结束秒：景别/角度/运镜 + 空间锚点 + 每人位置与动作 + 原句对白；默认1个连续镜头，必要时最多2个，每个至少2秒，各段相加等于 duration；原句对白仅在对应 Shot 写一次
-- 空间锚点：机位、门窗与家具相对角色的位置、主光方向；description 已有空间描述必须保留，不为清晰度删情节
-- overall_soundscape：环境/动作声与说话白名单，不重复台词，其他角色闭口不发声；无对白时明确无任何人声，无原旁白则禁止旁白、解说、画外人声与哼唱；non_diegetic_music 默认无背景配乐、无歌声，除非原文或用户指定
-- 提到场景用 @场景名、提到角色用 @角色名，名字必须与 read_storyboard_context 返回的列表完全一致
+video_prompt 规则（硬约束，MiniMax 官方 Ref2VA 六节）：
+- video_prompt 必须是六节结构化文本，小节名固定、顺序不可变：subject_definitions / summary / retention_analysis / detailed_description / overall_soundscape / non_diegetic_music。不要使用旧版自造的 shot_summary / reference_usage。
+- 六节正文一律英文，只有 <d> 内的对白/歌词与画面可见文字保留中文原语言；节名、关系标记、时间轴写法都是官方结构锚点，不可翻译或改写
+- subject_definitions：用 <Subject N> 逐行定义可复用主体并写明来源与必须保持的特征；summary：以 [reference generation] 等官方任务类型前缀开头的一段英文
+- retention_analysis：每个标签一行，只用官方关系标记 fully_preserved / partially_preserved / attribute_transfer / weak_reference
+- detailed_description：风格句由系统注入在 [Shot 1] 之前，不要自己写风格词；[Shot 1] 不带时间戳，后续镜头写 [Shot 2] At 00:03.000, the shot cuts to ...；逐镜头写清构图、主体位置与外观、环境与光线、动作与状态变化、运镜、当前声音；原句对白写成 <d>[Chinese] 原句</d> 并给说话人稳定 (S1)/(S2) ID
+- 空间锚点：机位、门窗与家具相对角色的位置、主光方向；description 已有空间描述必须保留对应英文表达，不为清晰度删情节
+- overall_soundscape：1—4 句英文环境音与物理声，不重复台词、不列说话白名单；non_diegetic_music：无配乐写 N/A
+- 提到场景用 @场景名、提到角色用 @角色名，名字必须与 read_storyboard_context 返回的列表完全一致；系统负责把 @名字 编号成 @图片N名字
 - 一个段落内允许切镜（换景别/角度/对象），但不跨场景
 - 用户消息中会告知本次视频模型，按该模型的时长限制调整写法；未告知时按 4-12 秒（目标 5 秒）处理
 
@@ -149,14 +149,14 @@ video_prompt 规则（硬约束，H3 六段结构）：
 
 工作流程：
 1. 调用 read_storyboard_context 读取该分镜的 description（含【镜头N】子镜头与台词/旁白）、atmosphere、duration 及绑定的场景/角色
-2. 按 H3 六节结构生成 video_prompt：subject_definitions（每个可见人物独立身份与资料已有识别点）、shot_summary（谁·在哪·做什么·结果，不重复对白）、reference_usage（实际参考用途，不复制角色拼版、姿势、背景）、detailed_description（连续时间轴、空间锚点、每人位置与动作，原句对白仅写一次）、overall_soundscape（环境/动作声与说话白名单，其他人物闭口不发声，无对白时明确无任何人声）、non_diegetic_music（默认无背景配乐、无歌声，除非原文或用户指定）
-3. 默认1个连续镜头，叙事必要时最多2个，每个至少2秒；重写已有分镜时保留 duration 和全部动作/对白，只在不删情节时合并冗余切镜，否则保留原时间轴。逐人明确位置、朝向与清晰脸部，不虚化配角，保留原有旁白，不新增旁白、解说、画外人声或哼唱。细则以本地 ComfyUI 视频提示词契约为准
-4. 每个 [Shot] 都要带空间锚点（机位在哪一侧、门窗与家具相对角色的位置、主光方向），description 里已有的空间描述必须原样保留——相邻镜头靠它和上一段尾帧对齐
+2. 按 MiniMax 官方 Ref2VA 六节结构生成 video_prompt：subject_definitions（<Subject N> 定义主体与必须保持的特征）、summary（官方任务类型前缀开头的一段英文）、retention_analysis（每个标签一行，只用官方关系标记）、detailed_description（[Shot 1] 不带时间戳、后续镜头写 [Shot N] At MM:SS.mmm，逐镜头写清构图/位置/动作/运镜/声音，对白写成 <d>[Chinese] 原句</d> 并分配 (Sx)）、overall_soundscape（1—4 句英文环境音与物理声）、non_diegetic_music（无配乐写 N/A）。六节正文一律英文，只有对白与画面可见文字保留中文
+3. 默认1个连续镜头，叙事必要时最多2个，每个至少2秒；重写已有分镜时保留 duration 和全部动作/对白，只在不删情节时合并冗余切镜，否则保留原镜头顺序。逐人明确位置、朝向与清晰脸部，不虚化配角，保留原有旁白，不新增旁白、解说、画外人声或哼唱。细则以本地 ComfyUI 视频提示词契约与 video-prompt 技能为准
+4. 每个 [Shot] 都要带空间锚点（机位在哪一侧、门窗与家具相对角色的位置、主光方向），description 里已有的空间描述必须保留对应英文表达——相邻镜头靠它和上一段尾帧对齐
 5. 生成时会自动把 @名字 替换为对应参考图片标记（如 @小明 → @图片1小明），因此名字必须精确匹配场景/角色列表，不要缩写或加额外符号
 6. 调用 update_storyboard 保存时参数只传两个键：storyboard_id 和 video_prompt。不要回传该分镜的其他任何字段（title、description、scene_id 等一律不传）
 
 通用规范：
-- 正文使用本次会话目标语言；图片提示词单段连贯描述，video_prompt 保持六节结构，不要混淆两类格式
+- 图片提示词使用本次会话目标语言且单段连贯描述；video_prompt 按 MiniMax 官方 Ref2VA 六节结构输出，正文一律英文、对白保留中文，不要混淆两类格式
 - 项目设定的视觉风格描述会由工具在保存图片提示词时自动注入到最终提示词的最前方，不要自行添加风格词
 - 必须实际调用保存工具，不要只在回复中给出提示词`,
   },

@@ -33,8 +33,8 @@ model: ""
 - 자연스러운 발화 시간과 약2초의 연기 여유를 확보합니다. 중국어4.5자/초를 한국어의 일률적 기준으로 적용하지 않습니다. 넘치는 대사는 인접 구간으로 나누며 구간 수를 맞추려고 삭제하지 않습니다.
 
 video_prompt 규칙(엄격한 제약):
-- 로컬 H3의 고정 순서 6절을 사용합니다: subject_definitions / shot_summary / reference_usage / detailed_description / overall_soundscape / non_diegetic_music. 시간축 [Shot N]은 detailed_description 안에 작성하며 별도의 단일 산문으로 만들지 않습니다.
-- reference_usage에는 실제 identity_reference / scene_reference / object_reference만 기재합니다. 이미지가 없으면 N/A입니다. description의 공간 기준을 유지합니다. 6절은 하나의 video_prompt 문자열이며 별도 노드 입력이 아닙니다.
+- MiniMax 공식 Ref2VA 고정 순서 6절을 사용합니다: subject_definitions / summary / retention_analysis / detailed_description / overall_soundscape / non_diegetic_music. 본문은 영어(대사는 <d>[Chinese] ...</d> 안에서만 중국어)로 씁니다. [Shot 1]에는 타임스탬프가 없고 이후 [Shot N] At MM:SS.mmm 형식을 사용하며 별도의 단일 산문으로 만들지 않습니다.
+- retention_analysis에는 공식 마커 fully_preserved / partially_preserved / attribute_transfer / weak_reference만 사용하고 임의 마커는 금지합니다. description의 공간 기준을 유지합니다. 6절은 하나의 video_prompt 문자열이며 별도 노드 입력이 아닙니다.
 - 기본은[Shot 1]에서0.0초부터duration까지 연속 한 컷입니다. 필요한 경우에만 최대 두 구간, 각2초 이상으로 연속 배치하며 기계적으로 등분하지 않습니다. 기존 분할을 다시 쓸 때 길이, 모든 동작과 원문 대사를 유지하며 줄거리를 삭제하기보다 필요한 기존 컷을 보존합니다.
 - 원문 대사는 해당Shot에 발화자를 명시하여 한 번만 씁니다. overall_soundscape는 발화 허용 인물과 환경·동작 소리만 적으며 대사를 반복하지 않습니다. 다른 인물은 입을 닫고 발성하지 않습니다. 기존 내레이션은 보존하되 새 해설, 화면 밖 목소리, 흥얼거림이나 대사를 추가하지 않습니다.
 - 대사나 내레이션이 없으면 사람 목소리 없이 화면에 대응하는 환경·동작 소리만 있음을 명시합니다. non_diegetic_music는 요청이 없으면 배경 음악과 노래 없음입니다. N/A를 음성 차단으로 사용하지 않습니다.

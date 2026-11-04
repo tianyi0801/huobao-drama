@@ -56,7 +56,7 @@ test('真实 Agent 使用原文本协议、小批工具调用、保存通知与�
   const now = new Date().toISOString()
   db.insert(schema.dramas).values({ id: 1, title: '离线测试', createdAt: now, updatedAt: now }).run()
   db.insert(schema.episodes).values({ id: 1, dramaId: 1, episodeNumber: 1, title: '测试集', scriptContent: '教室，日。女孩抬头看向窗外。', createdAt: now, updatedAt: now }).run()
-  const output = ['subject_definitions: N/A', 'shot_summary: 窗外雨景', 'reference_usage: N/A', 'detailed_description: [Shot 1] 0-2.5: 固定窗外雨景\n[Shot 2] 2.5-5: 雨滴特写', 'overall_soundscape: 雨声', 'non_diegetic_music: N/A'].join('\n')
+  const output = ['subject_definitions: N/A', 'summary: [reference generation] The target video shows rain on a classroom window.', 'retention_analysis: N/A', 'detailed_description: [Shot 1] A fixed medium shot frames rain on the classroom window.\n[Shot 2] At 00:02.500, the shot cuts to a close-up of raindrops on the glass.', 'overall_soundscape: Soft rain patters against the window throughout the shot.', 'non_diegetic_music: N/A'].join('\n')
   const shot = (n: number) => ({ shot_number: n, description: '【镜头1】窗外雨景【镜头2】雨滴特写', video_prompt: output, duration: 5, character_ids: [], prop_ids: [] })
   const plan = [
     { name: 'read_storyboard_context', args: {} },
@@ -213,7 +213,7 @@ test('真实 Agent 使用原文本协议、小批工具调用、保存通知与�
 
     await t.test('本地 H3 契约完整且空 media 不残留演示参考图', () => {
       const contract = buildLocalAgentContract('storyboard_breaker')
-      for (const section of ['subject_definitions', 'shot_summary', 'reference_usage', 'detailed_description', 'overall_soundscape', 'non_diegetic_music']) assert.ok(contract.includes(section))
+      for (const section of ['subject_definitions', 'summary', 'retention_analysis', 'detailed_description', 'overall_soundscape', 'non_diegetic_music']) assert.ok(contract.includes(section))
       assert.ok(contract.includes('每批最多2段'))
       const graph = buildSubmission({ name: '媒体测试', api: { '1': { class_type: 'MediaNode', inputs: { media_manifest: '["old.png"]' } } },
         bindings: [{ source: 'media', encoding: 'json', targets: [{ node: '1', input: 'media_manifest' }] }], outputNodes: ['1'],

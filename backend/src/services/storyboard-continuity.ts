@@ -169,8 +169,9 @@ export async function resolvePreviousShotFrame(
 /**
  * 生成衔接提示词：把尾帧在素材清单里的序号说清楚，
  * 否则 reference_mention_mode=index 下模型不会主动去用它。
+ * 官方 retention_analysis 要求固定英文关系标记，不用自造的 continuity_reference 键。
  */
 export function buildContinuityPromptSuffix(imageIndex: number): string {
-  return `\n@图片${imageIndex} 是上一镜头的结尾画面：延续它的空间布局、机位朝向、人物站位与光线方向，`
-    + `本镜头在此基础上继续推进，不要更换场景朝向或重置构图。`
+  return `\n@图片${imageIndex}: weak_reference - the previous shot's final frame. Keep the same spatial layout, `
+    + `camera orientation, subject positions and lighting direction, then continue the action from that frame without resetting the composition.`
 }

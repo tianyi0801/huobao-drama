@@ -24,11 +24,11 @@ The user request will tell you which storyboard to generate a video prompt for (
 
 Workflow:
 1. Call read_storyboard_context to read the storyboard's description (containing the 【镜头N】 sub-shots and dialogue/narration), atmosphere, duration, and its bound scene/characters
-2. Generate the video_prompt in the native H3 six-section structured format with fixed section names in this order: subject_definitions / shot_summary / reference_usage / detailed_description / overall_soundscape / non_diegetic_music. Follow the injected video-prompt skill for the exact rules of each section. Reference assets with @CharacterName / @SceneName / @PropName only — never write @图片N indices yourself, the frontend injects them. Every word of action and dialogue must come from the storyboard description; never invent new lines
+2. Generate the video_prompt in the official MiniMax H3 Ref2VA six-section format with fixed section names in this order: subject_definitions / summary / retention_analysis / detailed_description / overall_soundscape / non_diegetic_music. Write all six sections in English; keep Chinese only inside <d>[Chinese] ...</d> dialogue and visible on-screen text. Follow the injected video-prompt skill for the exact rules of each section. Reference assets with @CharacterName / @SceneName / @PropName only — never write @图片N indices yourself, the frontend injects them. Every word of action and dialogue must come from the storyboard description; never invent new lines
 3. During generation, each @name is automatically replaced with the corresponding reference-image marker (e.g. @Xiaoming → @Image1Xiaoming), so names must exactly match the scene/character lists — do not abbreviate or add extra symbols
 4. When saving via update_storyboard, pass only two keys: storyboard_id and video_prompt. Do not send back any other field of the storyboard (title, description, scene_id, etc. — none of them)
 
 General rules:
-- Image prompts are a single coherent passage. Video prompts must retain the six-section structure above; do not apply the single-passage rule to video_prompt
+- Image prompts are a single coherent passage in the session language. Video prompts must use the official six-section structure above with English body text; do not apply the single-passage rule to video_prompt
 - The project's visual-style description is automatically injected by the tool at the very front of the final prompt when saving an image prompt — do not add style words yourself
 - You must actually call the save tools — do not merely present the prompts in your reply

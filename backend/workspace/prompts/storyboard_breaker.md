@@ -34,15 +34,16 @@ model: ""
 - 台词容量有限：段内台词与旁白总字数（写在 description 中的部分）≤ (duration − 2) × 4.5 字/秒，即 5 秒约 13 字、12 秒约 45 字。装不下必须拆到下一个段落
 - 空间连续性：同一场景内的相邻段落必须共享同一套空间锚点——机位方向、门窗与主要家具的相对位置、光源方向，并在 description 里写清楚（如「窗户在角色身后偏左」）。后续段落延续同一套锚点，不要每段重新想象房间布局；只有切换到新场景时才重新建立空间
 
-video_prompt 规则（硬约束，H3 原生六段结构）：
-- video_prompt 必须是六段结构化文本，小节名固定、顺序不可变：subject_definitions / shot_summary / reference_usage / detailed_description / overall_soundscape / non_diegetic_music
-- subject_definitions：每个可见人物独立一行 `<Subject N> 是 @角色名：资料已有的脸部/发型、服装识别点`，主角与配角同等明确；没有视觉输入不能声称看过图片
-- shot_summary：一句话讲清「谁 · 在哪 · 做什么 · 结果」，不超过 50 字，不重复对白
-- reference_usage：仅实际已有图片声明 identity_reference（身份与服装，不复制三视图拼版、姿势、背景）/ scene_reference（空间与陈设，不决定机位）/ object_reference（物件外观）；没有图片写 N/A，不虚构
-- detailed_description：`[Shot N] 起始秒-结束秒：景别/角度/运镜 + 空间锚点 + 逐人位置/朝向/动作 + 原句对白`；默认1个连续镜头，必要时最多2个，每个至少2秒，时间连续且总长等于 duration；对白逐字来自 description，只在对应 Shot 写一次，不新增台词
-- overall_soundscape：画面对应的环境/动作声与说话白名单，不再次抄写台词；其他人物闭口不发声，无原旁白则禁止旁白、解说、画外人声、哼唱。无对白/旁白时写“无任何人声，仅有画面对应的环境/动作声”；全静音要求写“全程静音”，不靠 N/A 禁人声
-- non_diegetic_music：默认“无背景配乐、无歌声”，除非原文或用户指定
-- 提到场景用 @场景名、角色用 @角色名、道具用 @道具名，精确匹配上下文；图片编号由系统生成，不手写 @图片N
+video_prompt 规则（硬约束，MiniMax 官方 Ref2VA 六节结构）：
+- video_prompt 必须是六节结构化文本，小节名固定、顺序不可变：subject_definitions / summary / retention_analysis / detailed_description / overall_soundscape / non_diegetic_music。禁止使用旧版自造的 shot_summary / reference_usage / identity_reference / scene_reference / object_reference / continuity_reference
+- 六节正文一律英文，只有 `<d>` 内的对白/歌词和画面可见文字保留中文原语言；节名、关系标记、时间轴写法都是模型的结构锚点，不可翻译或改写
+- subject_definitions：用 `<Subject N>` 逐行定义可复用主体（人物、场景、物件），写明来源参考与必须保持的特征；没有视觉输入不能声称看过图片
+- summary：一段英文，以官方任务类型前缀开头（默认 `[reference generation]`，有首尾帧用 `[keyframe completion + reference generation]`），说明主体、镜头流程与参考关系，不抄对白、不引入新标签
+- retention_analysis：每个标签一行，只用官方关系标记 fully_preserved / partially_preserved / attribute_transfer / weak_reference，格式如 `<Subject 1> (appears in [Shot 1]): fully_preserved - ...`
+- detailed_description：风格句由系统注入在 `[Shot 1]` 之前，不要自己写风格词；`[Shot 1]` 不带时间戳，后续镜头写 `[Shot 2] At 00:03.000, the shot cuts to ...`；逐镜头写清构图、主体位置与外观、环境与光线、动作与状态变化、运镜类型+幅度+速度、当前声音。原句对白逐字来自 description，写成 `<d>[Chinese] 原句</d>` 并给实际发声者分配稳定 `(S1)`/`(S2)`，不发声角色不分配 ID；不新增台词、旁白或解说
+- overall_soundscape：1—4 句英文环境音与物理声，不重复对白、不列说话白名单、不堆否定句；只有全静音才写 N/A
+- non_diegetic_music：1—3 句英文配乐描述，无配乐时写 N/A，除非原文或用户明确指定
+- 提到场景用 @场景名、角色用 @角色名、道具用 @道具名，精确匹配上下文；图片编号由系统生成，不手写 @图片N / <Picture 1>
 - 每段只设计一个主动作或一句短对白，不为了完整因果链而把多人动作、反应切镜塞进5秒；必要时在相邻段落连续表达
 - 用户消息中会告知本次视频模型，按该模型的时长限制调整写法；未告知时按 4-12 秒（目标 5 秒）处理
 

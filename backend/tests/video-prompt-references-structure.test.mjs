@@ -34,8 +34,8 @@ test('中文生产模板、技能、默认及批量消息不再强制短视频�
     assert.doesNotMatch(source, /≤\s*5\s*秒.{0,6}(?:写\s*)?2\s*个/)
     assert.doesNotMatch(source, /内部承载.{0,4}2-3\s*个子镜头/)
     assert.doesNotMatch(source, /控制在\s*400\s*字以内/)
-    assert.match(source, /说话白名单/)
-    assert.match(source, /无任何人声/)
+    assert.match(source, /retention_analysis/)
+    assert.match(source, /non_diegetic_music/)
   }
 })
 

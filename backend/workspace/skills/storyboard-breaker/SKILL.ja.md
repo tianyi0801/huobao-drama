@@ -77,7 +77,7 @@ description: 絵コンテ分解のプロ仕様 — 脚本を複数のサブカ�
 
 ## 品質要件
 
-- 原則 `【镜头1】` に各人物の位置、鮮明な顔、動作を書く。`video_prompt` は六節、可視人物ごとに独立Subjectを用い、実在画像だけ@で参照する
-- 原文のセリフは該当Shotに一度だけ書く。overall_soundscapeは発話許可者と環境・動作音、他の人物は無発声。元のナレーションがなければ解説や画外の声を加えず、セリフもナレーションもなければ人声なしと明記する
-- non_diegetic_musicは指定がなければ音楽なし、歌声なし。atmosphereだけを根拠に音声を追加しない
+- 原則 `【镜头1】` に各人物の位置、鮮明な顔、動作を書く。`video_prompt` は MiniMax 公式 Ref2VA 六節（subject_definitions / summary / retention_analysis / detailed_description / overall_soundscape / non_diegetic_music）を英語で書き、可視人物ごとに独立 <Subject N> を用い、実在画像だけ@で参照する
+- 原文のセリフは該当Shotに <d>[Chinese] ...</d> として一度だけ書き、発話者に安定した (Sx) を付ける。overall_soundscape は1〜4文の英語で環境音・動作音のみを書き、発話許可者リストや台詞の重複は禁止
+- retention_analysis は公式マーカー（fully_preserved / partially_preserved / attribute_transfer / weak_reference）のみ。non_diegetic_music は指定がなければ N/A。atmosphereだけを根拠に音声を追加しない
 - 保存ツールschemaのフィールドのみ使用する。差分 `update_storyboard` で話全体を消さない

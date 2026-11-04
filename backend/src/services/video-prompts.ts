@@ -66,7 +66,7 @@ export async function startVideoPromptBatch(
         const result = await agent.generate([{
           role: 'user',
           content: `请为分镜 #${sb.storyboardNumber}(ID:${sb.id})生成视频提示词(video_prompt)。视频模型:${videoLabel},请根据该模型的特性和时长限制生成。
-先调用 read_storyboard_context 获取该分镜的 description、atmosphere、duration 和绑定素材，按本地 ComfyUI 视频提示词契约的六节结构生成。默认1个连续镜头，不为了段数切镜；只在不删情节时合并冗余切镜，否则保留原时间轴。主角、配角均有独立身份和清晰脸部，明确每人位置与动作。原句对白只在对应 Shot 写一次，声音节列说话白名单；无对白时明确无任何人声，不新增配音或配乐。用 @角色名/@场景名/@道具名 引用实际素材。调用 update_storyboard 保存到分镜 ID:${sb.id}，参数只传 storyboard_id 和 video_prompt；不改描述、时长、绑定，不重新拆分整集。`,
+先调用 read_storyboard_context 获取该分镜的 description、atmosphere、duration 和绑定素材，按 MiniMax 官方 Ref2VA 六节结构（subject_definitions / summary / retention_analysis / detailed_description / overall_soundscape / non_diegetic_music）生成，六节正文用英文、对白放在 <d>[Chinese] 原句</d> 中。summary 用官方任务类型前缀，retention_analysis 用官方关系标记，detailed_description 的 [Shot 1] 不带时间戳。默认1个连续镜头，不为了段数切镜；只在不删情节时合并冗余切镜，否则保留原时间轴。主角、配角均有独立身份和清晰脸部，明确每人位置与动作。原句对白只在对应 Shot 写一次，不新增配音或配乐，无配乐写 N/A。用 @角色名/@场景名/@道具名 引用实际素材。调用 update_storyboard 保存到分镜 ID:${sb.id}，参数只传 storyboard_id 和 video_prompt；不改描述、时长、绑定，不重新拆分整集。`,
         }], { maxSteps: 8, requestContext })
         assertAgentSaved('prompt_generator', result, requestContext)
         // 以本次保存回执与实际落库为准，旧值非空不代表本次成功
