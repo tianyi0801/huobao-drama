@@ -6,6 +6,7 @@ import Database from 'better-sqlite3'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import * as schema from './schema.js'
 import { initSqliteSchema } from './sqlite-schema.js'
+import { initStudioSchema } from './studio-schema.js'
 import { maybeAutoImportMysql } from './mysql-import.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -27,6 +28,8 @@ sqlite.pragma('synchronous = NORMAL')
 /** 启动建表（DDL 幂等重放 + 种子补缺）。SQLite 无连接就绪问题，无需重试 */
 export function initDb() {
   initSqliteSchema(sqlite)
+  // 独立视频工作台的表单独建，不并入主 DDL 数组
+  initStudioSchema(sqlite)
 }
 
 initDb()

@@ -119,7 +119,8 @@
         <div class="project-body">
           <h2 class="project-name truncate">{{ d.title }}</h2>
           <div class="project-meta">
-            <span v-if="d.style" class="tag tag-accent">{{ styleLabel(d.style) }}</span>
+            <span v-if="projectTypeOf(d) !== 'drama'" class="tag tag-accent">{{ t(`studio.types.${projectTypeOf(d)}.label`) }}</span>
+            <span v-else-if="d.style" class="tag tag-accent">{{ styleLabel(d.style) }}</span>
             <span class="dim">{{ t('index.projectMeta', { chars: d.characters?.length || 0, scenes: d.scenes?.length || 0, eps: d.episodes?.length || 0 }) }}</span>
           </div>
           <div class="project-foot dim">
@@ -159,11 +160,12 @@
         </div>
         <form @submit.prevent="create" class="dialog-form">
           <div class="dialog-body">
+            <ProjectTypePicker v-model="form.project_type" />
             <label class="field">
               <span class="field-label">{{ t('index.createDialog.name') }} <span class="required">*</span></span>
               <input v-model="form.title" class="input" :placeholder="t('index.createDialog.namePlaceholder')" required autofocus />
             </label>
-            <label class="field">
+            <label v-if="form.project_type === 'drama'" class="field">
               <span class="field-label">{{ t('index.createDialog.style') }}</span>
               <BaseSelect v-model="form.style" :options="styleSelectOptions" :placeholder="t('index.createDialog.stylePlaceholder')" searchable />
               <span v-if="selectedStyleDesc" class="field-hint">{{ selectedStyleDesc }}</span>
@@ -203,7 +205,9 @@ import { toastError } from '~/composables/useToast'
 import { useI18n } from 'vue-i18n'
 import { Clock, CircleHelp } from 'lucide-vue-next'
 import { dramaAPI, stylePresetAPI } from '~/composables/useApi'
+import { projectPath } from '~/composables/useStudio'
 import BaseSelect from '~/components/BaseSelect.vue'
+import ProjectTypePicker from '~/components/studio/ProjectTypePicker.vue'
 import { startTour, autoTour } from '~/composables/useTour'
 
 const { t, locale } = useI18n()
@@ -221,7 +225,7 @@ const sortOptions = computed(() => ([
 const activeMenuId = ref(null)
 const dramaToDelete = ref(null)
 const deletingDrama = ref(false)
-const form = ref({ title: '', style: '', aspect_ratio: '16:9' })
+const form = ref({ title: '', project_type: 'drama', style: '', aspect_ratio: '16:9' })
 const stylePresets = ref([])
 const styleSelectOptions = computed(() => stylePresets.value.map(p => ({ label: p.name, value: p.value })))
 const selectedStyleDesc = computed(() => stylePresets.value.find(p => p.value === form.value.style)?.description || '')
@@ -247,6 +251,7 @@ const statusOptions = computed(() => ([
 const statusMenuId = ref(null)
 
 function currentStatus(d) { return d.status || 'draft' }
+function projectTypeOf(d) { return d.project_type || 'drama' }
 function projectStatus(d) { return statusOptions.value.find(s => s.value === currentStatus(d))?.label || t('index.status.draft') }
 function statusDotClass(d) { return currentStatus(d) === 'active' ? 'on' : currentStatus(d) === 'completed' ? 'done' : '' }
 
@@ -308,7 +313,7 @@ async function create() {
   try {
     const d = await dramaAPI.create(form.value)
     showCreate.value = false
-    navigateTo(`/drama/${d.id}`)
+    navigateTo(projectPath(d.project_type || form.value.project_type, d.id))
   } catch (e) {
     toastError(e)
   }
@@ -338,7 +343,7 @@ function getEpisodeNumber(d) {
 }
 
 function getDramaPath(d) {
-  return `/drama/${d.id}`
+  return projectPath(d.project_type, d.id)
 }
 
 function openDrama(d) {

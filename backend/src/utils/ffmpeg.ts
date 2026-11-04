@@ -69,6 +69,9 @@ if (ffmpegPath) ffmpeg.setFfmpegPath(ffmpegPath)
 if (ffprobePath) ffmpeg.setFfprobePath(ffprobePath)
 
 export { ffmpeg }
+/** 供需要直接 spawn 二进制的模块复用（已含环境变量覆盖与 PATH 回退）。 */
+export const ffmpegBin = ffmpegPath
+export const ffprobeBin = ffprobePath
 
 /** spawn 一次 -version 验证二进制真实可执行（含同步 EFTYPE 兜底） */
 function probeBinary(binPath: string | null): Promise<boolean> {

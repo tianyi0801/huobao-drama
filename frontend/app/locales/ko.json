@@ -1,4 +1,88 @@
 {
+  "studio": {
+    "head": {
+      "title": "영상 스튜디오",
+      "sub": "소재를 업로드하면 대본이나 스토리보드 없이 바로 영상을 생성합니다"
+    },
+    "invalid": "프로젝트 유형이 현재 워크스페이스와 일치하지 않습니다. 프로젝트 목록에서 다시 열어 주세요.",
+    "typePicker": {
+      "label": "프로젝트 유형",
+      "hint": "생성 후 고정되며 유형마다 별도 워크스페이스를 사용합니다"
+    },
+    "types": {
+      "drama": { "label": "숏 드라마", "desc": "대본 → 스토리보드 → 영상" },
+      "character_swap": { "label": "인물 교체", "desc": "영상과 인물 이미지 업로드" },
+      "transition": { "label": "첫·마지막 프레임 전환", "desc": "시작과 끝 이미지 업로드" }
+    },
+    "plan": {
+      "title": "장면 분할",
+      "sourceDuration": "원본 {n}",
+      "meta": "{w}×{h} · {fps}fps",
+      "cuts": "장면 전환 {n}개 감지",
+      "estimate": "생성 예정 {n}개 구간",
+      "range": "{start}s – {end}s",
+      "hint": "장면 전환을 기준으로 자동 분할하며, 모델의 구간 상한을 넘는 장면은 다시 나눕니다. 구간마다 별도 과금되고, 완료 후 이어 붙이고 원본 오디오를 합성합니다.",
+      "empty": "원본 영상을 업로드하면 분할 계획이 생성됩니다",
+      "loading": "장면 전환 감지 중…",
+      "durationBySource": "결과 길이 (원본 기준)"
+    },
+    "batch": {
+      "title": "구간 진행 & 완성본",
+      "empty": "아직 생성 배치가 없습니다",
+      "progress": "{done}/{total} 구간 완료",
+      "download": "완성본 다운로드",
+      "submitted": "배치를 제출했습니다. 순차 생성합니다",
+      "status": {
+        "processing": "구간 생성 중",
+        "merging": "병합 중",
+        "completed": "완료",
+        "failed": "실패"
+      },
+      "seg": {
+        "pending": "대기",
+        "processing": "생성 중",
+        "completed": "완료",
+        "failed": "실패"
+      }
+    },
+    "materials": {
+      "title": "소재",
+      "sub": "소재는 프로젝트에 저장되어 여러 번 사용할 수 있습니다"
+    },
+    "slots": {
+      "source_video": { "title": "원본 영상", "hint": "동작과 구도 참고용 영상, 최대 1개" },
+      "reference_image": { "title": "인물 참고 이미지", "hint": "교체할 인물 이미지, 여러 장 가능" },
+      "first_frame": { "title": "첫 프레임", "hint": "시작 이미지 1장 필수" },
+      "last_frame": { "title": "마지막 프레임", "hint": "종료 이미지 1장 필수" },
+      "upload": "업로드",
+      "uploading": "업로드 중…",
+      "remove": "소재 삭제",
+      "fileTooLarge": "영상 파일은 50MB 이하여야 합니다"
+    },
+    "form": {
+      "title": "생성 설정",
+      "prompt": "프롬프트",
+      "promptPlaceholder": "원하는 결과를 입력하세요. 비우면 기본 프롬프트를 사용합니다",
+      "duration": "길이 (초)",
+      "ratio": "비율",
+      "model": "영상 모델",
+      "modelAuto": "현재 활성 설정 사용",
+      "generate": "생성 시작",
+      "generating": "생성 중…",
+      "needMaterials": "먼저 필수 소재를 모두 업로드해 주세요"
+    },
+    "results": {
+      "title": "결과물",
+      "empty": "아직 생성 기록이 없습니다. 소재를 업로드한 뒤 생성해 주세요",
+      "download": "다운로드",
+      "recover": "작업 복구",
+      "status": { "processing": "생성 중", "completed": "완료", "failed": "실패" }
+    },
+    "toast": {
+      "submitted": "생성 작업을 제출했습니다",
+      "recovered": "작업 복구를 시작했습니다"
+    }
+  },
   "app": {
     "title": "화바오 숏드라마",
     "updateAvailable": "새 버전 v{version}을 사용할 수 있습니다. 「설정 → 업데이트 정보」에서 업그레이드하세요",

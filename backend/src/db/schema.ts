@@ -10,6 +10,7 @@ export const dramas = sqliteTable('dramas', {
   title: text('title').notNull(),
   description: text('description'),
   genre: text('genre'),
+  projectType: text('project_type').default('drama'),
   style: text('style').default('3d'),
   aspectRatio: text('aspect_ratio').default('16:9'),
   totalEpisodes: integer('total_episodes').default(1),

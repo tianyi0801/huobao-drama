@@ -1,4 +1,88 @@
 {
+  "studio": {
+    "head": {
+      "title": "動画スタジオ",
+      "sub": "素材をアップロードして直接動画を生成します。脚本・絵コンテは不要です"
+    },
+    "invalid": "プロジェクト種別がこのワークスペースと一致しません。プロジェクト一覧から開き直してください。",
+    "typePicker": {
+      "label": "プロジェクト種別",
+      "hint": "作成後は変更できません。種別ごとに専用ワークスペースがあります"
+    },
+    "types": {
+      "drama": { "label": "ショートドラマ", "desc": "脚本 → 絵コンテ → 動画" },
+      "character_swap": { "label": "人物置換", "desc": "動画と人物画像をアップロード" },
+      "transition": { "label": "首尾フレーム転場", "desc": "先頭と末尾の画像をアップロード" }
+    },
+    "plan": {
+      "title": "カット分割",
+      "sourceDuration": "元動画 {n}",
+      "meta": "{w}×{h} · {fps}fps",
+      "cuts": "カット点 {n} 件を検出",
+      "estimate": "生成予定 {n} セグメント",
+      "range": "{start}s – {end}s",
+      "hint": "シーン変化で自動分割し、モデルの上限を超えるカットは再分割します。セグメントごとに課金され、完了後に連結して元動画の音声を合成します。",
+      "empty": "元動画をアップロードすると分割計画を生成します",
+      "loading": "カット点を検出中…",
+      "durationBySource": "出力長さ（元動画に準拠）"
+    },
+    "batch": {
+      "title": "分割進捗と完成動画",
+      "empty": "生成バッチはまだありません",
+      "progress": "{done}/{total} セグメント完了",
+      "download": "完成動画をダウンロード",
+      "submitted": "バッチを送信しました。順番に生成します",
+      "status": {
+        "processing": "セグメント生成中",
+        "merging": "連結中",
+        "completed": "完了",
+        "failed": "失敗"
+      },
+      "seg": {
+        "pending": "待機",
+        "processing": "生成中",
+        "completed": "完了",
+        "failed": "失敗"
+      }
+    },
+    "materials": {
+      "title": "素材",
+      "sub": "素材はプロジェクトに保存され、何度でも利用できます"
+    },
+    "slots": {
+      "source_video": { "title": "元動画", "hint": "動きとカメラの参考になる動画、最大 1 件" },
+      "reference_image": { "title": "人物参考画像", "hint": "置換する人物の画像、複数可" },
+      "first_frame": { "title": "先頭フレーム", "hint": "開始画像、1 枚必須" },
+      "last_frame": { "title": "末尾フレーム", "hint": "終了画像、1 枚必須" },
+      "upload": "アップロード",
+      "uploading": "アップロード中…",
+      "remove": "素材を削除",
+      "fileTooLarge": "動画ファイルは 50MB までです"
+    },
+    "form": {
+      "title": "生成設定",
+      "prompt": "プロンプト",
+      "promptPlaceholder": "仕上がりを記述します。空欄なら既定プロンプトを使用",
+      "duration": "長さ（秒）",
+      "ratio": "比率",
+      "model": "動画モデル",
+      "modelAuto": "現在有効な設定を使用",
+      "generate": "生成開始",
+      "generating": "生成中…",
+      "needMaterials": "先に必要な素材をすべてアップロードしてください"
+    },
+    "results": {
+      "title": "生成結果",
+      "empty": "生成結果はまだありません。素材をアップロードして生成してください",
+      "download": "ダウンロード",
+      "recover": "タスクを復旧",
+      "status": { "processing": "生成中", "completed": "完了", "failed": "失敗" }
+    },
+    "toast": {
+      "submitted": "生成タスクを送信しました",
+      "recovered": "タスクの復旧を開始しました"
+    }
+  },
   "app": {
     "title": "火宝ショートドラマ",
     "updateAvailable": "新バージョン v{version} があります。「設定 → 更新について」でアップグレードできます",

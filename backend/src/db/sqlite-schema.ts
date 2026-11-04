@@ -12,6 +12,7 @@ export const sqliteSchemaStatements = [
     title TEXT NOT NULL,
     description TEXT,
     genre TEXT,
+    project_type TEXT NOT NULL DEFAULT 'drama',
     style TEXT DEFAULT '3d',
     aspect_ratio TEXT DEFAULT '16:9',
     total_episodes INTEGER DEFAULT 1,
@@ -389,6 +390,11 @@ export function initSqliteSchema(sqlite: Database.Database) {
   const characterColumns = new Set((sqlite.prepare('PRAGMA table_info(characters)').all() as { name: string }[]).map(c => c.name))
   for (const name of ['voice_audio_url', 'voice_audio_name']) {
     if (!characterColumns.has(name)) sqlite.exec(`ALTER TABLE characters ADD COLUMN ${name} TEXT`)
+  }
+  // 项目类型：旧项目全部视为短剧，新增两种视频模式后不影响历史数据。
+  const dramaColumns = new Set((sqlite.prepare('PRAGMA table_info(dramas)').all() as { name: string }[]).map(c => c.name))
+  if (!dramaColumns.has('project_type')) {
+    sqlite.exec(`ALTER TABLE dramas ADD COLUMN project_type TEXT DEFAULT 'drama'`)
   }
   const insertSeed = sqlite.prepare(SEED_SQL)
   const upgradeSeed = sqlite.prepare(UPGRADE_SQL)

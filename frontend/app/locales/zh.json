@@ -1,4 +1,88 @@
 {
+  "studio": {
+    "head": {
+      "title": "视频工作台",
+      "sub": "上传素材后直接生成视频，无需剧本与分镜"
+    },
+    "invalid": "项目类型与当前工作台不匹配，请从项目列表重新进入。",
+    "typePicker": {
+      "label": "项目类型",
+      "hint": "创建后固定，不同类型使用各自独立的工作台"
+    },
+    "types": {
+      "drama": { "label": "短剧制作", "desc": "剧本 → 分镜 → 成片" },
+      "character_swap": { "label": "人物替换", "desc": "上传视频与人物参考图" },
+      "transition": { "label": "首尾帧转场", "desc": "上传首帧与尾帧两张图" }
+    },
+    "plan": {
+      "title": "镜头分段",
+      "sourceDuration": "源视频 {n}",
+      "meta": "{w}×{h} · {fps}fps",
+      "cuts": "检测到 {n} 个镜头切点",
+      "estimate": "预计生成 {n} 段",
+      "range": "{start}s – {end}s",
+      "hint": "按场景切镜自动分段，超过模型单段上限的镜头会二次切分；每段单独计费，全部完成后自动拼接并合成源视频原音轨。",
+      "empty": "上传源视频后自动生成分段方案",
+      "loading": "正在检测镜头切点…",
+      "durationBySource": "成片时长（跟随源视频）"
+    },
+    "batch": {
+      "title": "分段进度与成片",
+      "empty": "还没有生成批次",
+      "progress": "{done}/{total} 段完成",
+      "download": "下载成片",
+      "submitted": "分段批次已提交，正在逐段生成",
+      "status": {
+        "processing": "逐段生成中",
+        "merging": "汇总拼接中",
+        "completed": "已完成",
+        "failed": "失败"
+      },
+      "seg": {
+        "pending": "等待",
+        "processing": "生成中",
+        "completed": "已完成",
+        "failed": "失败"
+      }
+    },
+    "materials": {
+      "title": "素材",
+      "sub": "素材保存在当前项目内，可多次用于生成"
+    },
+    "slots": {
+      "source_video": { "title": "源视频", "hint": "作为动作与镜头参考的原视频，最多 1 个" },
+      "reference_image": { "title": "人物参考图", "hint": "用于替换的人物形象，可上传多张" },
+      "first_frame": { "title": "首帧图片", "hint": "转场开始画面，必填 1 张" },
+      "last_frame": { "title": "尾帧图片", "hint": "转场结束画面，必填 1 张" },
+      "upload": "上传素材",
+      "uploading": "上传中…",
+      "remove": "移除素材",
+      "fileTooLarge": "视频文件不能超过 50MB"
+    },
+    "form": {
+      "title": "生成设置",
+      "prompt": "提示词",
+      "promptPlaceholder": "描述期望的画面效果，留空使用默认提示词",
+      "duration": "时长（秒）",
+      "ratio": "比例",
+      "model": "视频模型",
+      "modelAuto": "使用当前启用的配置",
+      "generate": "开始生成",
+      "generating": "生成中…",
+      "needMaterials": "请先上传全部必需素材"
+    },
+    "results": {
+      "title": "成片",
+      "empty": "还没有生成记录，上传素材后点击「开始生成」",
+      "download": "下载",
+      "recover": "恢复任务",
+      "status": { "processing": "生成中", "completed": "已完成", "failed": "失败" }
+    },
+    "toast": {
+      "submitted": "生成任务已提交",
+      "recovered": "任务已开始恢复"
+    }
+  },
   "app": {
     "title": "火宝短剧",
     "updateAvailable": "发现新版本 v{version}，可在「设置 → 关于更新」中升级",

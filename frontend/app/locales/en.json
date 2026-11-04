@@ -1,4 +1,88 @@
 {
+  "studio": {
+    "head": {
+      "title": "Video Studio",
+      "sub": "Upload materials and generate a video directly, no script or storyboard needed"
+    },
+    "invalid": "This project type does not match the workspace. Please re-open it from the project list.",
+    "typePicker": {
+      "label": "Project type",
+      "hint": "Fixed after creation; each type has its own workspace"
+    },
+    "types": {
+      "drama": { "label": "Short Drama", "desc": "Script → storyboard → film" },
+      "character_swap": { "label": "Character Swap", "desc": "Upload a video and portraits" },
+      "transition": { "label": "Frame Transition", "desc": "Upload first and last frames" }
+    },
+    "plan": {
+      "title": "Shot segmentation",
+      "sourceDuration": "Source {n}",
+      "meta": "{w}×{h} · {fps}fps",
+      "cuts": "{n} scene cuts detected",
+      "estimate": "{n} segments to generate",
+      "range": "{start}s – {end}s",
+      "hint": "Segments follow scene cuts; shots longer than the model's per-clip limit are split again. Each segment is billed separately. All clips are joined and the original audio is restored at the end.",
+      "empty": "Upload a source video to generate a segment plan",
+      "loading": "Detecting scene cuts…",
+      "durationBySource": "Output length (from source)"
+    },
+    "batch": {
+      "title": "Segments & final video",
+      "empty": "No generation batches yet",
+      "progress": "{done}/{total} segments done",
+      "download": "Download final video",
+      "submitted": "Batch submitted, generating segment by segment",
+      "status": {
+        "processing": "Generating segments",
+        "merging": "Merging",
+        "completed": "Completed",
+        "failed": "Failed"
+      },
+      "seg": {
+        "pending": "Pending",
+        "processing": "Generating",
+        "completed": "Completed",
+        "failed": "Failed"
+      }
+    },
+    "materials": {
+      "title": "Materials",
+      "sub": "Materials are saved with this project and can be reused"
+    },
+    "slots": {
+      "source_video": { "title": "Source video", "hint": "Original video used as motion reference, max 1" },
+      "reference_image": { "title": "Character reference", "hint": "Portraits of the character to swap in" },
+      "first_frame": { "title": "First frame", "hint": "Starting image, exactly 1 required" },
+      "last_frame": { "title": "Last frame", "hint": "Ending image, exactly 1 required" },
+      "upload": "Upload",
+      "uploading": "Uploading…",
+      "remove": "Remove material",
+      "fileTooLarge": "Video files must be under 50MB"
+    },
+    "form": {
+      "title": "Generation settings",
+      "prompt": "Prompt",
+      "promptPlaceholder": "Describe the expected result, leave empty to use the default prompt",
+      "duration": "Duration (s)",
+      "ratio": "Ratio",
+      "model": "Video model",
+      "modelAuto": "Use the active configuration",
+      "generate": "Generate",
+      "generating": "Generating…",
+      "needMaterials": "Please upload all required materials first"
+    },
+    "results": {
+      "title": "Results",
+      "empty": "No results yet. Upload materials and click Generate.",
+      "download": "Download",
+      "recover": "Recover task",
+      "status": { "processing": "Processing", "completed": "Completed", "failed": "Failed" }
+    },
+    "toast": {
+      "submitted": "Generation task submitted",
+      "recovered": "Task recovery started"
+    }
+  },
   "app": {
     "title": "Huobao Shorts",
     "updateAvailable": "New version v{version} is available. Upgrade in Settings → About.",

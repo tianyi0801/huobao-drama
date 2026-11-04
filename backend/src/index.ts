@@ -25,8 +25,10 @@ import storage from './routes/storage.js'
 import serverUpdate from './routes/serverUpdate.js'
 import localEnv from './routes/localEnv.js'
 import workflows from './routes/workflows.js'
+import studio from './routes/studio.js'
 import { requestLogger, errorHandler } from './middleware/logger.js'
 import { resumeInterruptedTasks } from './services/generation.js'
+import { resumeStudioBatches } from './services/studio-orchestrator.js'
 import { seedComfyDefaultsIfMissing } from './services/comfyui/bootstrap.js'
 import { syncWorkspaceTemplate } from './agents/workspace-sync.js'
 import { DATA_ROOT } from './utils/paths.js'
@@ -73,6 +75,7 @@ api.route('/settings', settings)
 api.route('/server-update', serverUpdate)
 api.route('/local-env', localEnv)
 api.route('/workflows', workflows)
+api.route('/studio', studio)
 
 app.route('/api/v1', api)
 
@@ -104,5 +107,7 @@ try {
 // 首次启动预置本地 ComfyUI 工作流模板（已有配置时不覆盖）
 seedComfyDefaultsIfMissing()
 await resumeInterruptedTasks()
+// 独立工作台：重启后继续未完成的镜头批次（已完成的段不重复生成）
+await resumeStudioBatches()
 
 serve({ fetch: app.fetch, port })

@@ -51,9 +51,15 @@ app.get('/', async (c) => {
 // POST /dramas - Create drama
 app.post('/', async (c) => {
   const body = await c.req.json()
+  // 项目类型创建后固定：老客户端不传该字段时一律按短剧处理
+  const projectType = body.project_type ?? 'drama'
+  if (!['drama', 'character_swap', 'transition'].includes(projectType)) {
+    return badRequest(c, '不支持的项目类型')
+  }
   const ts = now()
   const res = await db.insert(schema.dramas).values({
     title: body.title,
+    projectType,
     description: body.description,
     genre: body.genre,
     style: body.style,
