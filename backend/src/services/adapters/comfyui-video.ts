@@ -19,7 +19,7 @@ import { getComfyConfig } from '../comfyui/config.js'
 import { buildSubmission, type ComfyJobContext } from '../comfyui/template.js'
 import { stageMany, taskSubfolder } from '../comfyui/staging.js'
 import { resolveSeed, viewUrl } from './comfyui-image.js'
-import { validateVideoPromptTimeline } from '../video-prompt-structure.js'
+import { normalizeVideoPromptSections, validateVideoPromptTimeline } from '../video-prompt-structure.js'
 
 const VIDEO_EXTENSIONS = ['.mp4', '.webm', '.mov', '.mkv']
 
@@ -169,7 +169,9 @@ export class ComfyUiVideoAdapter implements VideoProviderAdapter {
     if (!template) throw new Error('当前没有可用的「视频」工作流模板，请到设置页导入')
     const isH3 = Object.values(template.api).some(node => node.class_type.includes('MiniMaxH3EasyV'))
     const rawPrompt = String(record.prompt || '').trim()
-    const prompt = isH3 ? rawPrompt.replace(/（音色参考音频(\d+)）/g, '（音色参考@音频$1）') : rawPrompt
+    // 历史分镜用的是自造节名，提交前归一成官方六节，避免旧数据仍以 shot_summary / reference_usage 进入模型
+    const withVoice = isH3 ? rawPrompt.replace(/（音色参考音频(\d+)）/g, '（音色参考@音频$1）') : rawPrompt
+    const prompt = isH3 ? normalizeVideoPromptSections(withVoice) : withVoice
     if (isH3 && !prompt) throw new Error('本地 H3 视频提示词不能为空，请先生成或填写分镜提示词')
     if (isH3) validateVideoPromptTimeline(prompt, Number(record.duration ?? 5))
     if (isH3 && /@(?!图片\d+|视频\d+|音频\d+)[^\s@#]+/.test(prompt)) {

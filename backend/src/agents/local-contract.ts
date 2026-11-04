@@ -30,22 +30,17 @@ export function buildLocalAgentContract(type: string, rc?: RequestContext): stri
   }
   const comfy = getComfyConfig()
   const localVideo = comfy.video?.name || '尚未绑定本地视频工作流'
-  const video = `## 本地 ComfyUI 视频提示词契约
-- 实际视频模板：${localVideo}。本项目内置 H3 工作流；不要按历史云端配置显示名改用其他提示词格式。
-- video_prompt 是一个完整字符串，含以下六节且顺序固定：${H3_SECTIONS.join(' / ')}。六节不是六个节点参数，禁止退化为单段散文。
-- 分镜创作按戏剧节拍组织，不把硬件配置当成单镜头或单动作限制；一个生成段落可以包含铺垫—发生—反应及多轮短对白，不为了某个固定秒数把因果链切碎。
-- 优先读取 target_storyboard 的绑定素材与 available_image_references，直接复制其中 image_reference（如 @林墨）而不是自己按ID猜名称；整集拆分按资产 image_url 与本段绑定生成同样引用。有图且在画面中使用的资产必须使用精确 @角色名/@场景名/@道具名，不是可选修饰；只有确实无图的资产才用普通名称。
-- subject_definitions：每个可见人物单独一行；有图写 <Subject N> 是 @角色名：文字资料已有的脸部/发型、服装识别点，无图才省略 @。主角与配角同等明确；shot_summary 与 detailed_description 提到有图人物/场景/道具时也保留精确 @名称，原句对白正文不插入资源标记。
-- reference_usage：每条必须点名实际素材与用途，如 <Subject 1>（@林墨）: identity_reference、@林墨家客厅: scene_reference、@钥匙: object_reference，不写“角色参考图”“场景参考图”等泛称。有图的绑定场景及本段使用的有图角色/道具逐项列出；角色图提供身份与服装，不复制三视图拼版、姿势或背景，场景图提供空间，尾帧可声明 continuity_reference。只有确实没有可用图片时才写 N/A，不虚构引用；保存回执提示缺少 @引用时必须按清单补齐后重试。
-- detailed_description：连续的 [Shot N] 起始秒-结束秒，含景别/角度/运镜、空间锚点、动作及原有对白。总长严格等于 duration，不跨场景，不创作新台词。
-- 新拆分 duration 为4—12的整数秒，绝不能超过12秒；先设计节拍、动作与自然对白，再确定时长，没有固定目标秒数，不填充空停顿。一般可用2—4个有叙事作用的子镜头表达建立关系、动作细节与反应，这只是手法参考，不是镜头数量配额；完整调度适合长镜头时可用1个镜头，不设最多2镜头或每镜头2秒下限。切镜按信息变化、视线、动作或话轮，不机械等分；短促插入特写与反应可少于2秒，但须看清内容，台词须有自然发话时间。
-- 优先在同段保留铺垫—发生—反应，超出时长范围才在自然话轮或动作承接处拆段，不删剧情。对白可与动作、听者反应并行，不为每个子镜头机械预留2秒；中文约4—5字/秒仅为语速估算，实际按语言、情绪与停顿分配。重写已有分镜时保留 duration、description、全部动作/原句对白以及原有子镜头顺序和切镜点，不为单镜头偏好合并或新增子镜头。
-- 景别和机位服务叙事：可使用建立镜头、正反打、过肩、动作/道具特写、反应镜头、推拉跟移与动机明确的焦点转移，不把双人戏锁为平视同焦中近景。写清逐镜人物相对位置、视线、动作与关注主体，需辨认身份或表情时脸部应清晰；可有背影、遮挡和景深变化，但不丢剧情角色。保持场景布局、光源、轴线与动作连续，允许叙事性换机位、景别和构图。
-- 对白只从 description 逐字提取，仅在 detailed_description 对应时间段写一次完整原句，明确说话人；overall_soundscape 只列说话白名单和环境/动作声，不再次抄写台词。可按原文轮流发话，逐段标明发话起止；每人仅在自己的对白时段发声，未轮到发话或无台词者闭口不发声。原文没有旁白则禁止旁白、解说、画外人声、哼唱及临时对白；原文对白在合法反打时延续不等于新增画外人声。
-- 无对白/旁白时 overall_soundscape 明确写“无任何人声，仅有画面对应的环境/动作声”，全静音要求则写“全程静音”；不能仅靠 N/A 表示禁人声。non_diegetic_music 默认写“无背景配乐、无歌声”，只有原文或用户明确指定才设计配乐。@角色名/@场景名/@道具名精确匹配上下文，系统负责最终图片编号，不手写 @图片1。
-- 六节正文精炼但不牺牲戏剧回合；每人2—3个可靠外观识别点即可，不堆叠无关衣饰或质量词，不用总字数上限挤掉配角身份、动作或对白白名单。
-- 只有 available_voice_references / has_voice 明确可用的角色才用 #角色名 标注对白音色；否则用角色姓名描述对白，不虚构声音引用。
-- 步数、分辨率、种子、采样器、增强开关由模板/界面控制，不写进创作文本。`
+  const video = `## 本地 ComfyUI 视频提示词契约（MiniMax 官方 Ref2VA 格式）
+- 实际视频模板：${localVideo}。本项目内置 H3 Ref2VA 工作流；不要按历史云端配置显示名改用其他提示词格式。
+- video_prompt 是一个完整字符串，含以下官方六节且顺序固定：${H3_SECTIONS.join(' / ')}。节名是英文结构锚点，禁止改名、翻译或退化成单段散文；禁止使用项目旧版自造的 shot_summary / reference_usage / identity_reference / continuity_reference。
+- 六节正文一律英文；只有 <d> 内的对白/歌词和画面可见文字保留原语言（中文）。这是格式硬要求，不受会话语言指令影响。逐节细则以注入的 video-prompt 技能为准。
+- subject_definitions：用 <Subject N> 逐行定义可复用主体，写明来源参考与必须保持的特征；summary：以 [reference generation] 等官方任务类型前缀开头的一段英文；retention_analysis：每个标签一行，只用官方关系标记 fully_preserved / partially_preserved / attribute_transfer / weak_reference（音频用 fully_copy / partially_copy / reference / weak_reference）。
+- detailed_description：风格句由系统在 [Shot 1] 之前注入，不要自己写风格词；[Shot 1] 不带时间戳，后续镜头写 [Shot N] At MM:SS.mmm, the shot cuts to ...；逐镜头写清构图、主体位置与外观、环境与光线、动作与状态变化、运镜类型+幅度+速度、当前声音。描述必须具体可见，不能写成剧情摘要或参考关系清单。
+- 对白写成 <Subject 1> (S1) ... says, <d>[Chinese] 原句</d>；(Sx) 按实际发声顺序分配，不发声的角色不分配。台词逐字来自 description，只在对应 Shot 写一次，不新增台词、旁白或解说。overall_soundscape 只写 1—4 句英文环境音与物理声，不抄对白、不用说话白名单或否定句堆砌；non_diegetic_music 无配乐时写 N/A。
+- 素材只写 @角色名/@场景名/@道具名，精确匹配上下文，系统负责编号，不手写 @图片1 / <Picture 1>。仅 image_url 已有实际图片的资产才使用 @ 引用，未生图资产用普通名称描述，不虚构参考图。
+- 新拆分 duration 为4—12的整数秒，目标5秒，绝不能超过12秒；默认1个连续镜头、固定机位或缓慢单一运镜、1个主要动作，仅叙事确需切镜时最多2个且每个至少2秒。重写已有分镜时保留 duration 与全部业务动作/台词。
+- 每个 Shot 都要带空间锚点，description 已有的空间描述原样保留对应英文表达；双人对话优先同焦平面平视中近景，逐人写清左右位置、距离、朝向与独立动作，所有需要辨认的脸均清晰可见，避免浅景深、背景人物虚化、遮脸与快速运动。
+- 只有 available_voice_references / has_voice 明确可用的角色才用 #角色名 标注对白音色；否则用角色姓名描述说话人。步数、分辨率、种子、采样器、增强开关由模板/界面控制，不写进创作文本。`
   if (type === 'storyboard_breaker') return `${common}\n${video}
 - 先用 read_storyboard_context 读取本集事实与绑定ID；每段写齐 description、video_prompt、duration、character_ids、prop_ids、scene_id、atmosphere。
 - 整集重拆时首批 save_storyboards 带 replace_existing: true，后续追加；每批最多${STORYBOARD_BATCH_SIZE}段，每轮仅一次 save_storyboards；不要同时生成多批。shot_number 从1连续递增；全部批次保存后才能完成。不要一次性塞入整集，也不要每批都清空。

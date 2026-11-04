@@ -12,7 +12,7 @@ import { logTaskProgress, logTaskSuccess } from '../../utils/task-logger.js'
 import { getDramaId, getEpisodeId } from '../context.js'
 import { STORYBOARD_BATCH_SIZE } from '../local-contract.js'
 import { resolveVoiceMentions } from '../../services/character-voice-references.js'
-import { validateVideoPromptImageReferences, validateVideoPromptTimeline } from '../../services/video-prompt-structure.js'
+import { validateVideoPromptTimeline } from '../../services/video-prompt-structure.js'
 
 type ImageAsset = { id: number; name: string; imageUrl: string | null; deletedAt: string | null }
 type SceneImageAsset = Omit<ImageAsset, 'name'> & { location: string }
@@ -31,16 +31,6 @@ function buildImageReferences(characters: ImageAsset[], scenes: SceneImageAsset[
     image_url: asset.imageUrl!,
     usage: asset.usage,
   }))
-}
-
-async function validateVideoPromptImages(prompt: string | undefined, dramaId: number, sceneId: number | null | undefined, characterIds: number[] = [], propIds: number[] = [], description = '') {
-  if (!prompt?.includes('reference_usage')) return
-  const [characters, scenes, props] = await Promise.all([
-    db.select().from(schema.characters).where(eq(schema.characters.dramaId, dramaId)),
-    db.select().from(schema.scenes).where(eq(schema.scenes.dramaId, dramaId)),
-    db.select().from(schema.props).where(eq(schema.props.dramaId, dramaId)),
-  ])
-  validateVideoPromptImageReferences(prompt, buildImageReferences(characters, scenes, props, sceneId, characterIds, propIds), description)
 }
 
 async function validateVideoPromptVoices(prompt: string | undefined, dramaId: number, characterIds: number[] = []) {
@@ -324,7 +314,6 @@ const saveStoryboards = createTool({
       }
       await validateVideoPromptVoices(sb.video_prompt, dramaId, sb.character_ids)
       if (sb.video_prompt) validateVideoPromptTimeline(sb.video_prompt, sb.duration ?? 5)
-      await validateVideoPromptImages(sb.video_prompt, dramaId, sb.scene_id, sb.character_ids, sb.prop_ids, sb.description)
       await validateStoryboardBindings(episodeId, dramaId, sb.scene_id, sb.character_ids, sb.prop_ids)
     }
     if (replace_existing === true) {
@@ -463,8 +452,6 @@ const updateStoryboard = createTool({
 
     await validateVideoPromptVoices(fields.video_prompt, dramaId, currentCharacterIds)
     if (fields.video_prompt) validateVideoPromptTimeline(fields.video_prompt, fields.duration ?? storyboard.duration ?? 5)
-    await validateVideoPromptImages(fields.video_prompt, dramaId, 'scene_id' in fields ? fields.scene_id : storyboard.sceneId,
-      currentCharacterIds, currentPropIds, fields.description ?? storyboard.description ?? '')
     await validateStoryboardBindings(
       episodeId,
       dramaId,

@@ -6,7 +6,7 @@ import { generateImage, generateVideo, recoverVideoTask } from '../services/gene
 import { safeTaskError } from '../services/video-download.js'
 import { getActiveConfig, getConfigById, resolveGenerationConfigId } from '../services/ai.js'
 import { getComfyConfig } from '../services/comfyui/config.js'
-import { appendVideoPromptSection } from '../services/video-prompt-structure.js'
+import { injectStyleOpening } from '../services/video-prompt-structure.js'
 import { getDramaStylePrompt } from '../services/style-preset.js'
 import { resolveDramaImageSize } from '../services/image-size.js'
 import { resolveStoryboardVoiceReferences } from '../services/character-voice-references.js'
@@ -189,12 +189,12 @@ app.post('/', async (c) => {
     })
     logTaskPayload('TaskAPI', 'request body', body)
 
-    // H3视觉风格写入画面节，保留六节顺序与声音节边界
+    // 官方要求风格句写成 [Shot 1] 之前的 1—2 句英文，不能堆在画面节末尾
     let videoPrompt = videoBody?.prompt
     if (type === 'video' && String(videoPrompt || '').trim()) {
       const dramaId = body.drama_id ?? storyboardDramaId ?? null
       const stylePrompt = await getDramaStylePrompt(dramaId)
-      if (stylePrompt) videoPrompt = appendVideoPromptSection(String(videoPrompt), 'detailed_description', stylePrompt, true)
+      if (stylePrompt) videoPrompt = injectStyleOpening(String(videoPrompt), stylePrompt)
     }
 
     // 未显式指定尺寸时按项目画面比例 + 集清晰度档推导，避免竖屏项目出横图

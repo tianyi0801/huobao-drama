@@ -242,8 +242,8 @@ async function processTask(id: number, config: AIConfig) {
         if (previous && images.length < 12) {
           const imageIndex = images.indexOf(previous.framePath) + 1 || images.length + 1
           if (!images.includes(previous.framePath)) params.referenceImageUrls = [...images, previous.framePath]
-          record.prompt = appendVideoPromptSection(record.prompt || '', 'reference_usage',
-            `continuity_reference: ${buildContinuityPromptSuffix(imageIndex).trim()}`)
+          record.prompt = appendVideoPromptSection(record.prompt || '', 'retention_analysis',
+            buildContinuityPromptSuffix(imageIndex).trim())
           await db.update(schema.sysTask).set({ prompt: record.prompt, params: JSON.stringify(params), updatedAt: now() })
             .where(eq(schema.sysTask.id, id))
         }
