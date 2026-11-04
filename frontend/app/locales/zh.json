@@ -1000,7 +1000,8 @@
       "allCharsDone": "所有角色图片已生成",
       "allScenesDone": "所有场景图片已生成",
       "allPropsDone": "所有道具图片已生成",
-      "stillRunning": "生成耗时较长，已停止自动等待；稍后刷新页面查看结果"
+      "stillRunning": "生成耗时较长，已停止自动等待；稍后刷新页面查看结果",
+      "failed": "图片生成失败：{msg}"
     },
     "extract": {
       "done": "{type}提取完成",

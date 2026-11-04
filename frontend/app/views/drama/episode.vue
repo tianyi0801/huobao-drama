@@ -2520,6 +2520,31 @@ async function loadGenTasks() {
     }
     pendingVideoIds.value = [...pending]
     failedVideoMessages.value = failed
+
+    // 角色/场景/道具的「生成中」同样以最新任务记录为准：
+    // 任务失败或已完成就必须撤下 pending，否则失败后按钮会一直转圈
+    for (const kind of IMAGE_ASSET_KINDS) {
+      const field = IMAGE_TASK_FIELD[kind]
+      const ids = new Set()
+      for (const task of genTasks.value) {
+        if (task.type === 'image' && task[field] != null) ids.add(task[field])
+      }
+      const stillPending = []
+      for (const id of ids) {
+        if (assetHasImage(kind, id)) continue
+        const status = latestImageTask(kind, id)?.status
+        // 只有 processing 才算生成中；failed/completed 都不该继续转圈
+        if (status === 'processing') stillPending.push(id)
+      }
+      // 刚提交、任务记录还没出现的本地态保留，避免状态闪退
+      for (const id of (kind === 'character' ? pendingCharImageIds : kind === 'scene' ? pendingSceneImageIds : pendingPropImageIds).value) {
+        if (!ids.has(id) && !assetHasImage(kind, id)) stillPending.push(id)
+      }
+      const next = [...new Set(stillPending)]
+      if (kind === 'character') pendingCharImageIds.value = next
+      else if (kind === 'scene') pendingSceneImageIds.value = next
+      else pendingPropImageIds.value = next
+    }
   } catch { /* 静默失败,不打断其他刷新 */ }
 }
 
@@ -3206,7 +3231,14 @@ async function genCharImg(id) {
       const char = chars.value.find(c => c.id === id)
       const done = !!(char?.image_url || char?.imageUrl)
       if (done) pendingCharImageIds.value = pendingCharImageIds.value.filter(item => item !== id)
-      return done
+      if (done) return true
+      // 任务已失败：立即结束等待并提示原因，不再空转到超时
+      if (imageTaskFailed('character', id)) {
+        pendingCharImageIds.value = pendingCharImageIds.value.filter(item => item !== id)
+        toastError(imageTaskError('character', id), { fallback: 'episode.image.failed' })
+        return true
+      }
+      return false
     }, 180, 2500, () => {
       pendingCharImageIds.value = pendingCharImageIds.value.filter(item => item !== id)
       toast.warning(t('episode.image.stillRunning'))
@@ -3224,15 +3256,7 @@ async function batchCharImages() {
   characterAPI.batchImages(ids, epId.value, bareModelName(imageModel.value) || undefined, ownerConfigId(imageModelOptions.value, imageModel.value), chatModelOverride(), chatConfigId()).then(async () => {
     toast.success(t('episode.image.batchGeneratingChar'))
     await refresh()
-    watchAsyncResult(() => ids.every(id => {
-      const char = chars.value.find(c => c.id === id)
-      const done = !!(char?.image_url || char?.imageUrl)
-      if (done) pendingCharImageIds.value = pendingCharImageIds.value.filter(item => item !== id)
-      return done
-    }), batchAttempts(ids.length), 2500, () => {
-      pendingCharImageIds.value = pendingCharImageIds.value.filter(item => !ids.includes(item))
-      toast.warning(t('episode.image.stillRunning'))
-    })
+    watchImageBatch('character', ids)
   }).catch(e => {
     pendingCharImageIds.value = pendingCharImageIds.value.filter(item => !ids.includes(item))
     toastError(e)
@@ -3256,7 +3280,13 @@ async function genSceneImg(id) {
       const scene = scenes.value.find(s => s.id === id)
       const done = !!(scene?.image_url || scene?.imageUrl)
       if (done) pendingSceneImageIds.value = pendingSceneImageIds.value.filter(item => item !== id)
-      return done
+      if (done) return true
+      if (imageTaskFailed('scene', id)) {
+        pendingSceneImageIds.value = pendingSceneImageIds.value.filter(item => item !== id)
+        toastError(imageTaskError('scene', id), { fallback: 'episode.image.failed' })
+        return true
+      }
+      return false
     }, 180, 2500, () => {
       pendingSceneImageIds.value = pendingSceneImageIds.value.filter(item => item !== id)
       toast.warning(t('episode.image.stillRunning'))
@@ -3268,6 +3298,62 @@ async function genSceneImg(id) {
 }
 function isPendingPropImage(id) {
   return pendingPropImageIds.value.includes(id)
+}
+
+/** 图片任务按资产类型归类：用于判断「生成中」是否已进入终态 */
+const IMAGE_ASSET_KINDS = ['character', 'scene', 'prop']
+const IMAGE_TASK_FIELD = { character: 'character_id', scene: 'scene_id', prop: 'prop_id' }
+
+/** 该资产最新一条图片任务（先比 created_at 再比 id，旧任务不覆盖新状态） */
+function latestImageTask(kind, id) {
+  const field = IMAGE_TASK_FIELD[kind]
+  let latest = null
+  for (const task of genTasks.value) {
+    if (task.type !== 'image' || task[field] !== id) continue
+    if (!latest
+      || String(task.created_at || '') > String(latest.created_at || '')
+      || (String(task.created_at || '') === String(latest.created_at || '') && task.id > latest.id)) latest = task
+  }
+  return latest
+}
+
+function assetHasImage(kind, id) {
+  const list = kind === 'character' ? chars.value : kind === 'scene' ? scenes.value : propItems.value
+  const item = list.find(entry => entry.id === id)
+  return !!(item?.image_url || item?.imageUrl)
+}
+
+/** 最新任务已失败 → 等待应立即结束，否则按钮和时间线会一直停在「生成中」 */
+function imageTaskFailed(kind, id) {
+  return latestImageTask(kind, id)?.status === 'failed'
+}
+
+function imageTaskError(kind, id) {
+  return latestImageTask(kind, id)?.error_msg || latestImageTask(kind, id)?.errorMsg || ''
+}
+
+/** 批量生图等待：每张图完成或任务失败都算结束，失败只提示一次，避免一直显示「生成中」 */
+function watchImageBatch(kind, ids) {
+  const pendingRef = kind === 'character' ? pendingCharImageIds : kind === 'scene' ? pendingSceneImageIds : pendingPropImageIds
+  const clear = id => { pendingRef.value = pendingRef.value.filter(item => item !== id) }
+  let notified = false
+  watchAsyncResult(() => {
+    let allSettled = true
+    let failure = ''
+    for (const id of ids) {
+      if (assetHasImage(kind, id)) { clear(id); continue }
+      if (imageTaskFailed(kind, id)) { clear(id); failure ||= imageTaskError(kind, id); continue }
+      allSettled = false
+    }
+    if (failure && !notified) {
+      notified = true
+      toastError(failure, { fallback: 'episode.image.failed' })
+    }
+    return allSettled
+  }, batchAttempts(ids.length), 2500, () => {
+    for (const id of ids) clear(id)
+    toast.warning(t('episode.image.stillRunning'))
+  })
 }
 async function genPropImg(id) {
   if (!(await ensureImageEngine())) return
@@ -3287,7 +3373,13 @@ async function genPropImg(id) {
       const prop = propItems.value.find(p => p.id === id)
       const done = !!(prop?.image_url || prop?.imageUrl)
       if (done) pendingPropImageIds.value = pendingPropImageIds.value.filter(item => item !== id)
-      return done
+      if (done) return true
+      if (imageTaskFailed('prop', id)) {
+        pendingPropImageIds.value = pendingPropImageIds.value.filter(item => item !== id)
+        toastError(imageTaskError('prop', id), { fallback: 'episode.image.failed' })
+        return true
+      }
+      return false
     }, 180, 2500, () => {
       pendingPropImageIds.value = pendingPropImageIds.value.filter(item => item !== id)
       toast.warning(t('episode.image.stillRunning'))
@@ -3304,15 +3396,7 @@ async function batchSceneImages() {
   pendingSceneImageIds.value = [...new Set([...pendingSceneImageIds.value, ...ids])]
   ids.forEach(id => { sceneAPI.generateImage(id, epId.value, bareModelName(imageModel.value) || undefined, ownerConfigId(imageModelOptions.value, imageModel.value), chatModelOverride(), chatConfigId()).then(() => refresh()).catch(e => toastError(e)) })
   toast.success(t('episode.image.batchGeneratingScene'))
-  watchAsyncResult(() => ids.every(id => {
-    const scene = scenes.value.find(s => s.id === id)
-    const done = !!(scene?.image_url || scene?.imageUrl)
-    if (done) pendingSceneImageIds.value = pendingSceneImageIds.value.filter(item => item !== id)
-    return done
-  }), batchAttempts(ids.length), 2500, () => {
-    pendingSceneImageIds.value = pendingSceneImageIds.value.filter(item => !ids.includes(item))
-    toast.warning(t('episode.image.stillRunning'))
-  })
+  watchImageBatch('scene', ids)
 }
 async function batchPropImages() {
   if (!(await ensureImageEngine())) return
@@ -3321,15 +3405,7 @@ async function batchPropImages() {
   pendingPropImageIds.value = [...new Set([...pendingPropImageIds.value, ...ids])]
   ids.forEach(id => { propAPI.generateImage(id, epId.value, bareModelName(imageModel.value) || undefined, ownerConfigId(imageModelOptions.value, imageModel.value), chatModelOverride(), chatConfigId()).then(() => refresh()).catch(e => toastError(e)) })
   toast.success(t('episode.image.batchGeneratingProp'))
-  watchAsyncResult(() => ids.every(id => {
-    const prop = propItems.value.find(p => p.id === id)
-    const done = !!(prop?.image_url || prop?.imageUrl)
-    if (done) pendingPropImageIds.value = pendingPropImageIds.value.filter(item => item !== id)
-    return done
-  }), batchAttempts(ids.length), 2500, () => {
-    pendingPropImageIds.value = pendingPropImageIds.value.filter(item => !ids.includes(item))
-    toast.warning(t('episode.image.stillRunning'))
-  })
+  watchImageBatch('prop', ids)
 }
 function getVideoUrl(s) { return s?.video_url || s?.videoUrl || s?.composed_video_url || s?.composedVideoUrl || null }
 function hasVid(s) { return !!getVideoUrl(s) }
@@ -5020,11 +5096,14 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   align-items: center;
   padding: 2px 7px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.85);
+  /* 徽标压在缩略图上，背景与文字必须跟随主题：
+     原来固定 rgba(255,255,255,.85) 在暗色下变白底浅灰字，「待生成」几乎看不见 */
+  background: var(--media-badge-bg, rgba(255,255,255,0.85));
+  border: 1px solid var(--border-strong);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-  color: var(--text-2);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+  color: var(--text-1);
   font-size: 9.5px;
   font-weight: 700;
 }
