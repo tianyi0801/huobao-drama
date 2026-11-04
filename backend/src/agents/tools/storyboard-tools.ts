@@ -12,7 +12,36 @@ import { logTaskProgress, logTaskSuccess } from '../../utils/task-logger.js'
 import { getDramaId, getEpisodeId } from '../context.js'
 import { STORYBOARD_BATCH_SIZE } from '../local-contract.js'
 import { resolveVoiceMentions } from '../../services/character-voice-references.js'
-import { validateVideoPromptTimeline } from '../../services/video-prompt-structure.js'
+import { validateVideoPromptImageReferences, validateVideoPromptTimeline } from '../../services/video-prompt-structure.js'
+
+type ImageAsset = { id: number; name: string; imageUrl: string | null; deletedAt: string | null }
+type SceneImageAsset = Omit<ImageAsset, 'name'> & { location: string }
+
+function buildImageReferences(characters: ImageAsset[], scenes: SceneImageAsset[], props: ImageAsset[], sceneId: number | null | undefined, characterIds: number[] = [], propIds: number[] = []) {
+  const assets = [
+    ...scenes.filter(scene => scene.id === sceneId).map(scene => ({ ...scene, name: scene.location, asset_type: 'scene' as const, usage: 'scene_reference' as const })),
+    ...characters.filter(character => characterIds.includes(character.id)).map(character => ({ ...character, asset_type: 'character' as const, usage: 'identity_reference' as const })),
+    ...props.filter(prop => propIds.includes(prop.id)).map(prop => ({ ...prop, asset_type: 'prop' as const, usage: 'object_reference' as const })),
+  ]
+  return assets.filter(asset => !asset.deletedAt && asset.imageUrl?.trim()).map(asset => ({
+    asset_type: asset.asset_type,
+    asset_id: asset.id,
+    name: asset.name,
+    image_reference: `@${asset.name}`,
+    image_url: asset.imageUrl!,
+    usage: asset.usage,
+  }))
+}
+
+async function validateVideoPromptImages(prompt: string | undefined, dramaId: number, sceneId: number | null | undefined, characterIds: number[] = [], propIds: number[] = [], description = '') {
+  if (!prompt?.includes('reference_usage')) return
+  const [characters, scenes, props] = await Promise.all([
+    db.select().from(schema.characters).where(eq(schema.characters.dramaId, dramaId)),
+    db.select().from(schema.scenes).where(eq(schema.scenes.dramaId, dramaId)),
+    db.select().from(schema.props).where(eq(schema.props.dramaId, dramaId)),
+  ])
+  validateVideoPromptImageReferences(prompt, buildImageReferences(characters, scenes, props, sceneId, characterIds, propIds), description)
+}
 
 async function validateVideoPromptVoices(prompt: string | undefined, dramaId: number, characterIds: number[] = []) {
   if (!prompt?.includes('#')) return
@@ -151,7 +180,6 @@ const readStoryboardContext = createTool({
 
     const characters = chars
       .filter(c => !c.deletedAt)
-      .filter(c => !linkedCharacterIds.size || linkedCharacterIds.has(c.id))
       .map(c => ({
         id: c.id,
         name: c.name,
@@ -160,6 +188,7 @@ const readStoryboardContext = createTool({
         appearance: c.appearance || '',
         styling: c.styling || '',
         image_url: c.imageUrl || '',
+        image_reference: c.imageUrl?.trim() ? `@${c.name}` : null,
         reference_images: c.referenceImages || '',
         has_voice: Boolean(c.voiceAudioUrl?.trim()),
         voice_reference: c.voiceAudioUrl?.trim() ? `#${c.name}` : null,
@@ -167,7 +196,6 @@ const readStoryboardContext = createTool({
 
     const scenes = scns
       .filter(s => !s.deletedAt)
-      .filter(s => !linkedSceneIds.size || linkedSceneIds.has(s.id))
       .map(s => ({
         id: s.id,
         location: s.location,
@@ -175,18 +203,19 @@ const readStoryboardContext = createTool({
         prompt: s.prompt || '',
         lighting: s.lighting || '',
         image_url: s.imageUrl || '',
+        image_reference: s.imageUrl?.trim() ? `@${s.location}` : null,
         storyboard_count: s.storyboardCount || 0,
       }))
 
     const props = prps
       .filter(p => !p.deletedAt)
-      .filter(p => !linkedPropIds.size || linkedPropIds.has(p.id))
       .map(p => ({
         id: p.id,
         name: p.name,
         type: p.type || '',
         description: p.description || '',
         image_url: p.imageUrl || '',
+        image_reference: p.imageUrl?.trim() ? `@${p.name}` : null,
       }))
 
     const existingStoryboardPayload = await Promise.all(existingStoryboards
@@ -202,6 +231,7 @@ const readStoryboardContext = createTool({
           title: sb.title || '',
           scene_id: sb.sceneId,
           character_ids: links.map(link => link.characterId),
+          available_image_references: buildImageReferences(chars, scns, prps, sb.sceneId, links.map(link => link.characterId), sbPropLinks.map(link => link.propId)),
           available_voice_references: characters
             .filter(c => c.has_voice && links.some(link => link.characterId === c.id))
             .map(c => ({ character_id: c.id, name: c.name, voice_reference: c.voice_reference })),
@@ -214,6 +244,12 @@ const readStoryboardContext = createTool({
         }
       }))
 
+    const targetId = context?.requestContext?.get('targetStoryboardId' as never)
+    const target = typeof targetId === 'number' ? existingStoryboardPayload.find(sb => sb.id === targetId) : undefined
+    if (typeof targetId === 'number' && !target) return { error: `分镜 ${targetId} 不属于当前集或已删除` }
+    const boundCharacters = target ? characters.filter(c => target.character_ids.includes(c.id)) : []
+    const boundScenes = target ? scenes.filter(s => s.id === target.scene_id) : []
+    const boundProps = target ? props.filter(p => target.prop_ids.includes(p.id)) : []
     const payload = {
       episode: {
         id: ep.id,
@@ -221,20 +257,21 @@ const readStoryboardContext = createTool({
         episode_number: ep.episodeNumber,
         description: ep.description || '',
       },
-      script,
-      characters,
-      scenes,
-      props,
-      existing_storyboards: existingStoryboardPayload,
+      script: target ? '' : script,
+      characters: target ? boundCharacters : characters.filter(c => !linkedCharacterIds.size || linkedCharacterIds.has(c.id)),
+      scenes: target ? boundScenes : scenes.filter(s => !linkedSceneIds.size || linkedSceneIds.has(s.id)),
+      props: target ? boundProps : props.filter(p => !linkedPropIds.size || linkedPropIds.has(p.id)),
+      existing_storyboards: target ? [target] : existingStoryboardPayload,
+      target_storyboard: target ? { ...target, characters: boundCharacters, scenes: boundScenes, props: boundProps } : null,
     }
     logTaskSuccess('StoryboardTool', 'read-context', {
       episodeId,
       dramaId,
-      characters: characters.length,
-      scenes: scenes.length,
-      props: props.length,
+      characters: payload.characters.length,
+      scenes: payload.scenes.length,
+      props: payload.props.length,
       existingStoryboards: payload.existing_storyboards.length,
-      scriptLength: script.length,
+      scriptLength: payload.script.length,
     })
     return payload
   },
@@ -287,6 +324,7 @@ const saveStoryboards = createTool({
       }
       await validateVideoPromptVoices(sb.video_prompt, dramaId, sb.character_ids)
       if (sb.video_prompt) validateVideoPromptTimeline(sb.video_prompt, sb.duration ?? 5)
+      await validateVideoPromptImages(sb.video_prompt, dramaId, sb.scene_id, sb.character_ids, sb.prop_ids, sb.description)
       await validateStoryboardBindings(episodeId, dramaId, sb.scene_id, sb.character_ids, sb.prop_ids)
     }
     if (replace_existing === true) {
@@ -425,6 +463,8 @@ const updateStoryboard = createTool({
 
     await validateVideoPromptVoices(fields.video_prompt, dramaId, currentCharacterIds)
     if (fields.video_prompt) validateVideoPromptTimeline(fields.video_prompt, fields.duration ?? storyboard.duration ?? 5)
+    await validateVideoPromptImages(fields.video_prompt, dramaId, 'scene_id' in fields ? fields.scene_id : storyboard.sceneId,
+      currentCharacterIds, currentPropIds, fields.description ?? storyboard.description ?? '')
     await validateStoryboardBindings(
       episodeId,
       dramaId,

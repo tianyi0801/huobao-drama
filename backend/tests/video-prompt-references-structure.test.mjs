@@ -20,6 +20,20 @@ test('视频引用规范使用资产名称，恢复默认从后端读取而非�
   assert.match(settings, /await promptAPI\.get\(type, editLang\.value\)/)
 })
 
+test('单条和批量重写入口明确复制资源引用，不残留单镜头偏好', () => {
+  const frontend = read('../frontend/app/views/drama/episode.vue')
+  const start = frontend.indexOf('async function genVideoPrompt(sb) {')
+  const end = frontend.indexOf('toast.success(', start)
+  assert.ok(start >= 0 && end > start)
+  for (const source of [frontend.slice(start, end), read('src/services/video-prompts.ts')]) {
+    assert.match(source, /available_image_references/)
+    assert.match(source, /image_reference/)
+    assert.match(source, /有图人物.*必须(?:使用|用)/)
+    assert.match(source, /reference_usage.*逐项/)
+    assert.doesNotMatch(source, /默认一个连续镜头|默认1个连续镜头/)
+  }
+})
+
 test('中文生产模板、技能、默认及批量消息不再强制短视频多切镜或400字上限', () => {
   for (const file of [
     'workspace/prompts/storyboard_breaker.md',
@@ -39,7 +53,7 @@ test('中文生产模板、技能、默认及批量消息不再强制短视频�
   }
 })
 
-test('分镜提示词与技能统一12秒上限，保留默认5秒且不残留8秒上限', () => {
+test('分镜模板和所有入口按内容确定时长，支持多子镜头且保留原切镜', () => {
   for (const file of [
     'workspace/prompts/storyboard_breaker.md',
     'workspace/prompts/prompt_generator.md',
@@ -47,19 +61,32 @@ test('分镜提示词与技能统一12秒上限，保留默认5秒且不残留8�
     'workspace/skills/prompt-generator/video-prompt/SKILL.md',
     'src/agents/index.ts',
     'src/agents/local-contract.ts',
+    'src/services/video-prompts.ts',
   ]) {
     const text = read(file)
-    assert.match(text, /4[-—]12/)
-    assert.match(text, /(?:目标|优先)\s*5\s*秒/)
+    if (file !== 'src/services/video-prompts.ts') assert.match(text, /4[-—]12/)
+    assert.doesNotMatch(text, /(?:目标|优先)\s*5\s*秒|5秒优先|默认\s*1\s*个连续镜头|每段只设计一个主动作|最多\s*2\s*个(?:子)?镜头|每个至少\s*2\s*秒/)
     assert.doesNotMatch(text, /4[-—]8|超过\s*8\s*秒|8秒段落上限/)
+    assert.match(text, /反打/)
+    assert.match(text, /切镜点/)
+    assert.match(text, /未轮到发话/)
+  }
+  for (const file of ['workspace/prompts/storyboard_breaker.md', 'workspace/skills/storyboard-breaker/SKILL.md', 'src/agents/local-contract.ts']) {
+    assert.match(read(file), /铺垫—发生—反应/)
+    assert.match(read(file), /(?:2—4|2—4 个)/)
   }
 })
 
-test('三语言拆分模板与技能不残留旧时长、等分切镜及总量硬指标', () => {
+test('三语言模板和技能不残留五秒目标、单镜头偏好、切镜配额及总量硬指标', () => {
   for (const language of ['en', 'ja', 'ko']) {
-    for (const file of [`workspace/prompts/storyboard_breaker.${language}.md`, `workspace/skills/storyboard-breaker/SKILL.${language}.md`]) {
+    for (const file of [
+      `workspace/prompts/storyboard_breaker.${language}.md`,
+      `workspace/prompts/prompt_generator.${language}.md`,
+      `workspace/skills/storyboard-breaker/SKILL.${language}.md`,
+    ]) {
       const text = read(file)
       assert.match(text, /4[-〜]12/)
+      assert.doesNotMatch(text, /target\s*5|目標\s*5秒|목표\s*5초|Default\s+(?:to\s+)?(?:\*\*)?one continuous|原則.*連続1ショット|기본은.*연속 한 컷|at most two shots|最大2ショット|최대 두 컷|each at least 2 seconds|各2秒以上|각2초 이상/)
       assert.doesNotMatch(text, /4[-〜]8|2-3 equal|2〜3等分|2-3등분|with ±20% tolerance|±20%の変動を許容/)
     }
   }

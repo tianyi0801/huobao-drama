@@ -3143,7 +3143,7 @@ async function genVideoPrompt(sb) {
 
 该分镜信息:时长 ${sb.duration || 5}s;场景:${getSceneName(sb) || '未绑定'};角色:${charNames};道具:${propNames}。
 
-先调用 read_storyboard_context 读取 description、atmosphere、duration 和实际绑定素材，按系统的本地 ComfyUI 视频提示词契约生成六节内容。默认一个连续镜头；保留全部动作、原句对白及原有旁白，时间轴总长等于该分镜 duration。主角与配角均写清身份、位置与清晰脸部；对白只写一次，声音节列说话白名单，无对白时明确无任何人声，不新增配音或配乐。没有图片的主体用普通名称描述，不虚构 @ 素材引用。调用 update_storyboard 保存到分镜 ID:${sb.id}，参数仅 storyboard_id 与 video_prompt，不改其他字段，不重新拆分整集。`,
+先调用 read_storyboard_context 读取 target_storyboard 的 description、atmosphere、duration、绑定素材及 available_image_references，按本地 ComfyUI 的 H3 六节规范生成。按原【镜头N】逐镜保留顺序、切镜点、动作、对白及旁白，时间轴总长等于 duration，不因单镜头偏好合并。直接复制 image_reference（如 @角色名/@场景名/@道具名）：有图人物在 subject_definitions 和画面动作中必须使用 @名称；reference_usage 逐项写明本段有图场景及使用的角色/道具 @名称和用途，不能用“角色参考图”等泛称，只有无图主体才用普通名称，不手写图片编号。主角与配角身份、位置、视线明确；对白只写一次，声音节列说话白名单，每人只在自己的对白时段发声，无对白/旁白时明确无任何人声，不新增配音或配乐。调用 update_storyboard 保存到分镜 ID:${sb.id}，参数仅 storyboard_id 与 video_prompt，不改其他字段，不重新拆分整集。`,
       drama_id: dramaId,
       episode_id: epId.value,
       model: chatModelOverride() || undefined,

@@ -25,7 +25,7 @@ model: ""
 작업 흐름:
 1. read_storyboard_context 를 호출해 해당 스토리보드의 description(【镜头N】 서브 컷과 대사/내레이션 포함), atmosphere, duration 및 바인딩된 장면/캐릭터를 읽습니다
 2. video_prompt 는 H3 네이티브 6단 구조로 생성합니다(절 이름 고정, 순서 불변): subject_definitions / shot_summary / reference_usage / detailed_description / overall_soundscape / non_diegetic_music. 각 절의 세부 규칙은 주입되는 video-prompt 스킬을 따르세요. 소재 참조는 @캐릭터명 / @장면명 / @도구명 만 사용하고 @图片N 같은 번호는 직접 쓰지 마세요(번호는 프런트엔드가 주입합니다). 동작과 대사는 모두 스토리보드 description 에서 가져와야 합니다
-3. 생성 시 @이름 이 해당 참조 이미지 마커로 자동 치환되므로(예: @小明 → @图片1小明), 이름은 장면/캐릭터 목록과 정확히 일치해야 하며 축약하거나 추가 기호를 붙이지 마세요
+3. duration, description, 모든 동작과 원문 대사를 유지하고 【镜头N】을[Shot N]에 순서와 전환점을 맞춰 대응합니다. 단일 컷 선호로 합치거나 새 서브 컷을 추가하거나 등분하지 않습니다. 원래 정반샷, 특写와 카메라 무빙을 유지하고 공간, 축선과 동작을 연결하되 구도를 고정하지 않습니다. 새 분할은 정수4-12초이며 고정 목표가 없고 다시 쓰면서 길이를 바꾸지 않습니다. 각 인물은 자기 원문 발화 구간만 말하며 새 음성과 음악을 추가하지 않습니다. @이름은 이미지 마커로 자동 치환되므로 실제 이미지가 있는 소재만 정확한 이름으로 참조합니다
 4. update_storyboard 를 호출해 저장할 때는 파라미터에 두 개의 키만 전달합니다: storyboard_id 와 video_prompt. 해당 스토리보드의 다른 어떤 필드(title, description, scene_id 등)도 되돌려 보내지 마세요
 
 공통 규범:

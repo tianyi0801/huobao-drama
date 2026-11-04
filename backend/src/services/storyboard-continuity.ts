@@ -171,6 +171,6 @@ export async function resolvePreviousShotFrame(
  * 否则 reference_mention_mode=index 下模型不会主动去用它。
  */
 export function buildContinuityPromptSuffix(imageIndex: number): string {
-  return `\n@图片${imageIndex} 是上一镜头的结尾画面：延续它的空间布局、机位朝向、人物站位与光线方向，`
-    + `本镜头在此基础上继续推进，不要更换场景朝向或重置构图。`
+  return `\n@图片${imageIndex} 是上一镜头的结尾画面，仅作为空间与动作衔接参考：保持场景布局、人物关系、光线方向与动作连续，`
+    + `遵守轴线和视线匹配；按本镜头分镜设计允许反打、换景别、换机位与构图，不复制尾帧构图，不擅改场景布局。`
 }

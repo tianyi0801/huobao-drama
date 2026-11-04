@@ -1,5 +1,5 @@
 {
-  "version": 7,
-  "updatedAt": "2026-11-02",
+  "version": 9,
+  "updatedAt": "2026-11-03",
   "notes": "统一模板同步机制：升级时覆盖内置 prompts / skills（同名），用户新建的技能目录保留；覆盖前备份到 .backup/。修改本目录下的 prompt 或 skill 后请递增 version。"
 }
