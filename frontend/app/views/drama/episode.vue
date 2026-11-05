@@ -2895,13 +2895,31 @@ const selectedVideoTaskNumber = computed(() => {
   return index >= 0 ? index + 1 : 0
 })
 
+// 分镜字段失焦即保存：记录在途请求，生成前先等写完，避免后端读到旧描述
+const pendingStoryboardSaves = new Map()
+
+/** 生成/拆分前调用：确保刚改的描述、时长已经落库 */
+async function awaitPendingStoryboardSaves() {
+  if (!pendingStoryboardSaves.size) return
+  await Promise.all([...pendingStoryboardSaves.values()])
+}
+
 function updateField(sb, field, value) {
-  const current = sb[field] ?? sb[toCamel(field)]
-  if (current === value) return
-  sb[field] = value
   const camelField = toCamel(field)
+  const previous = sb[field] ?? sb[camelField]
+  if (previous === value) return
+  sb[field] = value
   if (camelField !== field) sb[camelField] = value
-  storyboardAPI.update(sb.id, { [field]: value }).catch(e => toastError(e))
+  const key = `${sb.id}:${field}`
+  const task = storyboardAPI.update(sb.id, { [field]: value })
+    .catch(e => {
+      // 保存失败要回滚，否则界面显示的是没落库的内容，生成时又用回旧值
+      sb[field] = previous
+      if (camelField !== field) sb[camelField] = previous
+      toastError(e)
+    })
+    .finally(() => { pendingStoryboardSaves.delete(key) })
+  pendingStoryboardSaves.set(key, task)
 }
 
 function toCamel(field) {
@@ -3124,6 +3142,7 @@ function selectMissingVideos() {
 async function batchVideoPrompts() {
   if (videoPromptBatch.value.running || !epId.value) return
   if (!sbs.value.length) { toast.warning(t('episode.sb.breakFirst')); return }
+  await awaitPendingStoryboardSaves()
   // 选择模式下有勾选 → 仅补齐所选；否则全量补齐缺失
   const ids = (videoSelectMode.value && selectedVideoSbIds.value.length) ? [...selectedVideoSbIds.value] : undefined
   try {
@@ -3202,6 +3221,8 @@ async function onBreakdownDone() {
 // 按需为单个分镜生成视频提示词：由 prompt_generator 读取分镜字段生成并保存到 video_prompt
 async function genVideoPrompt(sb) {
   if (!sb || videoPromptGeneratingIds.value.includes(sb.id)) return
+  // 刚改过描述还没失焦时，先等这次保存落库，否则 Agent 读到旧描述
+  await awaitPendingStoryboardSaves()
   const idx = sbs.value.indexOf(sb) + 1
   const cfg = selectedVideoConfig.value
   const label = cfg ? `${cfg.name} (${cfg.provider})` : '默认'
@@ -3761,6 +3782,7 @@ function uploadAssetImage(kind, id) {
 
 async function genVid(sb, opts = {}) {
   if (!opts.forceNew && canRecoverVideo(sb.id)) return recoverVideo(sb)
+  await awaitPendingStoryboardSaves()
   const latest = latestVideoTask(sb.id)
   const forceNew = opts.forceNew || latest?.status === 'failed'
   if (forceNew && !window.confirm(t('episode.recovery.confirmNew'))) return
