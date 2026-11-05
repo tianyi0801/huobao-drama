@@ -358,6 +358,8 @@
                   </span>
                   <textarea v-model="agentForm.system_prompt" class="textarea agent-prompt-input" rows="16" :placeholder="t('settings.agents.promptPlaceholder')" />
                 </label>
+                <p class="field-hint">{{ t('settings.agents.effectHint') }}</p>
+                <p class="field-hint">{{ t('settings.agents.overrideHint') }}</p>
                 <div class="agent-card-foot">
                   <button class="btn btn-ghost btn-sm" @click="resetAgentPrompt(selectedAgent)">{{ t('settings.agents.reset') }}</button>
                   <span v-if="agentSaved === selectedAgent" class="tag tag-success" style="margin-left:8px">
@@ -387,6 +389,7 @@
                 </div>
               </div>
               <p class="settings-desc" style="margin-top:0">{{ t('settings.skills.desc') }}</p>
+              <p class="field-hint" style="margin-bottom:8px">{{ t('settings.skills.effectHint') }}</p>
 
               <!-- 无 skill 提示 -->
               <div v-if="!currentSkills.length" class="card skills-empty">

@@ -11,6 +11,9 @@
         <span class="agent-live-phase">{{ phaseText }}</span>
       </div>
       <span class="agent-live-elapsed">{{ elapsedText }}</span>
+      <button v-if="activity.active" class="agent-live-stop" type="button" @click="emit('cancel')">
+        <Square :size="11" />{{ t('episode.logUi.stop') }}
+      </button>
       <button class="agent-live-toggle" type="button" :aria-expanded="expanded" @click="expanded = !expanded">
         <ScrollText :size="13" />
         {{ t(expanded ? 'episode.logUi.hideDetails' : 'episode.logUi.showDetails') }}
@@ -71,7 +74,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { AlertCircle, Check, ChevronDown, Loader2, ScrollText } from 'lucide-vue-next'
+import { AlertCircle, Check, ChevronDown, Loader2, ScrollText, Square } from 'lucide-vue-next'
 import type { AgentActivity } from '~/composables/useAgent'
 import { resolveToolLabel } from '../utils/tool-labels'
 import { groupActivityTools } from '../utils/activity-log'
@@ -80,6 +83,7 @@ const props = defineProps<{
   activity: AgentActivity
   agentType?: string | null
 }>()
+const emit = defineEmits<{ cancel: [] }>()
 const { t, te } = useI18n()
 const textEl = ref<HTMLElement | null>(null)
 const expanded = ref(false)
@@ -134,6 +138,9 @@ watch(() => props.activity.text.length, async () => {
 .agent-live-elapsed { font: 11px var(--font-mono); color: var(--text-2); font-variant-numeric: tabular-nums; }
 .agent-live-toggle, .agent-live-text-toggle { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; padding: 5px 7px; border: 0; border-radius: var(--radius-sm); background: var(--bg-2); color: var(--text-2); font: 11px var(--font-body); cursor: pointer; }
 .agent-live-toggle:hover, .agent-live-text-toggle:hover { color: var(--text-0); background: var(--bg-3); }
+.agent-live-stop { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; padding: 5px 9px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg-1); color: var(--text-1); font: 11px var(--font-body); cursor: pointer; }
+.agent-live-stop:hover { color: var(--error); border-color: var(--error); }
+.agent-live-stop:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .agent-live-toggle:focus-visible, .agent-live-text-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .rotated { transform: rotate(180deg); }
 .agent-live-metrics { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 8px 0 0 42px; font-size: 10px; color: var(--text-2); }

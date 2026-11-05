@@ -116,6 +116,8 @@
       "busy": "処理を実行中です",
       "done": "完了",
       "failed": "エージェントの実行に失敗しました"
+    ,
+      "cancelled": "停止しました。保存済みの内容は残ります"
     }
   },
   "index": {
@@ -380,6 +382,9 @@
       "promptGenerator": "プロンプト生成",
       "langFallback": "中国語にフォールバック",
       "followContentLang": "編集言語：{lang}（「一般 → AI コンテンツ言語」で切替）"
+    ,
+      "effectHint": "保存後すぐに反映されます。次回の生成から新しいプロンプトが使われ、再起動は不要です。",
+      "overrideHint": "注意：新しい内蔵テンプレートをインストールするとこのファイルは上書きされます。上書き前の版は workspace/.backup に保存されます。"
     },
     "skills": {
       "agentList": "Agent 一覧",
@@ -398,6 +403,8 @@
       "descPlaceholder": "この Skill の用途を簡単に記述",
       "create": "作成",
       "created": "Skill を作成しました"
+    ,
+      "effectHint": "保存後すぐに反映されます。SKILL.md を直接編集した場合は、バックエンド再起動か本画面での再保存が必要です。"
     },
     "cfg": {
       "editTitle": "サービス設定を編集",
@@ -905,6 +912,9 @@
       "generic": "汎用",
       "fullMerge": "話全体の結合",
       "mergeKind": "結合"
+    ,
+      "cancel": "キャンセル",
+      "cancelled": "タスクをキャンセルしました"
     },
     "export": {
       "notReadyDesc": "先に分镜と制作の工程を完了してください",

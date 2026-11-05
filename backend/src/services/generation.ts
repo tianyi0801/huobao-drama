@@ -421,6 +421,13 @@ async function failTask(id: number, message: string, code?: string) {
 
 type SysTaskRecord = typeof schema.sysTask.$inferSelect
 
+/** 任务是否已被用户取消（轮询循环据此提前退出，不覆盖取消状态） */
+async function isCancelled(id: number): Promise<boolean> {
+  const [row] = await db.select({ status: schema.sysTask.status, errorCode: schema.sysTask.errorCode })
+    .from(schema.sysTask).where(eq(schema.sysTask.id, id))
+  return !row || row.errorCode === 'cancelled' || row.status === 'cancelled'
+}
+
 async function pollTask(record: SysTaskRecord, config: AIConfig, taskId: string) {
   const type = record.type as TaskType
   const label = taskLabel(type)
@@ -429,11 +436,14 @@ async function pollTask(record: SysTaskRecord, config: AIConfig, taskId: string)
   const startedAt = Date.now()
 
   for (let i = 0; i < profile.attempts; i++) {
+    // 用户取消后必须立刻停止轮询：否则会把已取消的任务重新写成完成/失败
+    if (await isCancelled(record.id)) return
     if (profile.maxDurationMs && Date.now() - startedAt >= profile.maxDurationMs) {
       await failTask(record.id, 'Timeout: Polling exceeded 10 minutes')
       return
     }
     await new Promise(r => setTimeout(r, profile.intervalMs))
+    if (await isCancelled(record.id)) return
     try {
       const { url, method, headers } = adapter.buildPollRequest(config, taskId)
       logTaskProgress(label, 'poll-request', {

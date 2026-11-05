@@ -116,6 +116,8 @@
       "busy": "操作执行中",
       "done": "完成",
       "failed": "AI 执行失败"
+    ,
+      "cancelled": "已停止，已保存内容保留"
     }
   },
   "index": {
@@ -386,6 +388,9 @@
       "promptGenerator": "提示词",
       "langFallback": "跟随中文",
       "followContentLang": "编辑语言跟随：{lang}（在「通用 → AI 内容语言」切换）"
+    ,
+      "effectHint": "保存后立即生效：下一次生成就会使用新提示词，不需要重启应用。",
+      "overrideHint": "注意：安装新版内置模板时会覆盖该文件；被覆盖前的版本备份在 workspace/.backup 目录。"
     },
     "skills": {
       "agentList": "Agent 列表",
@@ -404,6 +409,8 @@
       "descPlaceholder": "简短描述此 Skill 的用途",
       "create": "创建",
       "created": "Skill 创建成功"
+    ,
+      "effectHint": "保存后立即生效。若直接在磁盘修改 SKILL.md，需要重启后端或再在本页保存一次，技能缓存才会刷新。"
     },
     "cfg": {
       "editTitle": "编辑服务配置",
@@ -961,6 +968,9 @@
       "generic": "通用",
       "fullMerge": "整集拼接",
       "mergeKind": "合并"
+    ,
+      "cancel": "取消",
+      "cancelled": "任务已取消"
     },
     "export": {
       "notReadyDesc": "请先完成分镜和制作流程",

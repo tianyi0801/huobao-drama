@@ -220,6 +220,7 @@
             v-if="agentActivity.type === 'script_rewriter' && agentActivity.startedAt"
             :activity="agentActivity"
             agent-type="script_rewriter"
+            @cancel="cancelAgent"
           />
           <div v-if="!scriptContent && !rn" class="step-empty">
             <div class="empty-visual">
@@ -531,6 +532,7 @@
               v-if="agentActivity.type === 'storyboard_breaker' && agentActivity.startedAt"
               :activity="agentActivity"
               agent-type="storyboard_breaker"
+              @cancel="cancelAgent"
             />
             <div v-if="!sbs.length" class="step-empty video-task-empty-state">
               <div class="empty-visual">
@@ -857,6 +859,16 @@
                     <span>{{ runningEtaText(selectedSb) }}</span>
                   </div>
                   <button
+                    v-if="selectedSbRunningTaskId()"
+                    class="btn video-inspector-action"
+                    :disabled="cancellingTaskIds.includes(selectedSbRunningTaskId())"
+                    @click="cancelTask(selectedSbRunningTaskId())"
+                  >
+                    <Loader2 v-if="cancellingTaskIds.includes(selectedSbRunningTaskId())" :size="11" class="animate-spin" />
+                    {{ t('episode.tasks.cancel') }}
+                  </button>
+                  <button
+                    v-else
                     class="btn btn-primary video-inspector-action"
                     :disabled="videoTaskState(selectedSb) === 'pending'"
                     @click="genVid(selectedSb)"
@@ -1122,6 +1134,15 @@
                   <div v-if="row.kind === 'video' && videoModerationHint(row.errorMsg)" class="video-task-error-hint">{{ videoModerationHint(row.errorMsg) }}</div>
                 </div>
               </div>
+              <button
+                v-if="genTaskStateClass(row.status) === 'pending'"
+                class="btn btn-sm"
+                :disabled="cancellingTaskIds.includes(row.id)"
+                @click.stop="cancelTask(row.id)"
+              >
+                <Loader2 v-if="cancellingTaskIds.includes(row.id)" :size="11" class="animate-spin" />
+                {{ t('episode.tasks.cancel') }}
+              </button>
               <span :class="['video-task-status', 'is-' + genTaskStateClass(row.status)]">
                 <span :class="['dot', genTaskStateClass(row.status) === 'done' && 'ok', genTaskStateClass(row.status) === 'pending' && 'pending']" />
                 {{ genTaskStatusLabel(row.status) }}
@@ -1564,7 +1585,7 @@ const storedPanel = (() => {
 // 首个 refresh 时若已恢复面板位置，跳过按内容自动重置 scriptStep
 let panelRestored = !!storedPanel
 const panel = ref(['production', 'export'].includes(storedPanel?.panel) ? storedPanel.panel : 'script')
-const { running: rn, runningType: rt, activity: agentActivity, run: runAgent } = useAgent()
+const { running: rn, runningType: rt, activity: agentActivity, run: runAgent, cancel: cancelAgent } = useAgent()
 
 const localRaw = ref(''), localScript = ref('')
 const rawContent = computed(() => episode.value?.content || '')
@@ -2158,6 +2179,32 @@ async function recoverTask(taskId, storyboardId) {
     pendingVideoIds.value = pendingVideoIds.value.filter(id => id !== storyboardId)
     toastError(error)
   }
+}
+
+/** 取消生成任务：本地 ComfyUI 会出队/中断，云端服务只在本机停止等待 */
+const cancellingTaskIds = ref([])
+async function cancelTask(taskId) {
+  if (!taskId || cancellingTaskIds.value.includes(taskId)) return
+  cancellingTaskIds.value.push(taskId)
+  try {
+    await taskAPI.cancel(taskId)
+    // 取消后立刻撤下等待状态，避免继续显示生成中
+    pendingVideoIds.value = [...pendingVideoIds.value]
+    await refreshWorkbenchData()
+    toast.success(t('episode.tasks.cancelled'))
+  } catch (e) {
+    toastError(e)
+  } finally {
+    cancellingTaskIds.value = cancellingTaskIds.value.filter(id => id !== taskId)
+  }
+}
+
+/** 选中分镜当前可取消的任务（仅处理中的任务有 id） */
+function selectedSbRunningTaskId() {
+  const sb = selectedSb.value
+  if (!sb) return null
+  const task = latestVideoTask(sb.id)
+  return task?.status === 'processing' ? task.id : null
 }
 
 function videoTaskStatusLabel(sb) {

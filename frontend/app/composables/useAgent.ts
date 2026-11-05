@@ -209,5 +209,19 @@ export function useAgent() {
     }
   }
 
-  return { running, runningType, activity, run }
+  /** 手动停止：断开 SSE 后后端会 abort Agent，已保存的批次保留 */
+  function cancel() {
+    if (!controller) return
+    controller.abort()
+    controller = null
+    activity.active = false
+    activity.phase = 'error'
+    activity.error = i18n.global.t('composables.agent.cancelled')
+    activity.elapsedMs = Date.now() - activity.startedAt
+    stopTimer()
+    running.value = false
+    runningType.value = null
+  }
+
+  return { running, runningType, activity, run, cancel }
 }

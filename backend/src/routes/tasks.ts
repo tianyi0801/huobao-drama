@@ -1,7 +1,8 @@
 import { Hono } from 'hono'
 import { and, desc, eq } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
-import { success, created, badRequest } from '../utils/response.js'
+import { success, created, badRequest, now } from '../utils/response.js'
+import { ComfyClient } from '../services/comfyui/client.js'
 import { generateImage, generateVideo, recoverVideoTask } from '../services/generation.js'
 import { safeTaskError } from '../services/video-download.js'
 import { getActiveConfig, getConfigById, resolveGenerationConfigId } from '../services/ai.js'
@@ -19,6 +20,39 @@ app.post('/:id/recover', async c => {
     await recoverVideoTask(Number(c.req.param('id')))
     return success(c, { id: Number(c.req.param('id')) })
   } catch (error) { return badRequest(c, safeTaskError(error)) }
+})
+
+/**
+ * POST /tasks/:id/cancel — 取消生成任务
+ * 本地 ComfyUI：排队中的从队列删除，正在执行的用 interrupt；
+ * 云端厂商没有取消接口，只能在本机标记取消并停止轮询（上游可能继续跑）。
+ */
+app.post('/:id/cancel', async c => {
+  const id = Number(c.req.param('id'))
+  const [task] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id))
+  if (!task) return badRequest(c, '任务不存在')
+  if (task.status !== 'processing') return badRequest(c, '任务已结束，无需取消')
+
+  let upstream = 'not_attempted'
+  if ((task.provider || '').toLowerCase().includes('comfy') && task.taskId) {
+    try {
+      const client = new ComfyClient(getComfyConfig().url)
+      const running = await client.isRunning(task.taskId)
+      if (running) await client.interrupt()
+      else await client.deleteQueued([task.taskId])
+      upstream = running ? 'interrupted' : 'dequeued'
+    } catch {
+      // 队列不可达不阻断本地取消：任务至少要停止轮询并退出待处理态
+      upstream = 'unreachable'
+    }
+  }
+
+  await db.update(schema.sysTask).set({
+    status: 'failed', stage: 'cancelled', errorCode: 'cancelled', errorMsg: '任务已取消',
+    completedAt: now(), updatedAt: now(),
+  }).where(eq(schema.sysTask.id, id))
+  logTaskStart('Task', 'cancel', { id, provider: task.provider, upstream })
+  return success(c, { id, upstream })
 })
 
 app.get('/:id/diagnostics', async c => {

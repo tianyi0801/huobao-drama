@@ -116,6 +116,8 @@
       "busy": "작업 실행 중",
       "done": "완료",
       "failed": "에이전트 실행 실패"
+    ,
+      "cancelled": "중지했습니다. 저장된 내용은 유지됩니다"
     }
   },
   "index": {
@@ -380,6 +382,9 @@
       "promptGenerator": "프롬프트 생성",
       "langFallback": "중국어로 폴백",
       "followContentLang": "편집 언어: {lang} (일반 → AI 콘텐츠 언어에서 전환)"
+    ,
+      "effectHint": "저장 즉시 적용됩니다. 다음 생성부터 새 프롬프트가 사용되며 재시작은 필요 없습니다.",
+      "overrideHint": "주의: 새 내장 템플릿을 설치하면 이 파일이 덮어써집니다. 이전 버전은 workspace/.backup에 백업됩니다."
     },
     "skills": {
       "agentList": "Agent 목록",
@@ -398,6 +403,8 @@
       "descPlaceholder": "이 Skill의 용도를 간단히 기술",
       "create": "생성",
       "created": "Skill이 생성되었습니다"
+    ,
+      "effectHint": "저장 즉시 적용됩니다. SKILL.md를 직접 수정했다면 백엔드 재시작 또는 이 화면에서 다시 저장해야 반영됩니다."
     },
     "cfg": {
       "editTitle": "서비스 설정 편집",
@@ -905,6 +912,9 @@
       "generic": "일반",
       "fullMerge": "화 전체 병합",
       "mergeKind": "병합"
+    ,
+      "cancel": "취소",
+      "cancelled": "작업을 취소했습니다"
     },
     "export": {
       "notReadyDesc": "먼저 스토리보드와 제작 단계를 완료하세요",

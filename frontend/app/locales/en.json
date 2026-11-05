@@ -116,6 +116,8 @@
       "busy": "Operation in progress",
       "done": "Done",
       "failed": "Agent failed"
+    ,
+      "cancelled": "Stopped; saved results are kept"
     }
   },
   "index": {
@@ -386,6 +388,9 @@
       "promptGenerator": "Prompt Generator",
       "langFallback": "Falls back to Chinese",
       "followContentLang": "Editing language: {lang} (switch in General → AI Content Language)"
+    ,
+      "effectHint": "Takes effect immediately: the next generation uses the new prompt, no restart needed.",
+      "overrideHint": "Note: installing a newer built-in template overwrites this file; the previous version is backed up under workspace/.backup."
     },
     "skills": {
       "agentList": "Agents",
@@ -404,6 +409,8 @@
       "descPlaceholder": "A short description of this skill",
       "create": "Create",
       "created": "Skill created"
+    ,
+      "effectHint": "Takes effect immediately. If you edit SKILL.md directly on disk, restart the backend or save once on this page to refresh the skill cache."
     },
     "cfg": {
       "editTitle": "Edit Service Config",
@@ -961,6 +968,9 @@
       "generic": "General",
       "fullMerge": "Full-episode merge",
       "mergeKind": "Merge"
+    ,
+      "cancel": "Cancel",
+      "cancelled": "Task cancelled"
     },
     "export": {
       "notReadyDesc": "Please finish the storyboard and production steps first",

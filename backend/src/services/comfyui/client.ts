@@ -206,6 +206,26 @@ export class ComfyClient {
   }
 
   /**
+   * 从队列里移除指定 prompt（排队中未执行的任务）。
+   * ComfyUI 只支持按 prompt_id 精准删除，正在执行的用 interrupt。
+   */
+  async deleteQueued(promptIds: string[]): Promise<void> {
+    const ids = promptIds.filter(Boolean)
+    if (!ids.length) return
+    await this.json('/queue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ delete: ids }),
+    }).catch(() => undefined)
+  }
+
+  /** 该 prompt 是否正在执行（用于决定 interrupt 还是仅出队） */
+  async isRunning(promptId: string): Promise<boolean> {
+    const snapshot = await this.queue()
+    return snapshot.queue_running.some(entry => String((entry as any)?.[1] ?? '') === promptId)
+  }
+
+  /**
    * 列出 ComfyUI 用户的 Workflows 目录（界面左侧「工作流」面板里的文件）
    * 返回相对路径，如 ["huobao-qwen-t2i.workflow.json", "入门示例/basic.json"]
    */
