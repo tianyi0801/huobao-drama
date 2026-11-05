@@ -76,6 +76,36 @@ test('官方时间轴拒绝错误切镜与重复小节，兼容旧式起止秒�
   assert.doesNotThrow(() => validateVideoPromptTimeline('历史纯文本', 15))
 })
 
+test('视频提示词镜头数与description一一对应，台词必须逐字来自description', async () => {
+  const target = buildAgentRequestContext({ dramaId: drama.id, episodeId: episode.id, targetStoryboardId: a.id })
+  const tools = registerAgentTools({ updateVideoPrompt })
+  const description = '【镜头1】小明抬头看向门口。\n【镜头2】小明说：「你来了。」随后闭口。'
+  db.update(schema.storyboards).set({ description, duration: 6 }).where(eq(schema.storyboards.id, a.id)).run()
+
+  const oneShot = prompt('[Shot 1] 0.0-6.0秒：小明抬头看向门口。')
+  await assert.rejects(call(tools.update_storyboard, { storyboard_id: a.id, video_prompt: oneShot }, target), /镜头数必须一一对应/)
+
+  const invented = prompt('[Shot 1] 0.0-3.0秒：小明抬头。\n[Shot 2] 3.0-6.0秒：小明说，<d>[Chinese] 你怎么现在才来。</d>')
+  await assert.rejects(call(tools.update_storyboard, { storyboard_id: a.id, video_prompt: invented }, target), /不在 description 原文中/)
+
+  const dropped = prompt('[Shot 1] 0.0-3.0秒：小明抬头。\n[Shot 2] 3.0-6.0秒：小明保持沉默。')
+  await assert.rejects(call(tools.update_storyboard, { storyboard_id: a.id, video_prompt: dropped }, target), /必须用 <d>/)
+
+  const valid = prompt('[Shot 1] 0.0-3.0秒：小明抬头看向门口。\n[Shot 2] 3.0-6.0秒：小明(S1)说，<d>[Chinese] 你来了。</d>随后闭口。')
+  const saved = await call(tools.update_storyboard, { storyboard_id: a.id, video_prompt: valid }, target)
+  assert.equal(saved.storyboard_id, a.id)
+  assert.equal(db.select().from(schema.storyboards).where(eq(schema.storyboards.id, a.id)).get()!.videoPrompt, valid)
+
+  const noDialogue = '【镜头1】小明看向窗外。\n【镜头2】雨打在玻璃上。'
+  db.update(schema.storyboards).set({ description: noDialogue, duration: 5 }).where(eq(schema.storyboards.id, a.id)).run()
+  await assert.rejects(call(tools.update_storyboard, { storyboard_id: a.id, video_prompt: prompt() }, target), /镜头数必须一一对应/)
+  const twoSilentShots = prompt('[Shot 1] 0-2.5秒：小明看向窗外。\n[Shot 2] 2.5-5秒：雨打在玻璃上。')
+  await call(tools.update_storyboard, { storyboard_id: a.id, video_prompt: twoSilentShots }, target)
+  // 还原共享夹具，避免影响后续用例
+  db.update(schema.storyboards).set({ description: a.description, duration: a.duration, videoPrompt: a.videoPrompt })
+    .where(eq(schema.storyboards.id, a.id)).run()
+})
+
 test('提示词窄工具保护目标分镜与字段，保存回执不能用旧值冒充', async () => {
   const target = buildAgentRequestContext({ dramaId: drama.id, episodeId: episode.id, targetStoryboardId: a.id })
   const tools = registerAgentTools({ updateVideoPrompt, ...imagePromptTools })

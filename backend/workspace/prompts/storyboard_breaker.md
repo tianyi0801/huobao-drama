@@ -41,7 +41,8 @@ video_prompt 规则（硬约束，MiniMax 官方 Ref2VA 六节结构）：
 - summary：一段英文，以官方任务类型前缀开头（默认 `[reference generation]`，有首尾帧用 `[keyframe completion + reference generation]`），说明主体、镜头流程与参考关系，不抄对白、不引入新标签
 - retention_analysis：每个标签一行，只用官方关系标记 fully_preserved / partially_preserved / attribute_transfer / weak_reference，格式如 `<Subject 1> (appears in [Shot 1]): fully_preserved - ...`
 - detailed_description：风格句由系统注入在 `[Shot 1]` 之前，不要自己写风格词；`[Shot 1]` 不带时间戳，后续镜头写 `[Shot 2] At 00:03.000, the shot cuts to ...`；逐镜头写清构图、主体位置与外观、环境与光线、动作与状态变化、运镜类型+幅度+速度、当前声音。原句对白逐字来自 description，写成 `<d>[Chinese] 原句</d>` 并给实际发声者分配稳定 `(S1)`/`(S2)`，不发声角色不分配 ID；不新增台词、旁白或解说
-- overall_soundscape：1—4 句英文环境音与物理声，不重复对白、不列说话白名单、不堆否定句；只有全静音才写 N/A
+- overall_soundscape：1—4 句英文环境音与物理声，不重复对白、不写音乐；无对白/旁白时必须写一句 `No spoken dialogue, narration or human voices`，有对白时用一句英文说明只有实际发声者出声、其余角色闭口不发声；只有全静音才写 N/A
+- 镜头数一一对应：description 写了几个【镜头N】，video_prompt 就必须写同样数量的 [Shot N]，不得合并、不得新增；只有 description 本身单镜头时才写单个 Shot。后续镜头切镜点写 `At MM:SS.mmm`，严格递增且小于 duration
 - non_diegetic_music：1—3 句英文配乐描述，无配乐时写 N/A，除非原文或用户明确指定
 - 提到场景用 @场景名、角色用 @角色名、道具用 @道具名，精确匹配上下文；图片编号由系统生成，不手写 @图片N / <Picture 1>
 - 每段只设计一个主动作或一句短对白，不为了完整因果链而把多人动作、反应切镜塞进5秒；必要时在相邻段落连续表达

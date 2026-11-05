@@ -12,7 +12,7 @@ import { logTaskProgress, logTaskSuccess } from '../../utils/task-logger.js'
 import { getDramaId, getEpisodeId } from '../context.js'
 import { STORYBOARD_BATCH_SIZE } from '../local-contract.js'
 import { resolveVoiceMentions } from '../../services/character-voice-references.js'
-import { validateVideoPromptTimeline } from '../../services/video-prompt-structure.js'
+import { validateVideoPromptTimeline, validateVideoPromptAgainstDescription } from '../../services/video-prompt-structure.js'
 
 type ImageAsset = { id: number; name: string; imageUrl: string | null; deletedAt: string | null }
 type SceneImageAsset = Omit<ImageAsset, 'name'> & { location: string }
@@ -313,7 +313,10 @@ const saveStoryboards = createTool({
         throw new Error('新拆分分镜时长必须为4—12的整数秒')
       }
       await validateVideoPromptVoices(sb.video_prompt, dramaId, sb.character_ids)
-      if (sb.video_prompt) validateVideoPromptTimeline(sb.video_prompt, sb.duration ?? 5)
+      if (sb.video_prompt) {
+        validateVideoPromptTimeline(sb.video_prompt, sb.duration ?? 5)
+        if (sb.description) validateVideoPromptAgainstDescription(sb.video_prompt, sb.description)
+      }
       await validateStoryboardBindings(episodeId, dramaId, sb.scene_id, sb.character_ids, sb.prop_ids)
     }
     if (replace_existing === true) {
@@ -451,7 +454,10 @@ const updateStoryboard = createTool({
           .map(link => link.propId)
 
     await validateVideoPromptVoices(fields.video_prompt, dramaId, currentCharacterIds)
-    if (fields.video_prompt) validateVideoPromptTimeline(fields.video_prompt, fields.duration ?? storyboard.duration ?? 5)
+    if (fields.video_prompt) {
+      validateVideoPromptTimeline(fields.video_prompt, fields.duration ?? storyboard.duration ?? 5)
+      validateVideoPromptAgainstDescription(fields.video_prompt, fields.description ?? storyboard.description ?? '')
+    }
     await validateStoryboardBindings(
       episodeId,
       dramaId,

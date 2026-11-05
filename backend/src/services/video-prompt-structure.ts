@@ -98,6 +98,58 @@ export function injectStyleOpening(prompt: string, style: string): string {
   return `${base.slice(0, at).trimEnd()}\n${opening}\n${base.slice(at).trimStart()}`
 }
 
+/** 归一化文本用于逐字比对：忽略空白、全半角标点与引号差异 */
+function normalizeForCompare(value: string): string {
+  return String(value || '')
+    .replace(/[\s\u00a0]+/g, '')
+    .replace(/[“”「」『』]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/[，。！？；：]/g, ch => ({ '，': ',', '。': '.', '！': '!', '？': '?', '；': ';', '：': ':' } as Record<string, string>)[ch])
+}
+
+/** 提取 <d>[Chinese] 原句</d> 内的台词正文 */
+function extractDialogue(prompt: string): string[] {
+  return Array.from(prompt.matchAll(/<d>([\s\S]*?)<\/d>/gi))
+    .map(match => match[1].replace(/^\s*\[[^\]]+\]\s*/, '').trim())
+    .filter(Boolean)
+}
+
+/**
+ * 让 video_prompt 与分镜 description 严格对齐：
+ * 1) description 写了几个【镜头N】，就必须生成同样数量的 [Shot N]，不得合并或新增；
+ * 2) <d> 里的每句台词都必须逐字来自 description，防止模型自行配音、加旁白。
+ * description 没有编号镜头或没有台词时，对应检查跳过。
+ */
+export function validateVideoPromptAgainstDescription(prompt: string, description: string): void {
+  const source = String(description || '')
+  const normalizedPrompt = normalizeVideoPromptSections(prompt)
+  const headings = sectionHeadings(normalizedPrompt)
+  if (!headings.length || !source.trim()) return
+
+  const sourceShots = source.match(/【镜头\s*\d+】/g) || []
+  if (sourceShots.length && isOfficialStructure(normalizedPrompt, headings)) {
+    const { bodyStart, end } = detailBodyRange(normalizedPrompt, headings)
+    const promptShots = normalizedPrompt.slice(bodyStart, end).match(/\[Shot\s+\d+\]/gi) || []
+    if (promptShots.length !== sourceShots.length) {
+      throw new Error(`description 有 ${sourceShots.length} 个【镜头N】，video_prompt 却只有 ${promptShots.length} 个 [Shot N]；镜头数必须一一对应，不能合并或新增`)
+    }
+  }
+
+  const dialogues = extractDialogue(normalizedPrompt)
+  if (!dialogues.length) {
+    if (/[说讲道][：:]\s*[「"“]|旁白[：:]/.test(source)) {
+      throw new Error('description 含有台词或旁白，video_prompt 必须用 <d>[Chinese] 原句</d> 保留，不能省略')
+    }
+    return
+  }
+  const normalizedSource = normalizeForCompare(source)
+  for (const line of dialogues) {
+    if (!normalizedSource.includes(normalizeForCompare(line))) {
+      throw new Error(`video_prompt 中的台词「${line.slice(0, 40)}」不在 description 原文中，禁止新增配音、旁白或改写台词`)
+    }
+  }
+}
+
 /** 旧格式 [Shot N] 0.0-5.0秒 / 官方格式 [Shot N] At MM:SS.mmm */
 const LEGACY_RANGE = /^\s*(\d+(?:\.\d+)?)\s*(?:秒|s)?\s*[-–—~～]\s*(\d+(?:\.\d+)?)/
 const OFFICIAL_CUT = /^\s*At\s+(\d{2}):(\d{2})\.(\d{3})\b/i

@@ -3168,7 +3168,7 @@ async function genVideoPrompt(sb) {
 
 该分镜信息:时长 ${sb.duration || 5}s;场景:${getSceneName(sb) || '未绑定'};角色:${charNames};道具:${propNames}。
 
-先调用 read_storyboard_context 读取 target_storyboard 的 description、atmosphere、duration、绑定素材及 available_image_references，按 MiniMax 官方 Ref2VA 六节结构（subject_definitions / summary / retention_analysis / detailed_description / overall_soundscape / non_diegetic_music）生成，六节正文用英文、对白放在 <d>[Chinese] 原句</d> 中。summary 用官方任务类型前缀，retention_analysis 用官方关系标记，detailed_description 的 [Shot 1] 不带时间戳。默认1个连续镜头，不为了段数切镜；只在不删情节时合并冗余切镜，否则保留原时间轴。直接复制 image_reference（如 @角色名/@场景名/@道具名）引用实际素材，不手写图片编号。主角与配角均有独立身份和清晰脸部，明确每人位置与动作。原句对白只在对应 Shot 写一次，不新增配音或配乐，无配乐写 N/A。调用 update_storyboard 保存到分镜 ID:${sb.id}，参数仅 storyboard_id 与 video_prompt，不改其他字段，不重新拆分整集。`,
+先调用 read_storyboard_context 读取 target_storyboard 的 description、atmosphere、duration、绑定素材及 available_image_references，按 MiniMax 官方 Ref2VA 六节结构（subject_definitions / summary / retention_analysis / detailed_description / overall_soundscape / non_diegetic_music）生成，六节正文用英文、对白放在 <d>[Chinese] 原句</d> 中。summary 用官方任务类型前缀，retention_analysis 用官方关系标记，detailed_description 的 [Shot 1] 不带时间戳，后续镜头用 At MM:SS.mmm。description 的【镜头N】是镜头数唯一来源：有几个镜头就写几个 [Shot N]，不得合并、不得新增；只有 description 本身单镜头时才写单个 Shot。直接复制 image_reference（如 @角色名/@场景名/@道具名）引用实际素材，不手写图片编号。主角与配角均有独立身份和清晰脸部，明确每人位置与动作。原句对白只在对应 Shot 写一次，不新增配音或配乐，无配乐写 N/A。调用 update_storyboard 保存到分镜 ID:${sb.id}，参数仅 storyboard_id 与 video_prompt，不改其他字段，不重新拆分整集。`,
       drama_id: dramaId,
       episode_id: epId.value,
       model: chatModelOverride() || undefined,
