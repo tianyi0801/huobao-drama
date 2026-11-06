@@ -135,6 +135,33 @@
             </section>
           </div>
 
+          <!-- 模型思考模式 -->
+          <section class="card svc-group">
+            <div class="svc-group-head">
+              <div class="svc-group-heading">
+                <span class="svc-group-title">{{ t('settings.general.thinking') }}</span>
+                <div class="svc-group-sub">{{ t('settings.general.thinkingSub') }}</div>
+              </div>
+            </div>
+            <div class="config-row">
+              <div class="provider-badge" style="background:var(--accent-bg);color:var(--accent)"><Sparkles :size="15" /></div>
+              <div class="config-main">
+                <div class="config-line"><span class="config-name">{{ t('settings.general.thinkingLabel') }}</span></div>
+                <div class="config-sub">{{ t('settings.general.thinkingNote') }}</div>
+              </div>
+              <button
+                type="button"
+                :class="['btn', 'btn-sm', thinkingMode ? 'btn-primary' : '']"
+                :disabled="thinkingSaving"
+                @click="toggleThinkingMode"
+              >
+                <Loader2 v-if="thinkingSaving" :size="12" class="animate-spin" />
+                {{ thinkingMode ? t('settings.general.thinkingOn') : t('settings.general.thinkingOff') }}
+              </button>
+            </div>
+            <p class="config-empty">{{ t('settings.general.thinkingHint') }}</p>
+          </section>
+
           <!-- ===== ② 图片与视频：本地算力 ===== -->
           <div class="ai-section-head">
             <span class="ai-section-no">2</span>
@@ -943,6 +970,27 @@ const selectedAgentIcon = computed(() => agentDefs.value.find(a => a.type === se
 
 // ===== 通用：AI 内容语言（全局设置，与界面语言相互独立） =====
 const contentLanguage = ref('zh')
+const thinkingMode = ref(false)
+const thinkingSaving = ref(false)
+
+async function loadThinkingMode() {
+  try { thinkingMode.value = !!(await settingsAPI.thinkingMode())?.enabled } catch { /* 读取失败保持默认关闭 */ }
+}
+
+async function toggleThinkingMode() {
+  if (thinkingSaving.value) return
+  thinkingSaving.value = true
+  try {
+    const next = !thinkingMode.value
+    await settingsAPI.setThinkingMode(next)
+    thinkingMode.value = next
+    toast.success(t(next ? 'settings.general.thinkingOnToast' : 'settings.general.thinkingOffToast'))
+  } catch (error) {
+    toastError(error)
+  } finally {
+    thinkingSaving.value = false
+  }
+}
 const contentLangOptions = [
   { value: 'zh', label: '中文', shortLabel: '中文' },
   { value: 'en', label: 'English', shortLabel: 'EN' },
@@ -1173,7 +1221,10 @@ onMounted(() => {
 const SETTINGS_TOUR = [
   { element: '.nav-item:has(.lucide-cpu), .nav-item:nth-of-type(1)', titleKey: 'tour.settings.nav.title', descKey: 'tour.settings.nav.desc', popoverSide: 'right' },
 ]
-onMounted(() => setTimeout(() => autoTour('settings', SETTINGS_TOUR, t), 800))
+onMounted(() => {
+  void loadThinkingMode()
+  setTimeout(() => autoTour('settings', SETTINGS_TOUR, t), 800)
+})
 function replaySettingsTour() { startTour('settings', SETTINGS_TOUR, t) }
 
 // ===== 存储位置 =====

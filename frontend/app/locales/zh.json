@@ -292,6 +292,16 @@
       "langNameJa": "日本語",
       "langNameKo": "한국어",
       "unifiedSwitchWarning": "已切换为 {lang}，界面与 AI 内容语言将同步更新，即将刷新…"
+    ,
+      "thinking": "模型思考模式",
+      "thinkingSub": "让文本模型先推理再输出，质量更稳但更慢",
+      "thinkingLabel": "开启后改写／提取／分镜会实时显示思考过程",
+      "thinkingNote": "依赖所用模型与网关支持 reasoning 回传；遇到报错可随时关掉",
+      "thinkingOn": "已开启",
+      "thinkingOff": "已关闭",
+      "thinkingHint": "开启后批量分镜可能变慢，且单轮输出更易触及长度上限；界面会实时显示思考与输出内容。",
+      "thinkingOnToast": "已开启思考模式",
+      "thinkingOffToast": "已关闭思考模式"
     },
     "ai": {
       "title": "AI 模型与算力",
@@ -552,6 +562,10 @@
       "follow": "跟随最新",
       "reconnect": "重新连接",
       "disconnected": "日志连接已断开，任务状态以工作台为准"
+    ,
+      "reasoning": "思考过程"
+    ,
+      "stop": "停止"
     },
     "liveLog": {
       "badge": "日志",

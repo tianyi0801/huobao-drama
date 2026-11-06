@@ -11,6 +11,7 @@ import { streamSSE } from 'hono/streaming'
 import { validAgentTypes } from '../agents/index.js'
 import { buildAgentRequestContext } from '../agents/context.js'
 import { assertAgentSaved, getAgentUsage } from '../agents/execution.js'
+import { getThinkingMode } from '../services/app-settings.js'
 import { STORYBOARD_MAX_STEPS } from '../agents/local-contract.js'
 import { mastra } from '../mastra/index.js'
 import { success, badRequest } from '../utils/response.js'
@@ -173,7 +174,64 @@ app.post('/:type/stream', async (c) => {
 
     try {
       live.send('start', { agent: agentType })
-      // 保持升级前的模型请求协议：SSE 只传展示信息，不强迫厂商支持流式工具调用。
+      if (getThinkingMode()) {
+        // 思考模式：流式返回，界面能实时看到思考过程与输出
+        const streamed = await agent.stream([{ role: 'user', content: message }], {
+          maxSteps: agentType === 'storyboard_breaker' ? STORYBOARD_MAX_STEPS : 20,
+          requestContext,
+          abortSignal: abort.signal,
+          onStepFinish: (step: any) => {
+            logTaskProgress('Agent', 'step-usage', { agentType, step: ++stepIndex, ...getAgentUsage(step) })
+          },
+        } as any)
+        let text = ''
+        let reasoningChars = 0
+        for await (const chunk of (streamed as any).fullStream as AsyncIterable<any>) {
+          const payload = chunk?.payload || {}
+          switch (chunk?.type) {
+            case 'text-delta': {
+              const delta = String(payload.text || '')
+              if (delta) { text += delta; live.send('text', { text: delta }) }
+              break
+            }
+            case 'reasoning-delta': {
+              const delta = String(payload.text || '')
+              if (delta) { reasoningChars += delta.length; live.send('reasoning', { text: delta }) }
+              break
+            }
+            case 'tool-call': {
+              const name = normalizeToolName(chunk) || 'tool'
+              const id = payload.toolCallId || name
+              logTaskProgress('Agent', 'tool-call', { agentType, tool: name })
+              live.send('tool-call', { id, name, args: summarize(payload.args) })
+              break
+            }
+            case 'tool-result': {
+              const name = normalizeToolName(chunk) || 'tool'
+              live.send('tool-result', {
+                id: payload.toolCallId || name,
+                name,
+                ok: !payload.isError,
+                preview: summarize(payload.result, 120),
+              })
+              break
+            }
+            case 'error':
+              throw new Error(payload?.error?.message || payload?.message || 'Agent 执行失败')
+            default:
+              break
+          }
+        }
+        if (abort.signal.aborted) throw new Error('已取消')
+        const finishReason = await Promise.resolve((streamed as any).finishReason).catch(() => undefined)
+        logTaskProgress('Agent', 'generation-usage', { agentType, finishReason, chars: text.length, reasoningChars })
+        assertAgentSaved(agentType, { finishReason }, requestContext)
+        const elapsedMs = Math.round(performance.now() - startTime)
+        logTaskSuccess('Agent', `${agentType} stream`, { elapsedMs, steps: stepIndex, chars: text.length, reasoningChars })
+        live.send('done', { text, elapsedMs })
+        return
+      }
+      // 默认：保持升级前的模型请求协议，SSE 只传展示信息，不强迫厂商支持流式工具调用。
       const result = await agent.generate([{ role: 'user', content: message }], {
         maxSteps: agentType === 'storyboard_breaker' ? STORYBOARD_MAX_STEPS : 20,
         requestContext,

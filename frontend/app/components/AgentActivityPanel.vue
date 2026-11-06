@@ -58,6 +58,10 @@
         </li>
       </ol>
       <div v-if="!groups.length" class="agent-live-empty">{{ t('episode.logUi.waiting') }}</div>
+      <details v-if="reasoningTail" class="agent-live-reasoning">
+        <summary>{{ t('episode.logUi.reasoning') }}<span class="dim"> · {{ activity.reasoning.length }}</span></summary>
+        <pre class="agent-live-pre agent-live-pre-reasoning">{{ reasoningTail }}</pre>
+      </details>
       <div v-if="tail" class="agent-live-output">
         <div class="agent-live-section-head">
           <span>{{ t('episode.activity.liveOutput') }}</span>
@@ -84,6 +88,12 @@ const props = defineProps<{
   agentType?: string | null
 }>()
 const emit = defineEmits<{ cancel: [] }>()
+const reasoningTail = computed(() => {
+  const text = props.activity.reasoning || ''
+  // 思考内容可能很长：只保留尾部，避免刷屏和占用内存
+  return text.length > 4000 ? text.slice(-4000) : text
+})
+
 const { t, te } = useI18n()
 const textEl = ref<HTMLElement | null>(null)
 const expanded = ref(false)
@@ -162,6 +172,9 @@ watch(() => props.activity.text.length, async () => {
 .agent-tool-result summary { cursor: pointer; font-size: 10px; color: var(--text-2); }
 .agent-tool-result pre { margin: 6px 0 0; font: 10px/1.6 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 100px; overflow: auto; }
 .agent-live-output { margin-top: 12px; }
+.agent-live-reasoning { margin: 8px 0 0; }
+.agent-live-reasoning summary { cursor: pointer; font-size: 11px; color: var(--text-2); padding: 4px 0; }
+.agent-live-pre-reasoning { max-height: 120px; color: var(--text-2); background: var(--bg-1); font-style: italic; }
 .agent-live-pre { margin: 0; max-height: 144px; overflow-y: auto; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-2); color: var(--text-1); font: 11px/1.7 var(--font-body); white-space: pre-wrap; overflow-wrap: anywhere; }
 .agent-live-error { display: flex; align-items: flex-start; gap: 7px; margin-top: 10px; padding: 8px 10px; max-height: 74px; overflow-y: auto; border-radius: var(--radius-sm); color: var(--error); background: var(--error-bg); font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; }
 .agent-live-error > svg { flex-shrink: 0; margin-top: 2px; }

@@ -292,6 +292,16 @@
       "langNameJa": "日本語",
       "langNameKo": "韓国語",
       "unifiedSwitchWarning": "{lang} に切替しました。UI と AI コンテンツ言語が同期され、まもなく再読み込みします…"
+    ,
+      "thinking": "モデル思考モード",
+      "thinkingSub": "テキストモデルに推論させてから出力します",
+      "thinkingLabel": "有効にすると改写／抽出／絵コンテで思考過程をリアルタイム表示",
+      "thinkingNote": "reasoning を返せるモデル／ゲートウェイが必要です。エラー時は無効にしてください",
+      "thinkingOn": "有効",
+      "thinkingOff": "無効",
+      "thinkingHint": "有効にするとバッチ処理が遅くなり、出力上限に達しやすくなります。思考と出力はパネルに流れます。",
+      "thinkingOnToast": "思考モードを有効にしました",
+      "thinkingOffToast": "思考モードを無効にしました"
     },
     "ai": {
       "title": "AI サービス設定",
@@ -496,6 +506,10 @@
       "follow": "最新に追従",
       "reconnect": "再接続",
       "disconnected": "ログ切断・タスク状態は作業画面で確認"
+    ,
+      "reasoning": "思考プロセス"
+    ,
+      "stop": "停止"
     },
     "liveLog": {
       "badge": "ログ",

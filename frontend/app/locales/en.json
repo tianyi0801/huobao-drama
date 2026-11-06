@@ -292,6 +292,16 @@
       "langNameJa": "Japanese",
       "langNameKo": "Korean",
       "unifiedSwitchWarning": "Switched to {lang} — UI and AI content language update together. Refreshing…"
+    ,
+      "thinking": "Model thinking mode",
+      "thinkingSub": "Let the text model reason before answering",
+      "thinkingLabel": "Rewrite / extract / storyboard show reasoning live",
+      "thinkingNote": "Requires the model and gateway to return reasoning; turn off if errors appear",
+      "thinkingOn": "Enabled",
+      "thinkingOff": "Disabled",
+      "thinkingHint": "Enabling can slow batch storyboarding and hit output limits sooner; reasoning and text stream in the panel.",
+      "thinkingOnToast": "Thinking mode enabled",
+      "thinkingOffToast": "Thinking mode disabled"
     },
     "ai": {
       "title": "AI models & compute",
@@ -552,6 +562,10 @@
       "follow": "Follow latest",
       "reconnect": "Reconnect",
       "disconnected": "Log disconnected; check the workbench for task status"
+    ,
+      "reasoning": "Reasoning"
+    ,
+      "stop": "Stop"
     },
     "liveLog": {
       "badge": "Log",
