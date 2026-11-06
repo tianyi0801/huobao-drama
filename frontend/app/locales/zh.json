@@ -971,6 +971,8 @@
     ,
       "cancel": "取消",
       "cancelled": "任务已取消"
+    ,
+      "cancelledStatus": "已取消"
     },
     "export": {
       "notReadyDesc": "请先完成分镜和制作流程",

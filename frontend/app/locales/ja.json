@@ -915,6 +915,8 @@
     ,
       "cancel": "キャンセル",
       "cancelled": "タスクをキャンセルしました"
+    ,
+      "cancelledStatus": "キャンセル済み"
     },
     "export": {
       "notReadyDesc": "先に分镜と制作の工程を完了してください",

@@ -915,6 +915,8 @@
     ,
       "cancel": "취소",
       "cancelled": "작업을 취소했습니다"
+    ,
+      "cancelledStatus": "취소됨"
     },
     "export": {
       "notReadyDesc": "먼저 스토리보드와 제작 단계를 완료하세요",

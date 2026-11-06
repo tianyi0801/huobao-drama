@@ -971,6 +971,8 @@
     ,
       "cancel": "Cancel",
       "cancelled": "Task cancelled"
+    ,
+      "cancelledStatus": "Cancelled"
     },
     "export": {
       "notReadyDesc": "Please finish the storyboard and production steps first",

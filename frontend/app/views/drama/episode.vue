@@ -642,11 +642,25 @@
                     <span class="video-inspector-label">{{ t('episode.sb.descSection') }}</span>
                     <label class="field">
                       <span class="field-label">{{ t('episode.sb.descLabel') }} <span class="dim">({{ t('episode.sb.descHint') }})</span></span>
-                      <textarea :value="selectedSb.description || ''" class="textarea" rows="7" @blur="updateField(selectedSb, 'description', $event.target.value)" :placeholder="t('episode.sb.descPlaceholder')" />
+                      <textarea
+                        :value="fieldValue(selectedSb, 'description')"
+                        class="textarea"
+                        rows="7"
+                        @input="onFieldInput(selectedSb, 'description', $event)"
+                        @blur="onFieldBlur(selectedSb, 'description', $event)"
+                        :placeholder="t('episode.sb.descPlaceholder')"
+                      />
                     </label>
                     <label class="field">
                       <span class="field-label">{{ t('episode.sb.atmosphere') }}</span>
-                      <textarea :value="selectedSb.atmosphere || ''" class="textarea" rows="2" @blur="updateField(selectedSb, 'atmosphere', $event.target.value)" :placeholder="t('episode.sb.atmospherePlaceholder')" />
+                      <textarea
+                        :value="fieldValue(selectedSb, 'atmosphere')"
+                        class="textarea"
+                        rows="2"
+                        @input="onFieldInput(selectedSb, 'atmosphere', $event)"
+                        @blur="onFieldBlur(selectedSb, 'atmosphere', $event)"
+                        :placeholder="t('episode.sb.atmospherePlaceholder')"
+                      />
                     </label>
                   </section>
 
@@ -836,11 +850,12 @@
                       <span class="video-param-name">{{ t('episode.inspector.duration') }}</span>
                       <span class="video-param-control">
                         <input
-                          :value="selectedSb.duration || 5"
+                          :value="fieldValue(selectedSb, 'duration') || 5"
                           type="number"
                           min="2"
                           max="12"
                           class="input video-duration-input"
+                          @input="onFieldInput(selectedSb, 'duration', $event)"
                           @change="onVideoDurationChange"
                         />
                         <span class="video-param-unit">{{ t('episode.inspector.durationUnit') }}</span>
@@ -1087,7 +1102,7 @@
             <div
               v-for="row in genTaskRows"
               :key="row.key"
-              :class="['video-task-row', 'gen-task-row', 'is-' + genTaskStateClass(row.status)]"
+              :class="['video-task-row', 'gen-task-row', 'is-' + genTaskStateClass(row)]"
             >
               <div class="video-task-preview">
                 <video
@@ -1107,7 +1122,7 @@
                   @click="openImageViewer(genTaskPreviewSrc(row.previewUrl), row.targetLabel)"
                 />
                 <div v-else class="video-task-empty">
-                  <Loader2 v-if="genTaskStateClass(row.status) === 'pending'" :size="18" class="animate-spin" />
+                  <Loader2 v-if="genTaskStateClass(row) === 'pending'" :size="18" class="animate-spin" />
                   <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
                 </div>
                 <span class="video-task-index">{{ genTaskKindLabel(row.kind) }}</span>
@@ -1125,7 +1140,7 @@
                   <span class="video-task-sep">·</span>
                   <span>#{{ row.id }}</span>
                 </div>
-                <div v-if="row.errorMsg" class="video-task-error" :title="row.errorMsg">
+                <div v-if="row.errorMsg && !isCancelledTask(row)" class="video-task-error" :title="row.errorMsg">
                   {{ mapError(row.errorMsg) }}
                   <div v-if="row.kind === 'video'" class="flex gap-2">
                     <button v-if="row.recoverable" class="btn btn-sm" @click.stop="recoverTask(row.id, row.storyboardId)">{{ t('episode.recovery.restore') }}</button>
@@ -1135,7 +1150,7 @@
                 </div>
               </div>
               <button
-                v-if="genTaskStateClass(row.status) === 'pending'"
+                v-if="genTaskStateClass(row) === 'pending'"
                 class="btn btn-sm"
                 :disabled="cancellingTaskIds.includes(row.id)"
                 @click.stop="cancelTask(row.id)"
@@ -1143,9 +1158,9 @@
                 <Loader2 v-if="cancellingTaskIds.includes(row.id)" :size="11" class="animate-spin" />
                 {{ t('episode.tasks.cancel') }}
               </button>
-              <span :class="['video-task-status', 'is-' + genTaskStateClass(row.status)]">
-                <span :class="['dot', genTaskStateClass(row.status) === 'done' && 'ok', genTaskStateClass(row.status) === 'pending' && 'pending']" />
-                {{ genTaskStatusLabel(row.status) }}
+              <span :class="['video-task-status', 'is-' + genTaskStateClass(row)]">
+                <span :class="['dot', genTaskStateClass(row) === 'done' && 'ok', genTaskStateClass(row) === 'pending' && 'pending', genTaskStateClass(row) === 'cancelled' && 'cancelled']" />
+                {{ genTaskStatusLabel(row) }}
               </span>
             </div>
           </div>
@@ -2125,8 +2140,9 @@ function videoModerationHint(msg) {
 }
 
 function videoTaskState(sb) {
-  if (hasVid(sb)) return 'done'
+  // 重新生成时旧视频还在，但要优先显示「生成中」，否则界面一直停在已完成
   if (isPendingVideo(sb?.id)) return 'pending'
+  if (hasVid(sb)) return 'done'
   if (videoFailMessage(sb?.id)) return 'failed'
   return 'ready'
 }
@@ -2138,7 +2154,9 @@ function latestVideoTask(id) {
 const recoverableVideoCount = computed(() => sbs.value.filter(sb => canRecoverVideo(sb.id)).length)
 function canRecoverVideo(id) {
   const task = latestVideoTask(id)
+  // 已取消的任务上游可能已出队/中断，恢复没有意义，应重新生成
   return !!task && task.status === 'failed' && task.error_code !== 'generation_failed'
+    && task.error_code !== 'cancelled'
     && !!(task.task_id || task.result_url)
 }
 function videoAwaitingDelivery(sb) {
@@ -2555,10 +2573,11 @@ async function loadGenTasks() {
     const pending = new Set()
     const failed = {}
     for (const [sbId, t] of latestBySb) {
-      // 分镜已有视频(失败后重试成功)时不再报历史错误
-      if (hasVid(sbs.value.find(s => s.id === sbId))) continue
+      const hasVideo = hasVid(sbs.value.find(s => s.id === sbId))
+      // 重新生成时旧视频还在：处理中的任务仍要显示生成中
       if (t.status === 'processing') pending.add(sbId)
-      else if (t.status === 'failed') failed[sbId] = t.error_msg || 'Task failed'
+      // 分镜已有视频(失败后重试成功)时不再报历史错误；用户取消不算失败，不挂红色错误
+      else if (t.status === 'failed' && t.error_code !== 'cancelled' && !hasVideo) failed[sbId] = t.error_msg || 'Task failed'
     }
     // 刚点击提交、任务记录尚未加载出来的本地状态保留,避免状态闪退
     for (const id of pendingVideoIds.value) if (!latestBySb.has(id)) pending.add(id)
@@ -2608,7 +2627,8 @@ const genTaskDoneCount = computed(() =>
   genMerges.value.filter(m => m.status === 'completed').length
 )
 const genTaskFailedCount = computed(() =>
-  genTasks.value.filter(t => t.status === 'failed').length +
+  // 用户取消不算失败，避免统计与红色数字误导
+  genTasks.value.filter(t => t.status === 'failed' && t.error_code !== 'cancelled').length +
   genMerges.value.filter(m => m.status === 'failed').length
 )
 
@@ -2642,9 +2662,10 @@ const genTaskRows = computed(() => {
     provider: t.provider || '',
     model: t.model || '',
     status: t.status || 'processing',
+    errorCode: t.error_code || '',
     errorMsg: t.error_msg || '',
     storyboardId: t.storyboard_id,
-    recoverable: t.type === 'video' && t.error_code !== 'generation_failed' && !!(t.task_id || t.result_url),
+    recoverable: t.type === 'video' && t.error_code !== 'generation_failed' && t.error_code !== 'cancelled' && !!(t.task_id || t.result_url),
     previewUrl: t.local_path || t.result_url || '',
     prompt: t.prompt || '',
     createdAt: t.created_at || '',
@@ -2671,16 +2692,23 @@ function genTaskKindLabel(kind) {
   return kind === 'image' ? t('common.serviceType.image') : kind === 'video' ? t('common.serviceType.video') : t('episode.tasks.mergeKind')
 }
 
-function genTaskStatusLabel(status) {
-  if (status === 'completed') return t('episode.status.done')
-  if (status === 'failed') return t('episode.status.failed')
+// 状态判定统一接受任务行：用户取消的任务要显示「已取消」，不能当成失败报错
+function genTaskStatusLabel(task) {
+  if (isCancelledTask(task)) return t('episode.tasks.cancelledStatus')
+  if (task?.status === 'completed') return t('episode.status.done')
+  if (task?.status === 'failed') return t('episode.status.failed')
   return t('episode.status.generating')
 }
 
-// 映射到现有 video-task-status 的样式类:is-done / is-pending / is-failed
-function genTaskStateClass(status) {
-  if (status === 'completed') return 'done'
-  if (status === 'failed') return 'failed'
+function isCancelledTask(task) {
+  return task?.error_code === 'cancelled' || task?.errorCode === 'cancelled' || task?.status === 'cancelled'
+}
+
+// 映射到现有 video-task-status 的样式类:is-done / is-pending / is-failed / is-cancelled
+function genTaskStateClass(task) {
+  if (isCancelledTask(task)) return 'cancelled'
+  if (task?.status === 'completed') return 'done'
+  if (task?.status === 'failed') return 'failed'
   return 'pending'
 }
 
@@ -2898,6 +2926,27 @@ const selectedVideoTaskNumber = computed(() => {
 // 分镜字段失焦即保存：记录在途请求，生成前先等写完，避免后端读到旧描述
 const pendingStoryboardSaves = new Map()
 
+/**
+ * 正在编辑的字段草稿。
+ * 后台任务轮询会不断 refresh()，若输入框直接绑库里的值，
+ * 每轮刷新都会把没编完的内容顶掉；草稿优先，保存成功才释放。
+ */
+const fieldDrafts = reactive({})
+const draftKey = (sb, field) => `${sb?.id}:${field}`
+function fieldValue(sb, field) {
+  const key = draftKey(sb, field)
+  if (key in fieldDrafts) return fieldDrafts[key]
+  return sb?.[field] ?? sb?.[toCamel(field)] ?? ''
+}
+function onFieldInput(sb, field, event) {
+  fieldDrafts[draftKey(sb, field)] = event.target.value
+}
+function onFieldBlur(sb, field, event) {
+  const value = event.target.value
+  fieldDrafts[draftKey(sb, field)] = value
+  void updateField(sb, field, value)
+}
+
 /** 生成/拆分前调用：确保刚改的描述、时长已经落库 */
 async function awaitPendingStoryboardSaves() {
   if (!pendingStoryboardSaves.size) return
@@ -2907,13 +2956,18 @@ async function awaitPendingStoryboardSaves() {
 function updateField(sb, field, value) {
   const camelField = toCamel(field)
   const previous = sb[field] ?? sb[camelField]
-  if (previous === value) return
+  const key = `${sb.id}:${field}`
+  if (previous === value) {
+    // 与库里一致：草稿已完成使命，释放后按库里值渲染
+    delete fieldDrafts[key]
+    return
+  }
   sb[field] = value
   if (camelField !== field) sb[camelField] = value
-  const key = `${sb.id}:${field}`
   const task = storyboardAPI.update(sb.id, { [field]: value })
+    .then(() => { delete fieldDrafts[key] })
     .catch(e => {
-      // 保存失败要回滚，否则界面显示的是没落库的内容，生成时又用回旧值
+      // 保存失败回滚库里值，但保留草稿：输入框内容不能被清掉，失焦重试即可再次提交
       sb[field] = previous
       if (camelField !== field) sb[camelField] = previous
       toastError(e)
@@ -3739,6 +3793,8 @@ function onVideoDurationChange(e) {
   if (!Number.isFinite(v)) v = Number(sb.duration || 5)
   v = Math.min(max, Math.max(min, v))
   e.target.value = v
+  // 归一后的值同步进草稿，避免输入框显示被截断前的原始数字
+  fieldDrafts[draftKey(sb, 'duration')] = v
   updateField(sb, 'duration', v)
 }
 
@@ -5588,6 +5644,13 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   border-color: var(--warning-bg);
   background: var(--warning-bg);
 }
+/* 用户主动取消：中性灰，不按失败报错 */
+.video-task-status.is-cancelled {
+  color: var(--text-2);
+  border-color: var(--border);
+  background: var(--bg-2);
+}
+.dot.cancelled { background: var(--text-3); }
 .video-task-table {
   flex: 1;
   min-height: 0;
