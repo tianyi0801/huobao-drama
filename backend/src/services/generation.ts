@@ -11,6 +11,7 @@ import { prepareReferenceAudio, resolveReferenceAudioUrls } from './reference-au
 import { getActiveConfig, getConfigById } from './ai.js'
 import { waitForScenePredecessor, resolvePreviousShotFrame, buildContinuityPromptSuffix } from './storyboard-continuity.js'
 import { getComfyConfig } from './comfyui/config.js'
+import { watchComfyRun } from './comfyui/live-preview.js'
 import { appendVideoPromptSection } from './video-prompt-structure.js'
 import { now } from '../utils/response.js'
 import { downloadFile, fetchImageAsCompressedDataUrl, generateImageThumb, readImageAsCompressedDataUrl, readImageAsDataUrl, saveBase64Image } from '../utils/storage.js'
@@ -429,6 +430,25 @@ async function isCancelled(id: number): Promise<boolean> {
 }
 
 async function pollTask(record: SysTaskRecord, config: AIConfig, taskId: string) {
+  // 本地 ComfyUI：一采跑完就能看片，二采继续在后台高清化
+  if (record.type !== 'video' || config.provider !== 'comfyui') {
+    await pollTaskInner(record, config, taskId)
+    return
+  }
+  const stopPreview = watchComfyRun({
+    comfyUrl: getComfyConfig().url,
+    clientId: `huobao-video-${record.id}`,
+    promptId: taskId,
+    taskId: record.id,
+  })
+  try {
+    await pollTaskInner(record, config, taskId)
+  } finally {
+    stopPreview()
+  }
+}
+
+async function pollTaskInner(record: SysTaskRecord, config: AIConfig, taskId: string) {
   const type = record.type as TaskType
   const label = taskLabel(type)
   const profile = POLL_PROFILES[type]

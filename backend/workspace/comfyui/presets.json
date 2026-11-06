@@ -270,6 +270,9 @@
           "292",
           "34"
         ],
+        "previewOutputNodes": [
+          "12"
+        ],
         "bindings": [
           {
             "source": "prompt",

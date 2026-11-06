@@ -936,6 +936,8 @@
       "stillRunning": "生成耗时较长，已停止自动等待；可在右上角任务列表查看进度",
       "confirmEta": "预计耗时",
       "queued": "排队中"
+    ,
+      "firstPassBadge": "一采预览 · 二采高清化中"
     },
     "inspector": {
       "videoPromptPlaceholder": "用 {'@'}角色名引用图片，用 #角色名引用声音；描述台词、说话角色与镜头运动…",

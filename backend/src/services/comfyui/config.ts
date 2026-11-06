@@ -110,6 +110,11 @@ export interface ComfyWorkflowTemplate {
   bindings: ComfyBinding[]
   /** 产物读取节点 id（可多个，按 videoOutputIndex 选择） */
   outputNodes: string[]
+  /**
+   * 额外需要执行的预览节点（不参与产物选择）。
+   * 例如 H3 的一采保存节点：二采还在跑时先把一采视频落盘，供界面提前预览。
+   */
+  previewOutputNodes?: string[]
   /** 多个视频产物时的选择下标；null/缺省表示必须唯一 */
   videoOutputIndex?: number | null
   /** 模板声明的可调项 */
@@ -280,6 +285,16 @@ export function normalizeTemplate(raw: unknown): ComfyWorkflowTemplate | null {
   const outputNodes = Array.isArray(raw.outputNodes)
     ? raw.outputNodes.map((v: unknown) => String(v)).filter((v: string) => v in api)
     : []
+  // 预览节点：模板显式声明优先；老配置（已存进数据库、没有该字段）按节点类型自动补齐，
+  // 否则一采保存节点会被剪枝丢掉，界面上只能等二采跑完才看到视频。
+  const declaredPreview = Array.isArray(raw.previewOutputNodes)
+    ? raw.previewOutputNodes.map((v: unknown) => String(v)).filter((v: string) => v in api)
+    : []
+  const previewOutputNodes = declaredPreview.length
+    ? declaredPreview
+    : Object.entries(api)
+      .filter(([, node]) => /ConditionalFirstPassSaveVideo/i.test(String((node as ComfyApiNode)?.class_type || '')))
+      .map(([id]) => id)
   const videoOutputIndex = typeof raw.videoOutputIndex === 'number' && raw.videoOutputIndex >= 0
     ? raw.videoOutputIndex
     : null
@@ -288,6 +303,7 @@ export function normalizeTemplate(raw: unknown): ComfyWorkflowTemplate | null {
     api,
     bindings: normalizeBindings(raw.bindings),
     outputNodes,
+    ...(previewOutputNodes.length ? { previewOutputNodes } : {}),
     videoOutputIndex,
     options: normalizeOptions(raw.options),
     ...(typeof raw.savedAt === 'string' ? { savedAt: raw.savedAt } : {}),

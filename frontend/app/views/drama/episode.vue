@@ -741,6 +741,7 @@
                     {{ videoTaskStatusLabel(selectedSb) }}
                   </span>
                   <span v-if="selectedSb.duration" class="video-player-sub">{{ selectedSb.duration }}s</span>
+                  <span v-if="hasFirstPassPreview" class="tag video-first-pass-tag">{{ t('episode.vid.firstPassBadge') }}</span>
                 </div>
                 <button
                   v-if="previewVideoUrl && !playerIsRemote"
@@ -1769,6 +1770,8 @@ const pendingSceneImageIds = ref([])
 const pendingPropImageIds = ref([])
 const pendingVideoIds = ref([])
 const failedVideoMessages = ref({})
+// 本地 ComfyUI 二采还在跑时，一采视频已经落盘，先拿来预览
+const firstPassUrls = ref({})
 // 点击生成时的本地时间戳：任务记录尚未拉回来时用它兜底推算 ETA
 const videoStartTimes = ref({})
 function markVideoStart(sbId) {
@@ -2586,6 +2589,15 @@ async function loadGenTasks() {
     }
     pendingVideoIds.value = [...pending]
     failedVideoMessages.value = failed
+
+    // 任务详情里带的一采预览：处理中的分镜即使重开页面也能先看片
+    const previewMap = {}
+    for (const task of genTasks.value) {
+      if (task.type === 'video' && task.status === 'processing' && task.first_pass_ready && task.first_pass_url) {
+        previewMap[task.storyboard_id] = task.first_pass_url
+      }
+    }
+    firstPassUrls.value = previewMap
 
     // 角色/场景/道具的「生成中」同样以最新任务记录为准：
     // 任务失败或已完成就必须撤下 pending，否则失败后按钮会一直转圈
@@ -3544,9 +3556,18 @@ function videoSourceUrl(value) {
 // 不把临时签名 URL 写入分镜主视频，避免影响本地拼接导出。
 const playerVideoUrl = computed(() => {
   if (previewVideoUrl.value) return videoSourceUrl(previewVideoUrl.value)
-  const task = latestVideoTask(selectedSb.value?.id)
+  const sbId = selectedSb.value?.id
+  const task = latestVideoTask(sbId)
+  // 二采还在跑：一采画面已经可用，优先展示当前这次生成的效果
+  const firstPass = sbId ? firstPassUrls.value[sbId] : ''
+  if (firstPass && task?.status === 'processing') return firstPass
   const pendingResult = task && task.status !== 'completed' ? taskVideoPath(task) : ''
   return videoSourceUrl(pendingResult || getVideoUrl(selectedSb.value))
+})
+const hasFirstPassPreview = computed(() => {
+  const sbId = selectedSb.value?.id
+  const task = latestVideoTask(sbId)
+  return !!(sbId && firstPassUrls.value[sbId] && task?.status === 'processing')
 })
 const playerIsRemote = computed(() => /^https?:\/\//i.test(playerVideoUrl.value))
 watch(playerVideoUrl, () => { playerLoadFailed.value = false })
@@ -3905,17 +3926,24 @@ async function pollVideoGeneration(generationId, storyboardId) {
     await sleep(4000)
     try {
       const res = await taskAPI.get(generationId)
+      if (res?.first_pass_ready && res?.first_pass_url) {
+        firstPassUrls.value = { ...firstPassUrls.value, [storyboardId]: res.first_pass_url }
+      }
       await refresh()
       if (res?.status === 'completed') {
         pendingVideoIds.value = pendingVideoIds.value.filter(item => item !== storyboardId)
         clearVideoStart(storyboardId)
         delete failedVideoMessages.value[storyboardId]
+        const { [storyboardId]: _done, ...restFirstPass } = firstPassUrls.value
+        firstPassUrls.value = restFirstPass
         toast.success(t('episode.vid.genDone'))
         return
       }
       if (res?.status === 'failed') {
         pendingVideoIds.value = pendingVideoIds.value.filter(item => item !== storyboardId)
         clearVideoStart(storyboardId)
+        const { [storyboardId]: _failed, ...restFailed } = firstPassUrls.value
+        firstPassUrls.value = restFailed
         const errMsg = res?.error_msg || res?.errorMsg || t('episode.vid.genFailed')
         failedVideoMessages.value = {
           ...failedVideoMessages.value,
@@ -5537,6 +5565,7 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   gap: 8px;
 }
 .video-player-title { color: var(--text-0); font-size: 13px; font-weight: 700; white-space: nowrap; }
+.video-first-pass-tag { margin-left: 6px; color: var(--accent-text); background: var(--accent-bg); border-color: var(--accent-glow); }
 .video-player-sub { color: var(--text-3); font-size: 11px; white-space: nowrap; }
 .video-player-stage {
   flex: none;

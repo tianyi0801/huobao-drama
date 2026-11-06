@@ -936,6 +936,8 @@
       "stillRunning": "Still generating. Auto-waiting stopped — check progress in the task list (top right)",
       "confirmEta": "Estimated time",
       "queued": "Queued"
+    ,
+      "firstPassBadge": "First pass preview · refining"
     },
     "inspector": {
       "videoPromptPlaceholder": "Use {'@'}Name for images and #Name for voices; describe the dialogue, speaker and camera movement…",

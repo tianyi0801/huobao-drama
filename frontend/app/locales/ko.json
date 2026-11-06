@@ -880,6 +880,8 @@
       "stillRunning": "생성이 오래 걸리고 있습니다. 자동 대기를 중단했습니다. 우측 상단 작업 목록에서 진행 상황을 확인하세요",
       "confirmEta": "예상 소요 시간",
       "queued": "대기 중"
+    ,
+      "firstPassBadge": "1차 생성 미리보기 · 고화질 처리 중"
     },
     "inspector": {
       "videoPromptPlaceholder": "{'@'}이름으로 이미지, #이름으로 음색을 참조하고 대사, 화자, 카메라 움직임을 설명하세요…",

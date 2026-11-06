@@ -3,6 +3,7 @@ import { and, desc, eq } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
 import { success, created, badRequest, now } from '../utils/response.js'
 import { ComfyClient } from '../services/comfyui/client.js'
+import { decorateTaskWithPreview, getPreview, resolveByteRange } from '../services/comfyui/live-preview.js'
 import { generateImage, generateVideo, recoverVideoTask } from '../services/generation.js'
 import { safeTaskError } from '../services/video-download.js'
 import { getActiveConfig, getConfigById, resolveGenerationConfigId } from '../services/ai.js'
@@ -285,11 +286,63 @@ app.post('/', async (c) => {
 })
 
 // GET /tasks/:id — 轮询任务状态
+// GET /tasks/:id/first-pass — 二采还在跑时先把一采视频流给界面
+app.get('/:id/first-pass', async (c) => {
+  const id = Number(c.req.param('id'))
+  const preview = getPreview(id)
+  if (!preview?.filename) return badRequest(c, '一采视频尚未生成')
+  const comfy = getComfyConfig()
+  const query = new URLSearchParams({
+    filename: preview.filename,
+    subfolder: preview.subfolder || '',
+    type: preview.type || 'output',
+  })
+  try {
+    const upstream = await fetch(`${comfy.url.replace(/\/+$/, '')}/view?${query}`, {
+      signal: AbortSignal.timeout(30_000),
+    })
+    if (!upstream.ok || !upstream.body) return badRequest(c, '读取一采视频失败')
+    // 一采文件通常只有几 MB：整段缓冲后自己处理 Range，
+    // 避免浏览器拖动进度条或边下边播时因为上游不支持分段而黑屏
+    const buffer = Buffer.from(await upstream.arrayBuffer())
+    const total = buffer.length
+    const contentType = upstream.headers.get('content-type') || 'video/mp4'
+    const plan = resolveByteRange(total, c.req.header('range'))
+    if (plan.status === 206) {
+      const slice = buffer.subarray(plan.start, plan.end + 1)
+      return new Response(slice, {
+        status: 206,
+        headers: {
+          'Content-Type': contentType,
+          'Accept-Ranges': 'bytes',
+          'Content-Range': `bytes ${plan.start}-${plan.end}/${total}`,
+          'Content-Length': String(slice.length),
+          'Cache-Control': 'no-store',
+        },
+      })
+    }
+    if (plan.status === 416) {
+      return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${total}` } })
+    }
+    return new Response(buffer, {
+      status: 200,
+      headers: {
+        'Content-Type': contentType,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': String(total),
+        'Cache-Control': 'no-store',
+      },
+    })
+  } catch (error) {
+    return badRequest(c, safeTaskError(error))
+  }
+})
+
 app.get('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   const [row] = await db.select().from(schema.sysTask)
     .where(eq(schema.sysTask.id, id))
-  return success(c, row || null)
+  return success(c, row ? decorateTaskWithPreview(row) : null)
 })
 
 // GET /tasks — 按 type / storyboard_id / drama_id 过滤

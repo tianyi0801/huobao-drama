@@ -880,6 +880,8 @@
       "stillRunning": "生成に時間がかかっています。自動待機を停止しました。右上のタスク一覧で進捗を確認できます",
       "confirmEta": "所要時間の目安",
       "queued": "待機中"
+    ,
+      "firstPassBadge": "一次生成プレビュー・高画質化中"
     },
     "inspector": {
       "videoPromptPlaceholder": "{'@'}名前で画像、#名前で音声を参照。セリフ、話者、カメラの動きを記述…",
