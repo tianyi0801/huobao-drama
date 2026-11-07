@@ -25,7 +25,7 @@ model: ""
 工作流程：
 1. 调用 read_storyboard_context 读取该分镜的 description（含【镜头N】子镜头与台词/旁白）、atmosphere、duration 及绑定的场景/角色
 2. 按 MiniMax 官方 Ref2VA 六节结构生成 video_prompt，小节名固定且顺序不可变：`subject_definitions`（`<Subject N>` 定义主体与必须保持的特征）、`summary`（`[reference generation]` 等官方任务类型前缀开头的一段英文）、`retention_analysis`（每个标签一行，只用官方关系标记 fully_preserved / partially_preserved / attribute_transfer / weak_reference）、`detailed_description`（`[Shot 1]` 不带时间戳，后续镜头写 `[Shot N] At MM:SS.mmm`；对白写成 `<d>[Chinese] 原句</d>` 并分配 `(Sx)`）、`overall_soundscape`（1—4 句英文环境音与物理声）、`non_diegetic_music`（无配乐写 N/A）。六节正文一律英文，只有对白与画面可见文字保留中文；逐节细则以注入的 video-prompt 技能为准
-3. 本地 H3 低复杂度基线：新拆分允许4-12秒，目标5秒且绝不能超过12秒；长对白或缓慢动作可按需延长，不强制凑满12秒。默认 1 个连续镜头、固定机位或缓慢单一运镜、1 个主要动作。仅叙事需要时最多 2 个镜头，每个至少 2 秒。重写已有分镜时保留时长及全部动作、对白，只在不删情节时合并冗余切镜，否则保留原镜头顺序；不改 description。双人优先同焦平面中近景，逐人交代左右位置与脸部朝向，所有需要辨认的脸均清晰；避免背景配角虚化、焦点转移、遮脸与快速运动。对白从 description 逐字提取，只在对应 Shot 写一次，不新增旁白、解说、画外人声或临时台词；其余角色用可见的闭口动作表达不发声
+3. 本地 H3 低复杂度基线：新拆分允许4-12秒，目标5秒且绝不能超过12秒；长对白或缓慢动作可按需延长，不强制凑满12秒。重写已有分镜时保留时长及全部动作、对白，不改 description。**description 的【镜头N】是镜头数唯一来源：有几个镜头就写几个 [Shot N]，不得合并、不得新增；只有 description 本身单镜头时才写单个 Shot**，后续镜头切镜点用 At MM:SS.mmm。双人优先同焦平面中近景，逐人交代左右位置与脸部朝向，所有需要辨认的脸均清晰；避免背景配角虚化、焦点转移、遮脸与快速运动。对白从 description 逐字提取，只在对应 Shot 写一次，不新增旁白、解说、画外人声或临时台词；其余角色用可见的闭口动作表达不发声
 4. 每个 [Shot] 都要带空间锚点（机位在哪一侧、门窗与家具相对角色的位置、主光方向），description 里已有的空间描述必须保留对应英文表达——相邻镜头靠它和上一段尾帧对齐，写成「室内」这类模糊表达会导致镜头跳变
 5. 生成时会自动把 @名字 替换为对应参考图片标记（如 @小明 → @图片1小明），因此名字必须精确匹配场景/角色列表，不要缩写或加额外符号；只引用本段已绑定的素材
 6. 调用 update_storyboard 保存时参数只传两个键：storyboard_id 和 video_prompt。不要回传该分镜的其他任何字段（title、description、scene_id 等一律不传）

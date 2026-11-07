@@ -9,6 +9,8 @@ import {
   setToursSeen,
   getWorkspaceSyncNotice,
   setWorkspaceSyncNotice,
+  getThinkingMode,
+  setThinkingMode,
   CONTENT_LANGUAGES,
   type ContentLanguage,
 } from '../services/app-settings.js'
@@ -45,6 +47,16 @@ app.put('/content-language', async (c) => {
 })
 
 // GET /workspace-notice — 升级后待告知的内置模板同步结果（null = 无通知）
+app.get('/thinking-mode', async (c) => {
+  return success(c, { enabled: getThinkingMode() })
+})
+
+app.put('/thinking-mode', async (c) => {
+  const body = await c.req.json().catch(() => ({}))
+  if (typeof body?.enabled !== 'boolean') return badRequest(c, 'enabled 必须为布尔值')
+  return success(c, { enabled: setThinkingMode(body.enabled) })
+})
+
 app.get('/workspace-notice', async (c) => {
   return success(c, { notice: getWorkspaceSyncNotice() })
 })

@@ -200,6 +200,8 @@
       "busy": "Operation in progress",
       "done": "Done",
       "failed": "Agent failed"
+    ,
+      "cancelled": "Stopped; saved results are kept"
     }
   },
   "index": {
@@ -374,6 +376,16 @@
       "langNameJa": "Japanese",
       "langNameKo": "Korean",
       "unifiedSwitchWarning": "Switched to {lang} — UI and AI content language update together. Refreshing…"
+    ,
+      "thinking": "Model thinking mode",
+      "thinkingSub": "Let the text model reason before answering",
+      "thinkingLabel": "Rewrite / extract / storyboard show reasoning live",
+      "thinkingNote": "Requires the model and gateway to return reasoning; turn off if errors appear",
+      "thinkingOn": "Enabled",
+      "thinkingOff": "Disabled",
+      "thinkingHint": "Enabling can slow batch storyboarding and hit output limits sooner; reasoning and text stream in the panel.",
+      "thinkingOnToast": "Thinking mode enabled",
+      "thinkingOffToast": "Thinking mode disabled"
     },
     "ai": {
       "title": "AI models & compute",
@@ -470,6 +482,9 @@
       "promptGenerator": "Prompt Generator",
       "langFallback": "Falls back to Chinese",
       "followContentLang": "Editing language: {lang} (switch in General → AI Content Language)"
+    ,
+      "effectHint": "Takes effect immediately: the next generation uses the new prompt, no restart needed.",
+      "overrideHint": "Note: installing a newer built-in template overwrites this file; the previous version is backed up under workspace/.backup."
     },
     "skills": {
       "agentList": "Agents",
@@ -488,6 +503,8 @@
       "descPlaceholder": "A short description of this skill",
       "create": "Create",
       "created": "Skill created"
+    ,
+      "effectHint": "Takes effect immediately. If you edit SKILL.md directly on disk, restart the backend or save once on this page to refresh the skill cache."
     },
     "cfg": {
       "editTitle": "Edit Service Config",
@@ -629,6 +646,10 @@
       "follow": "Follow latest",
       "reconnect": "Reconnect",
       "disconnected": "Log disconnected; check the workbench for task status"
+    ,
+      "reasoning": "Reasoning"
+    ,
+      "stop": "Stop"
     },
     "liveLog": {
       "badge": "Log",
@@ -1013,6 +1034,8 @@
       "stillRunning": "Still generating. Auto-waiting stopped — check progress in the task list (top right)",
       "confirmEta": "Estimated time",
       "queued": "Queued"
+    ,
+      "firstPassBadge": "First pass preview · refining"
     },
     "inspector": {
       "videoPromptPlaceholder": "Use {'@'}Name for images and #Name for voices; describe the dialogue, speaker and camera movement…",
@@ -1045,6 +1068,11 @@
       "generic": "General",
       "fullMerge": "Full-episode merge",
       "mergeKind": "Merge"
+    ,
+      "cancel": "Cancel",
+      "cancelled": "Task cancelled"
+    ,
+      "cancelledStatus": "Cancelled"
     },
     "export": {
       "notReadyDesc": "Please finish the storyboard and production steps first",
@@ -1084,7 +1112,8 @@
       "allCharsDone": "All character images generated",
       "allScenesDone": "All scene images generated",
       "allPropsDone": "All prop images generated",
-      "stillRunning": "Generation is taking longer than expected. Auto-waiting stopped — refresh later to see the result"
+      "stillRunning": "Generation is taking longer than expected. Auto-waiting stopped — refresh later to see the result",
+      "failed": "Image generation failed: {msg}"
     },
     "extract": {
       "done": "{type} extraction complete",

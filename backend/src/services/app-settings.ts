@@ -123,3 +123,32 @@ export function setWorkspaceSyncNotice(notice: WorkspaceSyncNotice | null): void
     })
     .run()
 }
+
+const THINKING_MODE_KEY = 'model_thinking_mode'
+
+/**
+ * 是否让文本模型使用思考模式（默认关闭）。
+ * 开启后不再注入关思考参数，Agent 改为流式返回，界面可实时看到思考与输出。
+ */
+export function getThinkingMode(): boolean {
+  try {
+    const row = db.select().from(schema.appSettings)
+      .where(eq(schema.appSettings.key, THINKING_MODE_KEY))
+      .get()
+    return row?.value === 'true'
+  } catch {
+    return false
+  }
+}
+
+export function setThinkingMode(enabled: boolean): boolean {
+  const value = enabled ? 'true' : 'false'
+  db.insert(schema.appSettings)
+    .values({ key: THINKING_MODE_KEY, value, updatedAt: now() })
+    .onConflictDoUpdate({
+      target: schema.appSettings.key,
+      set: { value, updatedAt: now() },
+    })
+    .run()
+  return enabled
+}

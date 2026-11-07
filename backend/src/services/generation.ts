@@ -11,6 +11,7 @@ import { prepareReferenceAudio, resolveReferenceAudioUrls } from './reference-au
 import { getActiveConfig, getConfigById } from './ai.js'
 import { waitForScenePredecessor, resolvePreviousShotFrame, buildContinuityPromptSuffix } from './storyboard-continuity.js'
 import { getComfyConfig } from './comfyui/config.js'
+import { watchComfyRun } from './comfyui/live-preview.js'
 import { appendVideoPromptSection } from './video-prompt-structure.js'
 import { now } from '../utils/response.js'
 import { downloadFile, fetchImageAsCompressedDataUrl, generateImageThumb, readImageAsCompressedDataUrl, readImageAsDataUrl, saveBase64Image } from '../utils/storage.js'
@@ -421,7 +422,33 @@ async function failTask(id: number, message: string, code?: string) {
 
 type SysTaskRecord = typeof schema.sysTask.$inferSelect
 
+/** 任务是否已被用户取消（轮询循环据此提前退出，不覆盖取消状态） */
+async function isCancelled(id: number): Promise<boolean> {
+  const [row] = await db.select({ status: schema.sysTask.status, errorCode: schema.sysTask.errorCode })
+    .from(schema.sysTask).where(eq(schema.sysTask.id, id))
+  return !row || row.errorCode === 'cancelled' || row.status === 'cancelled'
+}
+
 async function pollTask(record: SysTaskRecord, config: AIConfig, taskId: string) {
+  // 本地 ComfyUI：一采跑完就能看片，二采继续在后台高清化
+  if (record.type !== 'video' || config.provider !== 'comfyui') {
+    await pollTaskInner(record, config, taskId)
+    return
+  }
+  const stopPreview = watchComfyRun({
+    comfyUrl: getComfyConfig().url,
+    clientId: `huobao-video-${record.id}`,
+    promptId: taskId,
+    taskId: record.id,
+  })
+  try {
+    await pollTaskInner(record, config, taskId)
+  } finally {
+    stopPreview()
+  }
+}
+
+async function pollTaskInner(record: SysTaskRecord, config: AIConfig, taskId: string) {
   const type = record.type as TaskType
   const label = taskLabel(type)
   const profile = POLL_PROFILES[type]
@@ -429,11 +456,14 @@ async function pollTask(record: SysTaskRecord, config: AIConfig, taskId: string)
   const startedAt = Date.now()
 
   for (let i = 0; i < profile.attempts; i++) {
+    // 用户取消后必须立刻停止轮询：否则会把已取消的任务重新写成完成/失败
+    if (await isCancelled(record.id)) return
     if (profile.maxDurationMs && Date.now() - startedAt >= profile.maxDurationMs) {
       await failTask(record.id, 'Timeout: Polling exceeded 10 minutes')
       return
     }
     await new Promise(r => setTimeout(r, profile.intervalMs))
+    if (await isCancelled(record.id)) return
     try {
       const { url, method, headers } = adapter.buildPollRequest(config, taskId)
       logTaskProgress(label, 'poll-request', {

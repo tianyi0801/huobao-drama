@@ -220,6 +220,7 @@
             v-if="agentActivity.type === 'script_rewriter' && agentActivity.startedAt"
             :activity="agentActivity"
             agent-type="script_rewriter"
+            @cancel="cancelAgent"
           />
           <div v-if="!scriptContent && !rn" class="step-empty">
             <div class="empty-visual">
@@ -531,6 +532,7 @@
               v-if="agentActivity.type === 'storyboard_breaker' && agentActivity.startedAt"
               :activity="agentActivity"
               agent-type="storyboard_breaker"
+              @cancel="cancelAgent"
             />
             <div v-if="!sbs.length" class="step-empty video-task-empty-state">
               <div class="empty-visual">
@@ -640,11 +642,25 @@
                     <span class="video-inspector-label">{{ t('episode.sb.descSection') }}</span>
                     <label class="field">
                       <span class="field-label">{{ t('episode.sb.descLabel') }} <span class="dim">({{ t('episode.sb.descHint') }})</span></span>
-                      <textarea :value="selectedSb.description || ''" class="textarea" rows="7" @blur="updateField(selectedSb, 'description', $event.target.value)" :placeholder="t('episode.sb.descPlaceholder')" />
+                      <textarea
+                        :value="fieldValue(selectedSb, 'description')"
+                        class="textarea"
+                        rows="7"
+                        @input="onFieldInput(selectedSb, 'description', $event)"
+                        @blur="onFieldBlur(selectedSb, 'description', $event)"
+                        :placeholder="t('episode.sb.descPlaceholder')"
+                      />
                     </label>
                     <label class="field">
                       <span class="field-label">{{ t('episode.sb.atmosphere') }}</span>
-                      <textarea :value="selectedSb.atmosphere || ''" class="textarea" rows="2" @blur="updateField(selectedSb, 'atmosphere', $event.target.value)" :placeholder="t('episode.sb.atmospherePlaceholder')" />
+                      <textarea
+                        :value="fieldValue(selectedSb, 'atmosphere')"
+                        class="textarea"
+                        rows="2"
+                        @input="onFieldInput(selectedSb, 'atmosphere', $event)"
+                        @blur="onFieldBlur(selectedSb, 'atmosphere', $event)"
+                        :placeholder="t('episode.sb.atmospherePlaceholder')"
+                      />
                     </label>
                   </section>
 
@@ -725,6 +741,7 @@
                     {{ videoTaskStatusLabel(selectedSb) }}
                   </span>
                   <span v-if="selectedSb.duration" class="video-player-sub">{{ selectedSb.duration }}s</span>
+                  <span v-if="hasFirstPassPreview" class="tag video-first-pass-tag">{{ t('episode.vid.firstPassBadge') }}</span>
                 </div>
                 <button
                   v-if="previewVideoUrl && !playerIsRemote"
@@ -834,11 +851,12 @@
                       <span class="video-param-name">{{ t('episode.inspector.duration') }}</span>
                       <span class="video-param-control">
                         <input
-                          :value="selectedSb.duration || 5"
+                          :value="fieldValue(selectedSb, 'duration') || 5"
                           type="number"
                           min="2"
                           max="12"
                           class="input video-duration-input"
+                          @input="onFieldInput(selectedSb, 'duration', $event)"
                           @change="onVideoDurationChange"
                         />
                         <span class="video-param-unit">{{ t('episode.inspector.durationUnit') }}</span>
@@ -857,6 +875,16 @@
                     <span>{{ runningEtaText(selectedSb) }}</span>
                   </div>
                   <button
+                    v-if="selectedSbRunningTaskId()"
+                    class="btn video-inspector-action"
+                    :disabled="cancellingTaskIds.includes(selectedSbRunningTaskId())"
+                    @click="cancelTask(selectedSbRunningTaskId())"
+                  >
+                    <Loader2 v-if="cancellingTaskIds.includes(selectedSbRunningTaskId())" :size="11" class="animate-spin" />
+                    {{ t('episode.tasks.cancel') }}
+                  </button>
+                  <button
+                    v-else
                     class="btn btn-primary video-inspector-action"
                     :disabled="videoTaskState(selectedSb) === 'pending'"
                     @click="genVid(selectedSb)"
@@ -1075,7 +1103,7 @@
             <div
               v-for="row in genTaskRows"
               :key="row.key"
-              :class="['video-task-row', 'gen-task-row', 'is-' + genTaskStateClass(row.status)]"
+              :class="['video-task-row', 'gen-task-row', 'is-' + genTaskStateClass(row)]"
             >
               <div class="video-task-preview">
                 <video
@@ -1095,7 +1123,7 @@
                   @click="openImageViewer(genTaskPreviewSrc(row.previewUrl), row.targetLabel)"
                 />
                 <div v-else class="video-task-empty">
-                  <Loader2 v-if="genTaskStateClass(row.status) === 'pending'" :size="18" class="animate-spin" />
+                  <Loader2 v-if="genTaskStateClass(row) === 'pending'" :size="18" class="animate-spin" />
                   <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
                 </div>
                 <span class="video-task-index">{{ genTaskKindLabel(row.kind) }}</span>
@@ -1113,7 +1141,7 @@
                   <span class="video-task-sep">·</span>
                   <span>#{{ row.id }}</span>
                 </div>
-                <div v-if="row.errorMsg" class="video-task-error" :title="row.errorMsg">
+                <div v-if="row.errorMsg && !isCancelledTask(row)" class="video-task-error" :title="row.errorMsg">
                   {{ mapError(row.errorMsg) }}
                   <div v-if="row.kind === 'video'" class="flex gap-2">
                     <button v-if="row.recoverable" class="btn btn-sm" @click.stop="recoverTask(row.id, row.storyboardId)">{{ t('episode.recovery.restore') }}</button>
@@ -1122,9 +1150,18 @@
                   <div v-if="row.kind === 'video' && videoModerationHint(row.errorMsg)" class="video-task-error-hint">{{ videoModerationHint(row.errorMsg) }}</div>
                 </div>
               </div>
-              <span :class="['video-task-status', 'is-' + genTaskStateClass(row.status)]">
-                <span :class="['dot', genTaskStateClass(row.status) === 'done' && 'ok', genTaskStateClass(row.status) === 'pending' && 'pending']" />
-                {{ genTaskStatusLabel(row.status) }}
+              <button
+                v-if="genTaskStateClass(row) === 'pending'"
+                class="btn btn-sm"
+                :disabled="cancellingTaskIds.includes(row.id)"
+                @click.stop="cancelTask(row.id)"
+              >
+                <Loader2 v-if="cancellingTaskIds.includes(row.id)" :size="11" class="animate-spin" />
+                {{ t('episode.tasks.cancel') }}
+              </button>
+              <span :class="['video-task-status', 'is-' + genTaskStateClass(row)]">
+                <span :class="['dot', genTaskStateClass(row) === 'done' && 'ok', genTaskStateClass(row) === 'pending' && 'pending', genTaskStateClass(row) === 'cancelled' && 'cancelled']" />
+                {{ genTaskStatusLabel(row) }}
               </span>
             </div>
           </div>
@@ -1564,7 +1601,7 @@ const storedPanel = (() => {
 // 首个 refresh 时若已恢复面板位置，跳过按内容自动重置 scriptStep
 let panelRestored = !!storedPanel
 const panel = ref(['production', 'export'].includes(storedPanel?.panel) ? storedPanel.panel : 'script')
-const { running: rn, runningType: rt, activity: agentActivity, run: runAgent } = useAgent()
+const { running: rn, runningType: rt, activity: agentActivity, run: runAgent, cancel: cancelAgent } = useAgent()
 
 const localRaw = ref(''), localScript = ref('')
 const rawContent = computed(() => episode.value?.content || '')
@@ -1733,6 +1770,8 @@ const pendingSceneImageIds = ref([])
 const pendingPropImageIds = ref([])
 const pendingVideoIds = ref([])
 const failedVideoMessages = ref({})
+// 本地 ComfyUI 二采还在跑时，一采视频已经落盘，先拿来预览
+const firstPassUrls = ref({})
 // 点击生成时的本地时间戳：任务记录尚未拉回来时用它兜底推算 ETA
 const videoStartTimes = ref({})
 function markVideoStart(sbId) {
@@ -2104,8 +2143,9 @@ function videoModerationHint(msg) {
 }
 
 function videoTaskState(sb) {
-  if (hasVid(sb)) return 'done'
+  // 重新生成时旧视频还在，但要优先显示「生成中」，否则界面一直停在已完成
   if (isPendingVideo(sb?.id)) return 'pending'
+  if (hasVid(sb)) return 'done'
   if (videoFailMessage(sb?.id)) return 'failed'
   return 'ready'
 }
@@ -2117,7 +2157,9 @@ function latestVideoTask(id) {
 const recoverableVideoCount = computed(() => sbs.value.filter(sb => canRecoverVideo(sb.id)).length)
 function canRecoverVideo(id) {
   const task = latestVideoTask(id)
+  // 已取消的任务上游可能已出队/中断，恢复没有意义，应重新生成
   return !!task && task.status === 'failed' && task.error_code !== 'generation_failed'
+    && task.error_code !== 'cancelled'
     && !!(task.task_id || task.result_url)
 }
 function videoAwaitingDelivery(sb) {
@@ -2158,6 +2200,32 @@ async function recoverTask(taskId, storyboardId) {
     pendingVideoIds.value = pendingVideoIds.value.filter(id => id !== storyboardId)
     toastError(error)
   }
+}
+
+/** 取消生成任务：本地 ComfyUI 会出队/中断，云端服务只在本机停止等待 */
+const cancellingTaskIds = ref([])
+async function cancelTask(taskId) {
+  if (!taskId || cancellingTaskIds.value.includes(taskId)) return
+  cancellingTaskIds.value.push(taskId)
+  try {
+    await taskAPI.cancel(taskId)
+    // 取消后立刻撤下等待状态，避免继续显示生成中
+    pendingVideoIds.value = [...pendingVideoIds.value]
+    await refreshWorkbenchData()
+    toast.success(t('episode.tasks.cancelled'))
+  } catch (e) {
+    toastError(e)
+  } finally {
+    cancellingTaskIds.value = cancellingTaskIds.value.filter(id => id !== taskId)
+  }
+}
+
+/** 选中分镜当前可取消的任务（仅处理中的任务有 id） */
+function selectedSbRunningTaskId() {
+  const sb = selectedSb.value
+  if (!sb) return null
+  const task = latestVideoTask(sb.id)
+  return task?.status === 'processing' ? task.id : null
 }
 
 function videoTaskStatusLabel(sb) {
@@ -2508,10 +2576,11 @@ async function loadGenTasks() {
     const pending = new Set()
     const failed = {}
     for (const [sbId, t] of latestBySb) {
-      // 分镜已有视频(失败后重试成功)时不再报历史错误
-      if (hasVid(sbs.value.find(s => s.id === sbId))) continue
+      const hasVideo = hasVid(sbs.value.find(s => s.id === sbId))
+      // 重新生成时旧视频还在：处理中的任务仍要显示生成中
       if (t.status === 'processing') pending.add(sbId)
-      else if (t.status === 'failed') failed[sbId] = t.error_msg || 'Task failed'
+      // 分镜已有视频(失败后重试成功)时不再报历史错误；用户取消不算失败，不挂红色错误
+      else if (t.status === 'failed' && t.error_code !== 'cancelled' && !hasVideo) failed[sbId] = t.error_msg || 'Task failed'
     }
     // 刚点击提交、任务记录尚未加载出来的本地状态保留,避免状态闪退
     for (const id of pendingVideoIds.value) if (!latestBySb.has(id)) pending.add(id)
@@ -2520,6 +2589,40 @@ async function loadGenTasks() {
     }
     pendingVideoIds.value = [...pending]
     failedVideoMessages.value = failed
+
+    // 任务详情里带的一采预览：处理中的分镜即使重开页面也能先看片
+    const previewMap = {}
+    for (const task of genTasks.value) {
+      if (task.type === 'video' && task.status === 'processing' && task.first_pass_ready && task.first_pass_url) {
+        previewMap[task.storyboard_id] = task.first_pass_url
+      }
+    }
+    firstPassUrls.value = previewMap
+
+    // 角色/场景/道具的「生成中」同样以最新任务记录为准：
+    // 任务失败或已完成就必须撤下 pending，否则失败后按钮会一直转圈
+    for (const kind of IMAGE_ASSET_KINDS) {
+      const field = IMAGE_TASK_FIELD[kind]
+      const ids = new Set()
+      for (const task of genTasks.value) {
+        if (task.type === 'image' && task[field] != null) ids.add(task[field])
+      }
+      const stillPending = []
+      for (const id of ids) {
+        if (assetHasImage(kind, id)) continue
+        const status = latestImageTask(kind, id)?.status
+        // 只有 processing 才算生成中；failed/completed 都不该继续转圈
+        if (status === 'processing') stillPending.push(id)
+      }
+      // 刚提交、任务记录还没出现的本地态保留，避免状态闪退
+      for (const id of (kind === 'character' ? pendingCharImageIds : kind === 'scene' ? pendingSceneImageIds : pendingPropImageIds).value) {
+        if (!ids.has(id) && !assetHasImage(kind, id)) stillPending.push(id)
+      }
+      const next = [...new Set(stillPending)]
+      if (kind === 'character') pendingCharImageIds.value = next
+      else if (kind === 'scene') pendingSceneImageIds.value = next
+      else pendingPropImageIds.value = next
+    }
   } catch { /* 静默失败,不打断其他刷新 */ }
 }
 
@@ -2536,7 +2639,8 @@ const genTaskDoneCount = computed(() =>
   genMerges.value.filter(m => m.status === 'completed').length
 )
 const genTaskFailedCount = computed(() =>
-  genTasks.value.filter(t => t.status === 'failed').length +
+  // 用户取消不算失败，避免统计与红色数字误导
+  genTasks.value.filter(t => t.status === 'failed' && t.error_code !== 'cancelled').length +
   genMerges.value.filter(m => m.status === 'failed').length
 )
 
@@ -2570,9 +2674,10 @@ const genTaskRows = computed(() => {
     provider: t.provider || '',
     model: t.model || '',
     status: t.status || 'processing',
+    errorCode: t.error_code || '',
     errorMsg: t.error_msg || '',
     storyboardId: t.storyboard_id,
-    recoverable: t.type === 'video' && t.error_code !== 'generation_failed' && !!(t.task_id || t.result_url),
+    recoverable: t.type === 'video' && t.error_code !== 'generation_failed' && t.error_code !== 'cancelled' && !!(t.task_id || t.result_url),
     previewUrl: t.local_path || t.result_url || '',
     prompt: t.prompt || '',
     createdAt: t.created_at || '',
@@ -2599,16 +2704,23 @@ function genTaskKindLabel(kind) {
   return kind === 'image' ? t('common.serviceType.image') : kind === 'video' ? t('common.serviceType.video') : t('episode.tasks.mergeKind')
 }
 
-function genTaskStatusLabel(status) {
-  if (status === 'completed') return t('episode.status.done')
-  if (status === 'failed') return t('episode.status.failed')
+// 状态判定统一接受任务行：用户取消的任务要显示「已取消」，不能当成失败报错
+function genTaskStatusLabel(task) {
+  if (isCancelledTask(task)) return t('episode.tasks.cancelledStatus')
+  if (task?.status === 'completed') return t('episode.status.done')
+  if (task?.status === 'failed') return t('episode.status.failed')
   return t('episode.status.generating')
 }
 
-// 映射到现有 video-task-status 的样式类:is-done / is-pending / is-failed
-function genTaskStateClass(status) {
-  if (status === 'completed') return 'done'
-  if (status === 'failed') return 'failed'
+function isCancelledTask(task) {
+  return task?.error_code === 'cancelled' || task?.errorCode === 'cancelled' || task?.status === 'cancelled'
+}
+
+// 映射到现有 video-task-status 的样式类:is-done / is-pending / is-failed / is-cancelled
+function genTaskStateClass(task) {
+  if (isCancelledTask(task)) return 'cancelled'
+  if (task?.status === 'completed') return 'done'
+  if (task?.status === 'failed') return 'failed'
   return 'pending'
 }
 
@@ -2823,13 +2935,57 @@ const selectedVideoTaskNumber = computed(() => {
   return index >= 0 ? index + 1 : 0
 })
 
+// 分镜字段失焦即保存：记录在途请求，生成前先等写完，避免后端读到旧描述
+const pendingStoryboardSaves = new Map()
+
+/**
+ * 正在编辑的字段草稿。
+ * 后台任务轮询会不断 refresh()，若输入框直接绑库里的值，
+ * 每轮刷新都会把没编完的内容顶掉；草稿优先，保存成功才释放。
+ */
+const fieldDrafts = reactive({})
+const draftKey = (sb, field) => `${sb?.id}:${field}`
+function fieldValue(sb, field) {
+  const key = draftKey(sb, field)
+  if (key in fieldDrafts) return fieldDrafts[key]
+  return sb?.[field] ?? sb?.[toCamel(field)] ?? ''
+}
+function onFieldInput(sb, field, event) {
+  fieldDrafts[draftKey(sb, field)] = event.target.value
+}
+function onFieldBlur(sb, field, event) {
+  const value = event.target.value
+  fieldDrafts[draftKey(sb, field)] = value
+  void updateField(sb, field, value)
+}
+
+/** 生成/拆分前调用：确保刚改的描述、时长已经落库 */
+async function awaitPendingStoryboardSaves() {
+  if (!pendingStoryboardSaves.size) return
+  await Promise.all([...pendingStoryboardSaves.values()])
+}
+
 function updateField(sb, field, value) {
-  const current = sb[field] ?? sb[toCamel(field)]
-  if (current === value) return
-  sb[field] = value
   const camelField = toCamel(field)
+  const previous = sb[field] ?? sb[camelField]
+  const key = `${sb.id}:${field}`
+  if (previous === value) {
+    // 与库里一致：草稿已完成使命，释放后按库里值渲染
+    delete fieldDrafts[key]
+    return
+  }
+  sb[field] = value
   if (camelField !== field) sb[camelField] = value
-  storyboardAPI.update(sb.id, { [field]: value }).catch(e => toastError(e))
+  const task = storyboardAPI.update(sb.id, { [field]: value })
+    .then(() => { delete fieldDrafts[key] })
+    .catch(e => {
+      // 保存失败回滚库里值，但保留草稿：输入框内容不能被清掉，失焦重试即可再次提交
+      sb[field] = previous
+      if (camelField !== field) sb[camelField] = previous
+      toastError(e)
+    })
+    .finally(() => { pendingStoryboardSaves.delete(key) })
+  pendingStoryboardSaves.set(key, task)
 }
 
 function toCamel(field) {
@@ -3052,6 +3208,7 @@ function selectMissingVideos() {
 async function batchVideoPrompts() {
   if (videoPromptBatch.value.running || !epId.value) return
   if (!sbs.value.length) { toast.warning(t('episode.sb.breakFirst')); return }
+  await awaitPendingStoryboardSaves()
   // 选择模式下有勾选 → 仅补齐所选；否则全量补齐缺失
   const ids = (videoSelectMode.value && selectedVideoSbIds.value.length) ? [...selectedVideoSbIds.value] : undefined
   try {
@@ -3130,6 +3287,8 @@ async function onBreakdownDone() {
 // 按需为单个分镜生成视频提示词：由 prompt_generator 读取分镜字段生成并保存到 video_prompt
 async function genVideoPrompt(sb) {
   if (!sb || videoPromptGeneratingIds.value.includes(sb.id)) return
+  // 刚改过描述还没失焦时，先等这次保存落库，否则 Agent 读到旧描述
+  await awaitPendingStoryboardSaves()
   const idx = sbs.value.indexOf(sb) + 1
   const cfg = selectedVideoConfig.value
   const label = cfg ? `${cfg.name} (${cfg.provider})` : '默认'
@@ -3143,7 +3302,7 @@ async function genVideoPrompt(sb) {
 
 该分镜信息:时长 ${sb.duration || 5}s;场景:${getSceneName(sb) || '未绑定'};角色:${charNames};道具:${propNames}。
 
-先调用 read_storyboard_context 读取 description、atmosphere、duration 和实际绑定素材，按系统的本地 ComfyUI 视频提示词契约生成六节内容。默认一个连续镜头；保留全部动作、原句对白及原有旁白，时间轴总长等于该分镜 duration。主角与配角均写清身份、位置与清晰脸部；对白只写一次，声音节列说话白名单，无对白时明确无任何人声，不新增配音或配乐。没有图片的主体用普通名称描述，不虚构 @ 素材引用。调用 update_storyboard 保存到分镜 ID:${sb.id}，参数仅 storyboard_id 与 video_prompt，不改其他字段，不重新拆分整集。`,
+先调用 read_storyboard_context 读取 target_storyboard 的 description、atmosphere、duration、绑定素材及 available_image_references，按 MiniMax 官方 Ref2VA 六节结构（subject_definitions / summary / retention_analysis / detailed_description / overall_soundscape / non_diegetic_music）生成，六节正文用英文、对白放在 <d>[Chinese] 原句</d> 中。summary 用官方任务类型前缀，retention_analysis 用官方关系标记，detailed_description 的 [Shot 1] 不带时间戳，后续镜头用 At MM:SS.mmm。description 的【镜头N】是镜头数唯一来源：有几个镜头就写几个 [Shot N]，不得合并、不得新增；只有 description 本身单镜头时才写单个 Shot。直接复制 image_reference（如 @角色名/@场景名/@道具名）引用实际素材，不手写图片编号。主角与配角均有独立身份和清晰脸部，明确每人位置与动作。原句对白只在对应 Shot 写一次，不新增配音或配乐，无配乐写 N/A。调用 update_storyboard 保存到分镜 ID:${sb.id}，参数仅 storyboard_id 与 video_prompt，不改其他字段，不重新拆分整集。`,
       drama_id: dramaId,
       episode_id: epId.value,
       model: chatModelOverride() || undefined,
@@ -3206,7 +3365,14 @@ async function genCharImg(id) {
       const char = chars.value.find(c => c.id === id)
       const done = !!(char?.image_url || char?.imageUrl)
       if (done) pendingCharImageIds.value = pendingCharImageIds.value.filter(item => item !== id)
-      return done
+      if (done) return true
+      // 任务已失败：立即结束等待并提示原因，不再空转到超时
+      if (imageTaskFailed('character', id)) {
+        pendingCharImageIds.value = pendingCharImageIds.value.filter(item => item !== id)
+        toastError(imageTaskError('character', id), { fallback: 'episode.image.failed' })
+        return true
+      }
+      return false
     }, 180, 2500, () => {
       pendingCharImageIds.value = pendingCharImageIds.value.filter(item => item !== id)
       toast.warning(t('episode.image.stillRunning'))
@@ -3224,15 +3390,7 @@ async function batchCharImages() {
   characterAPI.batchImages(ids, epId.value, bareModelName(imageModel.value) || undefined, ownerConfigId(imageModelOptions.value, imageModel.value), chatModelOverride(), chatConfigId()).then(async () => {
     toast.success(t('episode.image.batchGeneratingChar'))
     await refresh()
-    watchAsyncResult(() => ids.every(id => {
-      const char = chars.value.find(c => c.id === id)
-      const done = !!(char?.image_url || char?.imageUrl)
-      if (done) pendingCharImageIds.value = pendingCharImageIds.value.filter(item => item !== id)
-      return done
-    }), batchAttempts(ids.length), 2500, () => {
-      pendingCharImageIds.value = pendingCharImageIds.value.filter(item => !ids.includes(item))
-      toast.warning(t('episode.image.stillRunning'))
-    })
+    watchImageBatch('character', ids)
   }).catch(e => {
     pendingCharImageIds.value = pendingCharImageIds.value.filter(item => !ids.includes(item))
     toastError(e)
@@ -3256,7 +3414,13 @@ async function genSceneImg(id) {
       const scene = scenes.value.find(s => s.id === id)
       const done = !!(scene?.image_url || scene?.imageUrl)
       if (done) pendingSceneImageIds.value = pendingSceneImageIds.value.filter(item => item !== id)
-      return done
+      if (done) return true
+      if (imageTaskFailed('scene', id)) {
+        pendingSceneImageIds.value = pendingSceneImageIds.value.filter(item => item !== id)
+        toastError(imageTaskError('scene', id), { fallback: 'episode.image.failed' })
+        return true
+      }
+      return false
     }, 180, 2500, () => {
       pendingSceneImageIds.value = pendingSceneImageIds.value.filter(item => item !== id)
       toast.warning(t('episode.image.stillRunning'))
@@ -3268,6 +3432,62 @@ async function genSceneImg(id) {
 }
 function isPendingPropImage(id) {
   return pendingPropImageIds.value.includes(id)
+}
+
+/** 图片任务按资产类型归类：用于判断「生成中」是否已进入终态 */
+const IMAGE_ASSET_KINDS = ['character', 'scene', 'prop']
+const IMAGE_TASK_FIELD = { character: 'character_id', scene: 'scene_id', prop: 'prop_id' }
+
+/** 该资产最新一条图片任务（先比 created_at 再比 id，旧任务不覆盖新状态） */
+function latestImageTask(kind, id) {
+  const field = IMAGE_TASK_FIELD[kind]
+  let latest = null
+  for (const task of genTasks.value) {
+    if (task.type !== 'image' || task[field] !== id) continue
+    if (!latest
+      || String(task.created_at || '') > String(latest.created_at || '')
+      || (String(task.created_at || '') === String(latest.created_at || '') && task.id > latest.id)) latest = task
+  }
+  return latest
+}
+
+function assetHasImage(kind, id) {
+  const list = kind === 'character' ? chars.value : kind === 'scene' ? scenes.value : propItems.value
+  const item = list.find(entry => entry.id === id)
+  return !!(item?.image_url || item?.imageUrl)
+}
+
+/** 最新任务已失败 → 等待应立即结束，否则按钮和时间线会一直停在「生成中」 */
+function imageTaskFailed(kind, id) {
+  return latestImageTask(kind, id)?.status === 'failed'
+}
+
+function imageTaskError(kind, id) {
+  return latestImageTask(kind, id)?.error_msg || latestImageTask(kind, id)?.errorMsg || ''
+}
+
+/** 批量生图等待：每张图完成或任务失败都算结束，失败只提示一次，避免一直显示「生成中」 */
+function watchImageBatch(kind, ids) {
+  const pendingRef = kind === 'character' ? pendingCharImageIds : kind === 'scene' ? pendingSceneImageIds : pendingPropImageIds
+  const clear = id => { pendingRef.value = pendingRef.value.filter(item => item !== id) }
+  let notified = false
+  watchAsyncResult(() => {
+    let allSettled = true
+    let failure = ''
+    for (const id of ids) {
+      if (assetHasImage(kind, id)) { clear(id); continue }
+      if (imageTaskFailed(kind, id)) { clear(id); failure ||= imageTaskError(kind, id); continue }
+      allSettled = false
+    }
+    if (failure && !notified) {
+      notified = true
+      toastError(failure, { fallback: 'episode.image.failed' })
+    }
+    return allSettled
+  }, batchAttempts(ids.length), 2500, () => {
+    for (const id of ids) clear(id)
+    toast.warning(t('episode.image.stillRunning'))
+  })
 }
 async function genPropImg(id) {
   if (!(await ensureImageEngine())) return
@@ -3287,7 +3507,13 @@ async function genPropImg(id) {
       const prop = propItems.value.find(p => p.id === id)
       const done = !!(prop?.image_url || prop?.imageUrl)
       if (done) pendingPropImageIds.value = pendingPropImageIds.value.filter(item => item !== id)
-      return done
+      if (done) return true
+      if (imageTaskFailed('prop', id)) {
+        pendingPropImageIds.value = pendingPropImageIds.value.filter(item => item !== id)
+        toastError(imageTaskError('prop', id), { fallback: 'episode.image.failed' })
+        return true
+      }
+      return false
     }, 180, 2500, () => {
       pendingPropImageIds.value = pendingPropImageIds.value.filter(item => item !== id)
       toast.warning(t('episode.image.stillRunning'))
@@ -3304,15 +3530,7 @@ async function batchSceneImages() {
   pendingSceneImageIds.value = [...new Set([...pendingSceneImageIds.value, ...ids])]
   ids.forEach(id => { sceneAPI.generateImage(id, epId.value, bareModelName(imageModel.value) || undefined, ownerConfigId(imageModelOptions.value, imageModel.value), chatModelOverride(), chatConfigId()).then(() => refresh()).catch(e => toastError(e)) })
   toast.success(t('episode.image.batchGeneratingScene'))
-  watchAsyncResult(() => ids.every(id => {
-    const scene = scenes.value.find(s => s.id === id)
-    const done = !!(scene?.image_url || scene?.imageUrl)
-    if (done) pendingSceneImageIds.value = pendingSceneImageIds.value.filter(item => item !== id)
-    return done
-  }), batchAttempts(ids.length), 2500, () => {
-    pendingSceneImageIds.value = pendingSceneImageIds.value.filter(item => !ids.includes(item))
-    toast.warning(t('episode.image.stillRunning'))
-  })
+  watchImageBatch('scene', ids)
 }
 async function batchPropImages() {
   if (!(await ensureImageEngine())) return
@@ -3321,15 +3539,7 @@ async function batchPropImages() {
   pendingPropImageIds.value = [...new Set([...pendingPropImageIds.value, ...ids])]
   ids.forEach(id => { propAPI.generateImage(id, epId.value, bareModelName(imageModel.value) || undefined, ownerConfigId(imageModelOptions.value, imageModel.value), chatModelOverride(), chatConfigId()).then(() => refresh()).catch(e => toastError(e)) })
   toast.success(t('episode.image.batchGeneratingProp'))
-  watchAsyncResult(() => ids.every(id => {
-    const prop = propItems.value.find(p => p.id === id)
-    const done = !!(prop?.image_url || prop?.imageUrl)
-    if (done) pendingPropImageIds.value = pendingPropImageIds.value.filter(item => item !== id)
-    return done
-  }), batchAttempts(ids.length), 2500, () => {
-    pendingPropImageIds.value = pendingPropImageIds.value.filter(item => !ids.includes(item))
-    toast.warning(t('episode.image.stillRunning'))
-  })
+  watchImageBatch('prop', ids)
 }
 function getVideoUrl(s) { return s?.video_url || s?.videoUrl || s?.composed_video_url || s?.composedVideoUrl || null }
 function hasVid(s) { return !!getVideoUrl(s) }
@@ -3346,9 +3556,18 @@ function videoSourceUrl(value) {
 // 不把临时签名 URL 写入分镜主视频，避免影响本地拼接导出。
 const playerVideoUrl = computed(() => {
   if (previewVideoUrl.value) return videoSourceUrl(previewVideoUrl.value)
-  const task = latestVideoTask(selectedSb.value?.id)
+  const sbId = selectedSb.value?.id
+  const task = latestVideoTask(sbId)
+  // 二采还在跑：一采画面已经可用，优先展示当前这次生成的效果
+  const firstPass = sbId ? firstPassUrls.value[sbId] : ''
+  if (firstPass && task?.status === 'processing') return firstPass
   const pendingResult = task && task.status !== 'completed' ? taskVideoPath(task) : ''
   return videoSourceUrl(pendingResult || getVideoUrl(selectedSb.value))
+})
+const hasFirstPassPreview = computed(() => {
+  const sbId = selectedSb.value?.id
+  const task = latestVideoTask(sbId)
+  return !!(sbId && firstPassUrls.value[sbId] && task?.status === 'processing')
 })
 const playerIsRemote = computed(() => /^https?:\/\//i.test(playerVideoUrl.value))
 watch(playerVideoUrl, () => { playerLoadFailed.value = false })
@@ -3595,6 +3814,8 @@ function onVideoDurationChange(e) {
   if (!Number.isFinite(v)) v = Number(sb.duration || 5)
   v = Math.min(max, Math.max(min, v))
   e.target.value = v
+  // 归一后的值同步进草稿，避免输入框显示被截断前的原始数字
+  fieldDrafts[draftKey(sb, 'duration')] = v
   updateField(sb, 'duration', v)
 }
 
@@ -3638,6 +3859,7 @@ function uploadAssetImage(kind, id) {
 
 async function genVid(sb, opts = {}) {
   if (!opts.forceNew && canRecoverVideo(sb.id)) return recoverVideo(sb)
+  await awaitPendingStoryboardSaves()
   const latest = latestVideoTask(sb.id)
   const forceNew = opts.forceNew || latest?.status === 'failed'
   if (forceNew && !window.confirm(t('episode.recovery.confirmNew'))) return
@@ -3704,17 +3926,24 @@ async function pollVideoGeneration(generationId, storyboardId) {
     await sleep(4000)
     try {
       const res = await taskAPI.get(generationId)
+      if (res?.first_pass_ready && res?.first_pass_url) {
+        firstPassUrls.value = { ...firstPassUrls.value, [storyboardId]: res.first_pass_url }
+      }
       await refresh()
       if (res?.status === 'completed') {
         pendingVideoIds.value = pendingVideoIds.value.filter(item => item !== storyboardId)
         clearVideoStart(storyboardId)
         delete failedVideoMessages.value[storyboardId]
+        const { [storyboardId]: _done, ...restFirstPass } = firstPassUrls.value
+        firstPassUrls.value = restFirstPass
         toast.success(t('episode.vid.genDone'))
         return
       }
       if (res?.status === 'failed') {
         pendingVideoIds.value = pendingVideoIds.value.filter(item => item !== storyboardId)
         clearVideoStart(storyboardId)
+        const { [storyboardId]: _failed, ...restFailed } = firstPassUrls.value
+        firstPassUrls.value = restFailed
         const errMsg = res?.error_msg || res?.errorMsg || t('episode.vid.genFailed')
         failedVideoMessages.value = {
           ...failedVideoMessages.value,
@@ -5020,11 +5249,14 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   align-items: center;
   padding: 2px 7px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.85);
+  /* 徽标压在缩略图上，背景与文字必须跟随主题：
+     原来固定 rgba(255,255,255,.85) 在暗色下变白底浅灰字，「待生成」几乎看不见 */
+  background: var(--media-badge-bg, rgba(255,255,255,0.85));
+  border: 1px solid var(--border-strong);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-  color: var(--text-2);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+  color: var(--text-1);
   font-size: 9.5px;
   font-weight: 700;
 }
@@ -5333,6 +5565,7 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   gap: 8px;
 }
 .video-player-title { color: var(--text-0); font-size: 13px; font-weight: 700; white-space: nowrap; }
+.video-first-pass-tag { margin-left: 6px; color: var(--accent-text); background: var(--accent-bg); border-color: var(--accent-glow); }
 .video-player-sub { color: var(--text-3); font-size: 11px; white-space: nowrap; }
 .video-player-stage {
   flex: none;
@@ -5440,6 +5673,13 @@ onMounted(() => setTimeout(() => autoTour('episode', EPISODE_TOUR, t), 900))
   border-color: var(--warning-bg);
   background: var(--warning-bg);
 }
+/* 用户主动取消：中性灰，不按失败报错 */
+.video-task-status.is-cancelled {
+  color: var(--text-2);
+  border-color: var(--border);
+  background: var(--bg-2);
+}
+.dot.cancelled { background: var(--text-3); }
 .video-task-table {
   flex: 1;
   min-height: 0;

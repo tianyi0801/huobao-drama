@@ -200,6 +200,8 @@
       "busy": "操作执行中",
       "done": "完成",
       "failed": "AI 执行失败"
+    ,
+      "cancelled": "已停止，已保存内容保留"
     }
   },
   "index": {
@@ -374,6 +376,16 @@
       "langNameJa": "日本語",
       "langNameKo": "한국어",
       "unifiedSwitchWarning": "已切换为 {lang}，界面与 AI 内容语言将同步更新，即将刷新…"
+    ,
+      "thinking": "模型思考模式",
+      "thinkingSub": "让文本模型先推理再输出，质量更稳但更慢",
+      "thinkingLabel": "开启后改写／提取／分镜会实时显示思考过程",
+      "thinkingNote": "依赖所用模型与网关支持 reasoning 回传；遇到报错可随时关掉",
+      "thinkingOn": "已开启",
+      "thinkingOff": "已关闭",
+      "thinkingHint": "开启后批量分镜可能变慢，且单轮输出更易触及长度上限；界面会实时显示思考与输出内容。",
+      "thinkingOnToast": "已开启思考模式",
+      "thinkingOffToast": "已关闭思考模式"
     },
     "ai": {
       "title": "AI 模型与算力",
@@ -470,6 +482,9 @@
       "promptGenerator": "提示词",
       "langFallback": "跟随中文",
       "followContentLang": "编辑语言跟随：{lang}（在「通用 → AI 内容语言」切换）"
+    ,
+      "effectHint": "保存后立即生效：下一次生成就会使用新提示词，不需要重启应用。",
+      "overrideHint": "注意：安装新版内置模板时会覆盖该文件；被覆盖前的版本备份在 workspace/.backup 目录。"
     },
     "skills": {
       "agentList": "Agent 列表",
@@ -488,6 +503,8 @@
       "descPlaceholder": "简短描述此 Skill 的用途",
       "create": "创建",
       "created": "Skill 创建成功"
+    ,
+      "effectHint": "保存后立即生效。若直接在磁盘修改 SKILL.md，需要重启后端或再在本页保存一次，技能缓存才会刷新。"
     },
     "cfg": {
       "editTitle": "编辑服务配置",
@@ -629,6 +646,10 @@
       "follow": "跟随最新",
       "reconnect": "重新连接",
       "disconnected": "日志连接已断开，任务状态以工作台为准"
+    ,
+      "reasoning": "思考过程"
+    ,
+      "stop": "停止"
     },
     "liveLog": {
       "badge": "日志",
@@ -1013,6 +1034,8 @@
       "stillRunning": "生成耗时较长，已停止自动等待；可在右上角任务列表查看进度",
       "confirmEta": "预计耗时",
       "queued": "排队中"
+    ,
+      "firstPassBadge": "一采预览 · 二采高清化中"
     },
     "inspector": {
       "videoPromptPlaceholder": "用 {'@'}角色名引用图片，用 #角色名引用声音；描述台词、说话角色与镜头运动…",
@@ -1045,6 +1068,11 @@
       "generic": "通用",
       "fullMerge": "整集拼接",
       "mergeKind": "合并"
+    ,
+      "cancel": "取消",
+      "cancelled": "任务已取消"
+    ,
+      "cancelledStatus": "已取消"
     },
     "export": {
       "notReadyDesc": "请先完成分镜和制作流程",
@@ -1084,7 +1112,8 @@
       "allCharsDone": "所有角色图片已生成",
       "allScenesDone": "所有场景图片已生成",
       "allPropsDone": "所有道具图片已生成",
-      "stillRunning": "生成耗时较长，已停止自动等待；稍后刷新页面查看结果"
+      "stillRunning": "生成耗时较长，已停止自动等待；稍后刷新页面查看结果",
+      "failed": "图片生成失败：{msg}"
     },
     "extract": {
       "done": "{type}提取完成",

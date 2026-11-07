@@ -42,7 +42,11 @@ test('useAgent 以 SSE 逐块解析并暴露实时活动状态', () => {
   assert.match(useAgent, /resp\.status === 404 \|\| resp\.status === 405/)
   assert.match(useAgent, /agent\/\$\{type\}\/chat/)
   // 返回给工作台
-  assert.match(useAgent, /return \{ running, runningType, activity, run \}/)
+  assert.match(useAgent, /return \{ running, runningType, activity, run, cancel \}/)
+  // 停止按钮：中断请求并清空等待状态，已保存批次保留
+  assert.match(useAgent, /function cancel\(\)/)
+  assert.match(useAgent, /controller\.abort\(\)/)
+  assert.match(panel, /@click="emit\('cancel'\)"/)
 })
 
 test('AI 活动面板展示阶段文案、工具流水与实时输出', () => {

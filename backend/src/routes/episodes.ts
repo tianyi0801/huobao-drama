@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { decorateTaskWithPreview } from '../services/comfyui/live-preview.js'
 import { streamSSE } from 'hono/streaming'
 import { and, eq, isNull } from 'drizzle-orm'
 import { db, getInsertId, schema } from '../db/index.js'
@@ -290,7 +291,8 @@ app.get('/:id/generation-tasks', async (c) => {
     .slice(0, 20)
 
   return success(c, {
-    tasks: toSnakeCaseArray(tasks),
+    // 合并一采预览状态：任务还在跑时前端也能先看到一采画面
+    tasks: toSnakeCaseArray(tasks.map(task => decorateTaskWithPreview(task))),
     merges: toSnakeCaseArray(merges),
   })
 })

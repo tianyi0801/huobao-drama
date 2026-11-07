@@ -5,6 +5,7 @@
  * episodeId/dramaId 由工具从 RequestContext 读取
  */
 import { Agent } from '@mastra/core/agent'
+import { getThinkingMode } from '../services/app-settings.js'
 import type { RequestContext } from '@mastra/core/request-context'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { createOpenAI } from '@ai-sdk/openai'
@@ -206,7 +207,8 @@ function openaiThinkingOffPatch(): Record<string, any> {
 }
 
 export function createThinkingOffFetch(providerName: string, baseURL: string): typeof fetch | undefined {
-  if (!thinkingOffEnabled || isOfficialTextHost(baseURL)) return undefined
+  // 用户开启「模型思考模式」时不注入关思考参数，让模型正常推理
+  if (!thinkingOffEnabled || isOfficialTextHost(baseURL) || getThinkingMode()) return undefined
   // DeepSeek 与 MiMo 官方都支持 thinking.type=disabled，只注入各自文档支持的字段。
   // 多轮工具调用不完整回传 reasoning_content，因此该链路使用非思考模式。
   let supportsNativeThinking = false
@@ -324,7 +326,7 @@ async function getModel(fileModel: string | undefined, modelOverride?: string, t
       provider: textConfig.provider,
       baseUrl: resolvedBaseURL,
       model: modelName,
-      thinkingOff: thinkingOffEnabled && !isOfficialTextHost(resolvedBaseURL),
+      thinkingOff: thinkingOffEnabled && !isOfficialTextHost(resolvedBaseURL) && !getThinkingMode(),
       maxOutputTokens: isOfficialOpenAIHost(resolvedBaseURL) ? 'provider-default' : defaultMaxTokens,
       ...(temperature !== null ? { temperature } : {}),
     })

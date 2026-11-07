@@ -16,7 +16,8 @@
         v-model="form.url"
         class="input le-url"
         placeholder="http://127.0.0.1:8188"
-        @blur="saveBase"
+        @focus="urlFocused = true"
+        @blur="onUrlBlur"
       />
       <label class="le-switch">
         <input type="checkbox" class="sr-only" :checked="form.enabled" @change="onToggleEnabled" />
@@ -226,7 +227,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { AlertTriangle, Cpu, Download, RefreshCw, Trash2, Upload } from 'lucide-vue-next'
@@ -377,9 +378,12 @@ function presetsOf(kind: string) {
 const advancedOpen = ref(true)
 let advancedInitialized = false
 
+// 输入地址时不回填后端值，否则每次状态刷新都会把正在输入的内容顶掉
+const urlFocused = ref(false)
+
 function applyReport(data: any) {
   report.value = data
-  form.url = data?.comfyui?.url || form.url
+  if (!urlFocused.value) form.url = data?.comfyui?.url || form.url
   form.enabled = data?.enabled === true
   optionValues.value = { ...(data?.optionValues || {}) }
   if (!advancedInitialized) {
@@ -408,6 +412,13 @@ async function refresh(deep: boolean) {
     loading.value = false
     deepLoading.value = false
   }
+}
+
+async function onUrlBlur() {
+  // 先解除聚焦再保存，保存后的回填只影响已结束编辑的输入框
+  await nextTick()
+  urlFocused.value = false
+  await saveBase()
 }
 
 async function saveBase() {

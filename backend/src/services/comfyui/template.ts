@@ -243,7 +243,10 @@ export function buildSubmission(
   }
 
   // 3) 剪枝（同时天然清理掉未选中的互斥分支）
-  return pruneGraph(graph, template.outputNodes)
+  // 预览节点必须一起保留，否则 ComfyUI 不会执行它，一采视频永远不落盘
+  const outputs = [...new Set([...template.outputNodes, ...(template.previewOutputNodes || [])])]
+    .filter(id => graph[id])
+  return pruneGraph(graph, outputs)
 }
 
 /**

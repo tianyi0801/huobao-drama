@@ -142,12 +142,23 @@ app.put('/:id', async (c) => {
     if (snakeKey in body) updates[camelKey] = body[snakeKey]
   }
 
-  await validateStoryboardBindings(
-    storyboard.episodeId,
-    'scene_id' in body ? body.scene_id : storyboard.sceneId,
-    'character_ids' in body ? body.character_ids : await getStoryboardCharacterIds(id),
-    'prop_ids' in body ? body.prop_ids : await getStoryboardPropIds(id),
-  )
+  // 只校验本次实际提交的绑定字段：
+  // 历史数据里的场景/角色可能已从本集移除，若每次改描述都重校验旧绑定，
+  // 纯文本编辑会被无关的绑定错误挡下（表现为「描述/时长改不了」）。
+  const touchesBindings = 'scene_id' in body || 'character_ids' in body || 'prop_ids' in body
+  if (touchesBindings) {
+    try {
+      await validateStoryboardBindings(
+        storyboard.episodeId,
+        'scene_id' in body ? body.scene_id : null,
+        'character_ids' in body ? body.character_ids : [],
+        'prop_ids' in body ? body.prop_ids : [],
+      )
+    } catch (error) {
+      // 绑定不合法属于请求问题，返回可读的 400 而不是 500
+      return badRequest(c, error instanceof Error ? error.message : '绑定校验失败')
+    }
+  }
 
   await db.update(schema.storyboards).set(updates).where(eq(schema.storyboards.id, id))
   if ('character_ids' in body) await syncStoryboardCharacters(id, body.character_ids || [])

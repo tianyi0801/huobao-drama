@@ -115,6 +115,8 @@
   --seg-active-bg: #ffffff;
   --on-accent: #ffffff;
   --on-media: rgba(255,255,255,0.85);
+  /* 压在缩略图上的徽标底色：必须随主题切换，否则暗色下白底浅字看不清 */
+  --media-badge-bg: rgba(255,255,255,0.85);
   --scrim: rgba(15,23,42,0.45);
   --header-bg: rgba(247,248,250,0.75);
   --inverse-surface: #17181a;
@@ -218,6 +220,8 @@
   --overlay-track: rgba(148,163,184,0.10);
   --seg-active-bg: #28364a;
   --on-accent: #2a1503;
+  /* 暗色下徽标用深色半透明，配合浅色文字才有对比 */
+  --media-badge-bg: rgba(19,26,36,0.85);
   --scrim: rgba(0,0,0,0.60);
   --header-bg: rgba(11,15,22,0.75);
   --inverse-surface: #f1f5f9;

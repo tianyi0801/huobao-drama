@@ -30,6 +30,8 @@ export interface AgentActivity {
   text: string
   /** 思考内容字符数（部分模型会产出 reasoning） */
   reasoningChars: number
+  /** 模型思考正文（开启思考模式时流式累积，面板可展开查看） */
+  reasoning: string
   startedAt: number
   elapsedMs: number
   error: string | null
@@ -49,6 +51,7 @@ function createActivity(): AgentActivity {
     savedBatches: 0,
     text: '',
     reasoningChars: 0,
+    reasoning: '',
     startedAt: 0,
     elapsedMs: 0,
     error: null,
@@ -96,7 +99,12 @@ export function useAgent() {
         break
       }
       case 'reasoning':
-        activity.reasoningChars += String(data?.text ?? '').length
+        {
+          const delta = String(data?.text ?? '')
+          activity.reasoningChars += delta.length
+          activity.reasoning = (activity.reasoning + delta).slice(-TEXT_LIMIT)
+          activity.phase = 'thinking'
+        }
         break
       case 'saved':
         activity.savedBatches++
@@ -209,5 +217,19 @@ export function useAgent() {
     }
   }
 
-  return { running, runningType, activity, run }
+  /** 手动停止：断开 SSE 后后端会 abort Agent，已保存的批次保留 */
+  function cancel() {
+    if (!controller) return
+    controller.abort()
+    controller = null
+    activity.active = false
+    activity.phase = 'error'
+    activity.error = i18n.global.t('composables.agent.cancelled')
+    activity.elapsedMs = Date.now() - activity.startedAt
+    stopTimer()
+    running.value = false
+    runningType.value = null
+  }
+
+  return { running, runningType, activity, run, cancel }
 }

@@ -200,6 +200,8 @@
       "busy": "処理を実行中です",
       "done": "完了",
       "failed": "エージェントの実行に失敗しました"
+    ,
+      "cancelled": "停止しました。保存済みの内容は残ります"
     }
   },
   "index": {
@@ -374,6 +376,16 @@
       "langNameJa": "日本語",
       "langNameKo": "韓国語",
       "unifiedSwitchWarning": "{lang} に切替しました。UI と AI コンテンツ言語が同期され、まもなく再読み込みします…"
+    ,
+      "thinking": "モデル思考モード",
+      "thinkingSub": "テキストモデルに推論させてから出力します",
+      "thinkingLabel": "有効にすると改写／抽出／絵コンテで思考過程をリアルタイム表示",
+      "thinkingNote": "reasoning を返せるモデル／ゲートウェイが必要です。エラー時は無効にしてください",
+      "thinkingOn": "有効",
+      "thinkingOff": "無効",
+      "thinkingHint": "有効にするとバッチ処理が遅くなり、出力上限に達しやすくなります。思考と出力はパネルに流れます。",
+      "thinkingOnToast": "思考モードを有効にしました",
+      "thinkingOffToast": "思考モードを無効にしました"
     },
     "ai": {
       "title": "AI サービス設定",
@@ -464,6 +476,9 @@
       "promptGenerator": "プロンプト生成",
       "langFallback": "中国語にフォールバック",
       "followContentLang": "編集言語：{lang}（「一般 → AI コンテンツ言語」で切替）"
+    ,
+      "effectHint": "保存後すぐに反映されます。次回の生成から新しいプロンプトが使われ、再起動は不要です。",
+      "overrideHint": "注意：新しい内蔵テンプレートをインストールするとこのファイルは上書きされます。上書き前の版は workspace/.backup に保存されます。"
     },
     "skills": {
       "agentList": "Agent 一覧",
@@ -482,6 +497,8 @@
       "descPlaceholder": "この Skill の用途を簡単に記述",
       "create": "作成",
       "created": "Skill を作成しました"
+    ,
+      "effectHint": "保存後すぐに反映されます。SKILL.md を直接編集した場合は、バックエンド再起動か本画面での再保存が必要です。"
     },
     "cfg": {
       "editTitle": "サービス設定を編集",
@@ -573,6 +590,10 @@
       "follow": "最新に追従",
       "reconnect": "再接続",
       "disconnected": "ログ切断・タスク状態は作業画面で確認"
+    ,
+      "reasoning": "思考プロセス"
+    ,
+      "stop": "停止"
     },
     "liveLog": {
       "badge": "ログ",
@@ -957,6 +978,8 @@
       "stillRunning": "生成に時間がかかっています。自動待機を停止しました。右上のタスク一覧で進捗を確認できます",
       "confirmEta": "所要時間の目安",
       "queued": "待機中"
+    ,
+      "firstPassBadge": "一次生成プレビュー・高画質化中"
     },
     "inspector": {
       "videoPromptPlaceholder": "{'@'}名前で画像、#名前で音声を参照。セリフ、話者、カメラの動きを記述…",
@@ -989,6 +1012,11 @@
       "generic": "汎用",
       "fullMerge": "話全体の結合",
       "mergeKind": "結合"
+    ,
+      "cancel": "キャンセル",
+      "cancelled": "タスクをキャンセルしました"
+    ,
+      "cancelledStatus": "キャンセル済み"
     },
     "export": {
       "notReadyDesc": "先に分镜と制作の工程を完了してください",
@@ -1028,7 +1056,8 @@
       "allCharsDone": "すべてのキャラクター画像が生成済みです",
       "allScenesDone": "すべてのシーン画像が生成済みです",
       "allPropsDone": "すべての小道具画像が生成済みです",
-      "stillRunning": "生成に時間がかかっています。自動待機を停止しました。後でページを更新して確認してください"
+      "stillRunning": "生成に時間がかかっています。自動待機を停止しました。後でページを更新して確認してください",
+      "failed": "画像生成に失敗しました：{msg}"
     },
     "extract": {
       "done": "{type}の抽出が完了しました",

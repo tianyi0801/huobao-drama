@@ -11,6 +11,9 @@
         <span class="agent-live-phase">{{ phaseText }}</span>
       </div>
       <span class="agent-live-elapsed">{{ elapsedText }}</span>
+      <button v-if="activity.active" class="agent-live-stop" type="button" @click="emit('cancel')">
+        <Square :size="11" />{{ t('episode.logUi.stop') }}
+      </button>
       <button class="agent-live-toggle" type="button" :aria-expanded="expanded" @click="expanded = !expanded">
         <ScrollText :size="13" />
         {{ t(expanded ? 'episode.logUi.hideDetails' : 'episode.logUi.showDetails') }}
@@ -55,6 +58,10 @@
         </li>
       </ol>
       <div v-if="!groups.length" class="agent-live-empty">{{ t('episode.logUi.waiting') }}</div>
+      <details v-if="reasoningTail" class="agent-live-reasoning">
+        <summary>{{ t('episode.logUi.reasoning') }}<span class="dim"> · {{ activity.reasoning.length }}</span></summary>
+        <pre class="agent-live-pre agent-live-pre-reasoning">{{ reasoningTail }}</pre>
+      </details>
       <div v-if="tail" class="agent-live-output">
         <div class="agent-live-section-head">
           <span>{{ t('episode.activity.liveOutput') }}</span>
@@ -71,7 +78,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { AlertCircle, Check, ChevronDown, Loader2, ScrollText } from 'lucide-vue-next'
+import { AlertCircle, Check, ChevronDown, Loader2, ScrollText, Square } from 'lucide-vue-next'
 import type { AgentActivity } from '~/composables/useAgent'
 import { resolveToolLabel } from '../utils/tool-labels'
 import { groupActivityTools } from '../utils/activity-log'
@@ -80,6 +87,13 @@ const props = defineProps<{
   activity: AgentActivity
   agentType?: string | null
 }>()
+const emit = defineEmits<{ cancel: [] }>()
+const reasoningTail = computed(() => {
+  const text = props.activity.reasoning || ''
+  // 思考内容可能很长：只保留尾部，避免刷屏和占用内存
+  return text.length > 4000 ? text.slice(-4000) : text
+})
+
 const { t, te } = useI18n()
 const textEl = ref<HTMLElement | null>(null)
 const expanded = ref(false)
@@ -134,6 +148,9 @@ watch(() => props.activity.text.length, async () => {
 .agent-live-elapsed { font: 11px var(--font-mono); color: var(--text-2); font-variant-numeric: tabular-nums; }
 .agent-live-toggle, .agent-live-text-toggle { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; padding: 5px 7px; border: 0; border-radius: var(--radius-sm); background: var(--bg-2); color: var(--text-2); font: 11px var(--font-body); cursor: pointer; }
 .agent-live-toggle:hover, .agent-live-text-toggle:hover { color: var(--text-0); background: var(--bg-3); }
+.agent-live-stop { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; padding: 5px 9px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg-1); color: var(--text-1); font: 11px var(--font-body); cursor: pointer; }
+.agent-live-stop:hover { color: var(--error); border-color: var(--error); }
+.agent-live-stop:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .agent-live-toggle:focus-visible, .agent-live-text-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .rotated { transform: rotate(180deg); }
 .agent-live-metrics { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 8px 0 0 42px; font-size: 10px; color: var(--text-2); }
@@ -155,6 +172,9 @@ watch(() => props.activity.text.length, async () => {
 .agent-tool-result summary { cursor: pointer; font-size: 10px; color: var(--text-2); }
 .agent-tool-result pre { margin: 6px 0 0; font: 10px/1.6 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 100px; overflow: auto; }
 .agent-live-output { margin-top: 12px; }
+.agent-live-reasoning { margin: 8px 0 0; }
+.agent-live-reasoning summary { cursor: pointer; font-size: 11px; color: var(--text-2); padding: 4px 0; }
+.agent-live-pre-reasoning { max-height: 120px; color: var(--text-2); background: var(--bg-1); font-style: italic; }
 .agent-live-pre { margin: 0; max-height: 144px; overflow-y: auto; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-2); color: var(--text-1); font: 11px/1.7 var(--font-body); white-space: pre-wrap; overflow-wrap: anywhere; }
 .agent-live-error { display: flex; align-items: flex-start; gap: 7px; margin-top: 10px; padding: 8px 10px; max-height: 74px; overflow-y: auto; border-radius: var(--radius-sm); color: var(--error); background: var(--error-bg); font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; }
 .agent-live-error > svg { flex-shrink: 0; margin-top: 2px; }

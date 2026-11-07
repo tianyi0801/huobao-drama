@@ -100,6 +100,7 @@ export const propAPI = {
 export const taskAPI = {
   generate: (d: any) => api.post('/tasks', d),
   recover: (id: number) => api.post(`/tasks/${id}/recover`),
+  cancel: (id: number) => api.post(`/tasks/${id}/cancel`),
   diagnostics: (id: number) => api.get(`/tasks/${id}/diagnostics`),
   get: (id: number) => api.get(`/tasks/${id}`),
   del: (id: number) => api.del(`/tasks/${id}`),
@@ -177,6 +178,9 @@ export const storageAPI = {
 
 export const settingsAPI = {
   contentLanguage: () => api.get<{ language: string }>('/settings/content-language'),
+  // 模型思考模式：开启后允许模型推理，并改为流式展示思考与输出
+  thinkingMode: () => api.get<{ enabled: boolean }>('/settings/thinking-mode'),
+  setThinkingMode: (enabled: boolean) => api.put('/settings/thinking-mode', { enabled }),
   setContentLanguage: (language: string) => api.put('/settings/content-language', { language }),
   // 本地算力是否就绪（首页未配置引导用，不发起网络探测）
   localEngine: () => api.get<{ enabled: boolean; url: string; imageReady: boolean; videoReady: boolean }>('/settings/local-engine'),

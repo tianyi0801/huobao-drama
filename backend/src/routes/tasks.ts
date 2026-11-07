@@ -1,7 +1,9 @@
 import { Hono } from 'hono'
 import { and, desc, eq } from 'drizzle-orm'
 import { db, schema } from '../db/index.js'
-import { success, created, badRequest } from '../utils/response.js'
+import { success, created, badRequest, now } from '../utils/response.js'
+import { ComfyClient } from '../services/comfyui/client.js'
+import { decorateTaskWithPreview, getPreview, resolveByteRange } from '../services/comfyui/live-preview.js'
 import { generateImage, generateVideo, recoverVideoTask } from '../services/generation.js'
 import { safeTaskError } from '../services/video-download.js'
 import { getActiveConfig, getConfigById, resolveGenerationConfigId } from '../services/ai.js'
@@ -19,6 +21,39 @@ app.post('/:id/recover', async c => {
     await recoverVideoTask(Number(c.req.param('id')))
     return success(c, { id: Number(c.req.param('id')) })
   } catch (error) { return badRequest(c, safeTaskError(error)) }
+})
+
+/**
+ * POST /tasks/:id/cancel — 取消生成任务
+ * 本地 ComfyUI：排队中的从队列删除，正在执行的用 interrupt；
+ * 云端厂商没有取消接口，只能在本机标记取消并停止轮询（上游可能继续跑）。
+ */
+app.post('/:id/cancel', async c => {
+  const id = Number(c.req.param('id'))
+  const [task] = await db.select().from(schema.sysTask).where(eq(schema.sysTask.id, id))
+  if (!task) return badRequest(c, '任务不存在')
+  if (task.status !== 'processing') return badRequest(c, '任务已结束，无需取消')
+
+  let upstream = 'not_attempted'
+  if ((task.provider || '').toLowerCase().includes('comfy') && task.taskId) {
+    try {
+      const client = new ComfyClient(getComfyConfig().url)
+      const running = await client.isRunning(task.taskId)
+      if (running) await client.interrupt()
+      else await client.deleteQueued([task.taskId])
+      upstream = running ? 'interrupted' : 'dequeued'
+    } catch {
+      // 队列不可达不阻断本地取消：任务至少要停止轮询并退出待处理态
+      upstream = 'unreachable'
+    }
+  }
+
+  await db.update(schema.sysTask).set({
+    status: 'failed', stage: 'cancelled', errorCode: 'cancelled', errorMsg: '任务已取消',
+    completedAt: now(), updatedAt: now(),
+  }).where(eq(schema.sysTask.id, id))
+  logTaskStart('Task', 'cancel', { id, provider: task.provider, upstream })
+  return success(c, { id, upstream })
 })
 
 app.get('/:id/diagnostics', async c => {
@@ -251,11 +286,63 @@ app.post('/', async (c) => {
 })
 
 // GET /tasks/:id — 轮询任务状态
+// GET /tasks/:id/first-pass — 二采还在跑时先把一采视频流给界面
+app.get('/:id/first-pass', async (c) => {
+  const id = Number(c.req.param('id'))
+  const preview = getPreview(id)
+  if (!preview?.filename) return badRequest(c, '一采视频尚未生成')
+  const comfy = getComfyConfig()
+  const query = new URLSearchParams({
+    filename: preview.filename,
+    subfolder: preview.subfolder || '',
+    type: preview.type || 'output',
+  })
+  try {
+    const upstream = await fetch(`${comfy.url.replace(/\/+$/, '')}/view?${query}`, {
+      signal: AbortSignal.timeout(30_000),
+    })
+    if (!upstream.ok || !upstream.body) return badRequest(c, '读取一采视频失败')
+    // 一采文件通常只有几 MB：整段缓冲后自己处理 Range，
+    // 避免浏览器拖动进度条或边下边播时因为上游不支持分段而黑屏
+    const buffer = Buffer.from(await upstream.arrayBuffer())
+    const total = buffer.length
+    const contentType = upstream.headers.get('content-type') || 'video/mp4'
+    const plan = resolveByteRange(total, c.req.header('range'))
+    if (plan.status === 206) {
+      const slice = buffer.subarray(plan.start, plan.end + 1)
+      return new Response(slice, {
+        status: 206,
+        headers: {
+          'Content-Type': contentType,
+          'Accept-Ranges': 'bytes',
+          'Content-Range': `bytes ${plan.start}-${plan.end}/${total}`,
+          'Content-Length': String(slice.length),
+          'Cache-Control': 'no-store',
+        },
+      })
+    }
+    if (plan.status === 416) {
+      return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${total}` } })
+    }
+    return new Response(buffer, {
+      status: 200,
+      headers: {
+        'Content-Type': contentType,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': String(total),
+        'Cache-Control': 'no-store',
+      },
+    })
+  } catch (error) {
+    return badRequest(c, safeTaskError(error))
+  }
+})
+
 app.get('/:id', async (c) => {
   const id = Number(c.req.param('id'))
   const [row] = await db.select().from(schema.sysTask)
     .where(eq(schema.sysTask.id, id))
-  return success(c, row || null)
+  return success(c, row ? decorateTaskWithPreview(row) : null)
 })
 
 // GET /tasks — 按 type / storyboard_id / drama_id 过滤

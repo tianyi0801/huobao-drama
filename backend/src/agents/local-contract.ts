@@ -39,6 +39,8 @@ export function buildLocalAgentContract(type: string, rc?: RequestContext): stri
 - 对白写成 <Subject 1> (S1) ... says, <d>[Chinese] 原句</d>；(Sx) 按实际发声顺序分配，不发声的角色不分配。台词逐字来自 description，只在对应 Shot 写一次，不新增台词、旁白或解说。overall_soundscape 只写 1—4 句英文环境音与物理声，不抄对白、不用说话白名单或否定句堆砌；non_diegetic_music 无配乐时写 N/A。
 - 素材只写 @角色名/@场景名/@道具名，精确匹配上下文，系统负责编号，不手写 @图片1 / <Picture 1>。仅 image_url 已有实际图片的资产才使用 @ 引用，未生图资产用普通名称描述，不虚构参考图。
 - 新拆分 duration 为4—12的整数秒，目标5秒，绝不能超过12秒；默认1个连续镜头、固定机位或缓慢单一运镜、1个主要动作，仅叙事确需切镜时最多2个且每个至少2秒。重写已有分镜时保留 duration 与全部业务动作/台词。
+- description 的【镜头N】是镜头数唯一来源：video_prompt 必须写同样数量的 [Shot N]，不得合并、不得新增；只有 description 本身单镜头时才写单个 Shot。后续镜头的切镜点用官方 At MM:SS.mmm，严格递增且小于 duration。
+- 无对白/旁白时 overall_soundscape 必须写一句英文 No spoken dialogue, narration or human voices，只保留环境/动作声；有对白时用一句英文说明只有实际发声者出声、其余角色闭口不发声。detailed_description 每个 Shot 都要写清当前谁发声、谁闭口。
 - 每个 Shot 都要带空间锚点，description 已有的空间描述原样保留对应英文表达；双人对话优先同焦平面平视中近景，逐人写清左右位置、距离、朝向与独立动作，所有需要辨认的脸均清晰可见，避免浅景深、背景人物虚化、遮脸与快速运动。
 - 只有 available_voice_references / has_voice 明确可用的角色才用 #角色名 标注对白音色；否则用角色姓名描述说话人。步数、分辨率、种子、采样器、增强开关由模板/界面控制，不写进创作文本。`
   if (type === 'storyboard_breaker') return `${common}\n${video}
