@@ -199,13 +199,21 @@ app.post('/', async (c) => {
       }
       if (Number(region.w) < 8 || Number(region.h) < 8) return badRequest(c, '选区太小（最小 8×8 像素）')
     }
-    // 图片编辑工作台只允许走本机 ComfyUI：显式 local_only 时绝不回退云端配置，
-    // 避免「本地没配好」静默切到云端模型并产生费用
+    // 图片工作台只允许走本机 ComfyUI：显式 local_only 时绝不回退云端配置，
+    // 避免「本地没配好」静默切到云端模型并产生费用。
+    // 校验要按实际会用到的模板槽：无参考图走「文生图」槽，有参考图走「图片编辑」槽
     if (body.local_only === true) {
       const comfy = getComfyConfig()
       if (!comfy.enabled) return badRequest(c, '本地算力已关闭，请到「设置 → 本地算力」启用后再试')
-      if (!comfy.imageEdit?.outputNodes?.length) {
-        return badRequest(c, '未配置「图片编辑」工作流，请到「设置 → 本地算力」导入')
+      const references = Array.isArray(body.reference_images)
+        ? body.reference_images.filter((item: unknown) => !!String(item || '').trim())
+        : []
+      const needEdit = references.length > 0
+      const template = needEdit ? comfy.imageEdit : comfy.image
+      if (!template?.outputNodes?.length) {
+        return badRequest(c, needEdit
+          ? '未配置「图片编辑」工作流，请到「设置 → 本地算力」导入'
+          : '未配置「文生图」工作流，请到「设置 → 本地算力」导入')
       }
     }
   }

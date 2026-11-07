@@ -59,7 +59,8 @@
     "nav": {
       "projects": "プロジェクト",
       "imageEdit": "画像編集",
-      "settings": "設定"
+      "settings": "設定",
+      "textToImage": "文生図"
     },
     "banner": {
       "missing": "{types}モデルが未設定のため、AI 機能は使用できません",
@@ -1252,6 +1253,93 @@
     "taskCharacter": "キャラクター",
     "taskScene": "シーン",
     "taskProp": "小道具",
-    "taskImageEdit": "画像編集"
+    "taskImageEdit": "画像編集",
+    "taskTextToImage": "文生図"
+  },
+  "textToImage": {
+    "title": "文生図",
+    "sub": "ローカル ComfyUI · 説明文から画像を生成",
+    "engine": {
+      "ready": "ローカル引擎は利用可能",
+      "notEnabled": "ローカル引擎が無効",
+      "notReady": "文生図ワークフローが未設定",
+      "checking": "ローカル引擎を確認中…",
+      "goSettings": "設定へ"
+    },
+    "prompt": {
+      "label": "画面の説明",
+      "desc": "主体・環境・光・構図を具体的に書くと安定します",
+      "placeholder": "例：窓辺に座るオレンジ色の子猫、午後の柔らかい光、背景は静かな街並み、暖色系、浅い被写界深度"
+    },
+    "style": {
+      "cinematic": "映画のような質感、柔らかい自然光、浅い被写界深度、繊細な色階調、クリアな画面。",
+      "cinematicShort": "映画質感",
+      "anime": "日本のアニメ風、クリーンなセル塗り、鮮やかな色彩、柔らかい環境光。",
+      "animeShort": "アニメ風",
+      "flat": "フラットなベクターイラスト、シンプルな幾何形状、明るい配色、十分な余白。",
+      "flatShort": "フラット画",
+      "photo": "写実的な写真、50mm レンズ、自然光、リアルな質感と細部。",
+      "photoShort": "写実写真",
+      "poster": "商業ポスターデザイン、中央構図、強いコントラスト配色、十分な余白、洗練されたタイポグラフィ。",
+      "posterShort": "ポスター"
+    },
+    "adv": {
+      "title": "詳細設定",
+      "quality": "画質",
+      "custom": "カスタム",
+      "customSize": "出力ピクセル",
+      "customPixelNote": "約 {mp} MP",
+      "steps": "サンプリング回数",
+      "seed": "シード",
+      "seedPlaceholder": "空欄なら毎回ランダム",
+      "randomSeed": "ランダム生成",
+      "seedRandom": "ランダム",
+      "negative": "ネガティブプロンプト",
+      "negativePlaceholder": "例：ぼけ、歪み、指の過多、透かし",
+      "negativeHint": "現在のワークフローは KSampler cfg=1 のため、ネガティブプロンプトはサンプリングに影響しません。リクエスト記録にのみ残ります。",
+      "persistHint": "画質とステップ数はローカルテンプレートの既定値として保存され、以降のすべての画像生成に影響します。シードとネガティブプロンプトは今回のみ有効です。",
+      "saved": "テンプレート既定値に保存しました",
+      "summary": "{quality} · {steps} ステップ · {resolution} · シード {seed}",
+      "resolution": "出力解像度",
+      "resolutionHint": "出力サイズはワークフローの resolution で決まります：標準は本ページの出力サイズ、1K/2K は高精細ですが遅くなります",
+      "resLabel": "標準"
+    },
+    "output": {
+      "label": "出力比率",
+      "note": "実際のサイズ {size}（画質プリセットから算出）"
+    },
+    "action": {
+      "generate": "画像を生成",
+      "regenerate": "もう一枚生成",
+      "cancel": "生成を中止",
+      "cancelDone": "生成を中止しました",
+      "retry": "再試行",
+      "download": "ダウンロード",
+      "view": "拡大表示",
+      "close": "閉じる",
+      "shortcut": "Ctrl / ⌘ + Enter で生成"
+    },
+    "result": {
+      "title": "編集結果",
+      "hint": "結果は今回のセッション内のみ保持されます。早めに保存してください",
+      "empty": "まだ画像がありません",
+      "step1": "左側で生成したい画面を書く",
+      "step2": "比率・画質を選び、必要ならスタイルを追加",
+      "step3": "「画像を生成」を押して完了を待つ",
+      "running": "ローカルで推論中。通常 20〜120 秒",
+      "elapsed": "経過 {s} 秒",
+      "done": "編集が完了しました",
+      "failed": "生成に失敗しました",
+      "session": "今回のセッション",
+      "sessionHint": "セッション内のみ保持、再読み込みで消えます。早めに保存してください",
+      "useSeed": "このシードで再実行",
+      "seedHint": "同じシード・指示・参考画像でほぼ再現できます"
+    },
+    "err": {
+      "needPrompt": "編集指示を入力してください",
+      "failed": "生成に失敗しました。再試行してください",
+      "timeout": "待機がタイムアウトしました。しばらくして再試行してください",
+      "saveDefaults": "テンプレート既定値の保存に失敗しました"
+    }
   }
 }

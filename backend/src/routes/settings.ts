@@ -26,8 +26,12 @@ app.get('/local-engine', async (c) => {
     enabled: config.enabled,
     url: config.url,
     imageReady: isComfyReadyFor('image'),
+    // 按槽拆分的就绪状态：文生图页必须检查 image 槽本身，
+    // 不能只看 imageReady（它是 image || imageEdit 的并集）
+    textToImageReady: !!config.image?.outputNodes?.length,
+    imageEditReady: !!config.imageEdit?.outputNodes?.length,
     videoReady: isComfyReadyFor('video'),
-    // 图片侧当前默认值：图片编辑页要按全局默认回显清晰度与步数（不发起网络探测）
+    // 图片侧当前默认值：图片工作台要按全局默认回显清晰度与步数（不发起网络探测）
     imagePixelBudget: config.imagePixelBudget,
     optionValues: config.optionValues,
   })

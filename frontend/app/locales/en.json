@@ -59,7 +59,8 @@
     "nav": {
       "projects": "Projects",
       "imageEdit": "Image editor",
-      "settings": "Settings"
+      "settings": "Settings",
+      "textToImage": "Text to Image"
     },
     "banner": {
       "missing": "These capabilities are not ready: {types}",
@@ -1308,6 +1309,93 @@
     "taskCharacter": "Character",
     "taskScene": "Scene",
     "taskProp": "Prop",
-    "taskImageEdit": "Image edit"
+    "taskImageEdit": "Image edit",
+    "taskTextToImage": "Text to Image"
+  },
+  "textToImage": {
+    "title": "Text to Image",
+    "sub": "Local ComfyUI · generate from a description",
+    "engine": {
+      "ready": "Local engine ready",
+      "notEnabled": "Local engine disabled",
+      "notReady": "Text-to-image workflow not configured",
+      "checking": "Checking local engine…",
+      "goSettings": "Open settings"
+    },
+    "prompt": {
+      "label": "Image prompt",
+      "desc": "Describe the subject, setting, lighting and composition for steadier results",
+      "placeholder": "e.g. an orange kitten sitting on a windowsill in warm afternoon light, a quiet street behind, warm tones, shallow depth of field"
+    },
+    "style": {
+      "cinematic": "Cinematic look, soft natural light, shallow depth of field, nuanced color grading, crisp image.",
+      "cinematicShort": "Cinematic",
+      "anime": "Japanese animation style, clean cel shading, vivid colors, soft ambient light.",
+      "animeShort": "Anime",
+      "flat": "Flat vector illustration, simple geometric shapes, bright palette, generous negative space.",
+      "flatShort": "Flat art",
+      "photo": "Photorealistic photography, 50mm lens, natural light, lifelike texture and fine detail.",
+      "photoShort": "Photo",
+      "poster": "Commercial poster design, centered composition, high-contrast palette, generous white space, refined typography.",
+      "posterShort": "Poster"
+    },
+    "adv": {
+      "title": "Advanced",
+      "quality": "Quality",
+      "custom": "Custom",
+      "customSize": "Output pixels",
+      "customPixelNote": "about {mp} MP",
+      "steps": "Steps",
+      "seed": "Seed",
+      "seedPlaceholder": "Empty = random each run",
+      "randomSeed": "Randomize",
+      "seedRandom": "random",
+      "negative": "Negative prompt",
+      "negativePlaceholder": "e.g. blurry, distorted, extra fingers, watermark",
+      "negativeHint": "The workflow runs KSampler with cfg=1, so the negative prompt does not affect sampling — it is only recorded in the request snapshot.",
+      "persistHint": "Quality and steps are written back as the local template defaults and affect all later image generations; seed and negative prompt apply to this run only.",
+      "saved": "Saved as template defaults",
+      "summary": "{quality} · {steps} steps · {resolution} · seed {seed}",
+      "resolution": "Resolution",
+      "resolutionHint": "Output resolution is controlled by the workflow: default follows the size set here; 1K/2K is sharper but slower",
+      "resLabel": "Default"
+    },
+    "output": {
+      "label": "Aspect ratio",
+      "note": "Output {size} (derived from the quality preset)"
+    },
+    "action": {
+      "generate": "Generate",
+      "regenerate": "Generate again",
+      "cancel": "Cancel",
+      "cancelDone": "Generation cancelled",
+      "retry": "Retry",
+      "download": "Download",
+      "view": "View full size",
+      "close": "Close",
+      "shortcut": "Ctrl / ⌘ + Enter to generate"
+    },
+    "result": {
+      "title": "Result",
+      "hint": "Results live only in this session, download them in time",
+      "empty": "No image generated yet",
+      "step1": "Describe the image you want on the left",
+      "step2": "Pick a ratio and quality, optionally add a style",
+      "step3": "Click Generate and wait for the result",
+      "running": "Running locally, usually 20-120 seconds",
+      "elapsed": "{s}s elapsed",
+      "done": "Editing finished",
+      "failed": "Generation failed",
+      "session": "This session",
+      "sessionHint": "Kept in this session only, cleared on refresh - download in time",
+      "useSeed": "Reuse this seed",
+      "seedHint": "Same seed, prompt and references reproduce a similar result"
+    },
+    "err": {
+      "needPrompt": "Describe the edit first",
+      "failed": "Generation failed, please retry",
+      "timeout": "Timed out, please try again later",
+      "saveDefaults": "Failed to save template defaults"
+    }
   }
 }

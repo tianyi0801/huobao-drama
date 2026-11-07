@@ -59,7 +59,8 @@
     "nav": {
       "projects": "项目",
       "imageEdit": "图片编辑",
-      "settings": "设置"
+      "settings": "设置",
+      "textToImage": "文生图"
     },
     "banner": {
       "missing": "以下能力尚未就绪：{types}",
@@ -1308,6 +1309,93 @@
     "taskCharacter": "角色",
     "taskScene": "场景",
     "taskProp": "道具",
-    "taskImageEdit": "图片编辑"
+    "taskImageEdit": "图片编辑",
+    "taskTextToImage": "文生图"
+  },
+  "textToImage": {
+    "title": "文生图",
+    "sub": "本地 ComfyUI · 输入描述直接出图",
+    "engine": {
+      "ready": "本地算力就绪",
+      "notEnabled": "本地算力未启用",
+      "notReady": "未配置「文生图」工作流",
+      "checking": "正在检测本地算力…",
+      "goSettings": "去设置"
+    },
+    "prompt": {
+      "label": "画面描述",
+      "desc": "写清主体、环境、光线与构图，出图更稳定",
+      "placeholder": "例如：一只橘色小猫坐在窗台上，午后阳光洒进来，背景是安静的街道，暖色调，浅景深"
+    },
+    "style": {
+      "cinematic": "电影质感，柔和自然光，浅景深，细腻的色彩层次，画面通透。",
+      "cinematicShort": "电影质感",
+      "anime": "日系动画风格，干净的赛璐璐上色，色彩鲜明，柔和环境光。",
+      "animeShort": "日系动画",
+      "flat": "扁平化矢量插画，简洁几何形状，明亮配色，留白充足。",
+      "flatShort": "扁平插画",
+      "photo": "写实摄影，50mm 镜头，自然光，真实质感与细腻细节。",
+      "photoShort": "写实摄影",
+      "poster": "商业海报设计，居中构图，强对比配色，留白充足，排版精致。",
+      "posterShort": "海报设计"
+    },
+    "adv": {
+      "title": "高级参数",
+      "quality": "清晰度",
+      "custom": "自定义",
+      "customSize": "输出像素",
+      "customPixelNote": "约 {mp} MP",
+      "steps": "采样步数",
+      "seed": "随机种子",
+      "seedPlaceholder": "留空则每次随机",
+      "randomSeed": "随机一个",
+      "seedRandom": "随机",
+      "negative": "负面提示词",
+      "negativePlaceholder": "例如：模糊、变形、多余手指、水印",
+      "negativeHint": "当前工作流 KSampler cfg=1，负面词不参与采样，只记录进请求快照便于排查。",
+      "persistHint": "清晰度与步数会写回「本地算力」的模板默认值，影响后续所有图片生成；种子与负面词仅本次生效。",
+      "saved": "已写回模板默认值",
+      "summary": "{quality} · {steps} 步 · {resolution} · 种子 {seed}",
+      "resolution": "输出分辨率",
+      "resolutionHint": "由工作流的 resolution 决定出图尺寸档：默认按本页输出尺寸；1K/2K 更清晰但更慢",
+      "resLabel": "默认"
+    },
+    "output": {
+      "label": "输出比例",
+      "note": "实际尺寸 {size}（按清晰度档位换算）"
+    },
+    "action": {
+      "generate": "生成图片",
+      "regenerate": "再生成一张",
+      "cancel": "取消生成",
+      "cancelDone": "已取消本次生成",
+      "retry": "重试",
+      "download": "下载",
+      "view": "查看大图",
+      "close": "关闭",
+      "shortcut": "Ctrl / ⌘ + Enter 快速生成"
+    },
+    "result": {
+      "title": "编辑结果",
+      "hint": "结果只保留在本次会话中，请及时下载",
+      "empty": "还没有生成图片",
+      "step1": "在左侧写下你想要的画面",
+      "step2": "选好比例、清晰度，可叠加风格",
+      "step3": "点击「生成图片」等待出图",
+      "running": "本机正在推理，通常 20~120 秒",
+      "elapsed": "已用时 {s} 秒",
+      "done": "编辑完成",
+      "failed": "生成失败",
+      "session": "本次会话",
+      "sessionHint": "仅本次会话保留，刷新后清空，请及时下载",
+      "useSeed": "用这个种子重跑",
+      "seedHint": "同种子 + 同指令 + 同参考图可近似复现"
+    },
+    "err": {
+      "needPrompt": "请填写编辑指令",
+      "failed": "生成失败，请重试",
+      "timeout": "等待超时，请稍后重试",
+      "saveDefaults": "模板默认值保存失败"
+    }
   }
 }

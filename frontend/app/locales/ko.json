@@ -59,7 +59,8 @@
     "nav": {
       "projects": "프로젝트",
       "imageEdit": "이미지 편집",
-      "settings": "설정"
+      "settings": "설정",
+      "textToImage": "문생이미지"
     },
     "banner": {
       "missing": "{types} 모델이 아직 설정되지 않아 AI 기능을 사용할 수 없습니다",
@@ -1252,6 +1253,93 @@
     "taskCharacter": "캐릭터",
     "taskScene": "장면",
     "taskProp": "소품",
-    "taskImageEdit": "이미지 편집"
+    "taskImageEdit": "이미지 편집",
+    "taskTextToImage": "문생이미지"
+  },
+  "textToImage": {
+    "title": "텍스트→이미지",
+    "sub": "로컬 ComfyUI · 설명문으로 바로 생성",
+    "engine": {
+      "ready": "로컬 엔진 준비 완료",
+      "notEnabled": "로컬 엔진이 꺼져 있음",
+      "notReady": "문생이미지 워크플로가 설정되지 않음",
+      "checking": "로컬 엔진 확인 중…",
+      "goSettings": "설정으로"
+    },
+    "prompt": {
+      "label": "화면 설명",
+      "desc": "주체·환경·조명·구도를 구체적으로 쓰면 결과가 안정적입니다",
+      "placeholder": "예: 창가에 앉은 주황색 고양이, 오후의 따뜻한 햇빛, 뒤에는 조용한 거리, 따뜻한 색감, 얕은 피사계 심도"
+    },
+    "style": {
+      "cinematic": "영화 같은 질감, 부드러운 자연광, 얕은 피사계 심도, 섬세한 색감, 선명한 화면.",
+      "cinematicShort": "영화 질감",
+      "anime": "일본 애니메이션 스타일, 깔끔한 셀 채색, 선명한 색상, 부드러운 환경광.",
+      "animeShort": "애니메이션",
+      "flat": "플랫 벡터 일러스트, 단순한 기하 형태, 밝은 배색, 충분한 여백.",
+      "flatShort": "플랫 일러스트",
+      "photo": "사실적인 사진, 50mm 렌즈, 자연광, 실제 같은 질감과 세부 묘사.",
+      "photoShort": "실사 사진",
+      "poster": "상업 포스터 디자인, 중앙 구도, 강한 대비 배색, 충분한 여백, 정교한 타이포그래피.",
+      "posterShort": "포스터"
+    },
+    "adv": {
+      "title": "고급 설정",
+      "quality": "화질",
+      "custom": "사용자 지정",
+      "customSize": "출력 픽셀",
+      "customPixelNote": "약 {mp} MP",
+      "steps": "샘플링 스텝",
+      "seed": "시드",
+      "seedPlaceholder": "비우면 매번 무작위",
+      "randomSeed": "무작위 생성",
+      "seedRandom": "무작위",
+      "negative": "네거티브 프롬프트",
+      "negativePlaceholder": "예: 흐림, 왜곡, 손가락 과다, 워터마크",
+      "negativeHint": "현재 워크플로는 KSampler cfg=1이라 네거티브 프롬프트가 샘플링에 영향을 주지 않습니다. 요청 기록에만 남습니다.",
+      "persistHint": "화질과 스텝은 로컬 템플릿 기본값으로 저장되어 이후 모든 이미지 생성에 적용됩니다. 시드와 네거티브 프롬프트는 이번 요청에만 적용됩니다.",
+      "saved": "템플릿 기본값으로 저장했습니다",
+      "summary": "{quality} · {steps} 스텝 · {resolution} · 시드 {seed}",
+      "resolution": "출력 해상도",
+      "resolutionHint": "출력 해상도는 워크플로 resolution으로 결정됩니다. 기본은 이 페이지의 출력 크기, 1K/2K는 더 선명하지만 느립니다",
+      "resLabel": "기본"
+    },
+    "output": {
+      "label": "출력 비율",
+      "note": "실제 크기 {size} (화질 프리셋 기준)"
+    },
+    "action": {
+      "generate": "이미지 생성",
+      "regenerate": "한 장 더 생성",
+      "cancel": "생성 취소",
+      "cancelDone": "생성을 취소했습니다",
+      "retry": "재시도",
+      "download": "다운로드",
+      "view": "크게 보기",
+      "close": "닫기",
+      "shortcut": "Ctrl / ⌘ + Enter 로 생성"
+    },
+    "result": {
+      "title": "편집 결과",
+      "hint": "결과는 이번 세션에만 유지되니 빠르게 다운로드하세요",
+      "empty": "아직 생성된 이미지가 없습니다",
+      "step1": "왼쪽에 원하는 화면을 작성하세요",
+      "step2": "비율·화질을 고르고 필요하면 스타일을 추가하세요",
+      "step3": "「이미지 생성」을 누르고 완료를 기다리세요",
+      "running": "로컬에서 추론 중입니다. 보통 20~120초",
+      "elapsed": "{s}초 경과",
+      "done": "편집이 완료되었습니다",
+      "failed": "생성에 실패했습니다",
+      "session": "이번 세션",
+      "sessionHint": "세션에만 보관되며 새로고침하면 사라집니다. 빠르게 다운로드하세요",
+      "useSeed": "이 시드로 다시 실행",
+      "seedHint": "같은 시드·지시·참조 이미지면 거의 동일하게 재현됩니다"
+    },
+    "err": {
+      "needPrompt": "편집 지시를 입력하세요",
+      "failed": "생성에 실패했습니다. 다시 시도하세요",
+      "timeout": "대기 시간이 초과되었습니다. 잠시 후 다시 시도하세요",
+      "saveDefaults": "템플릿 기본값 저장에 실패했습니다"
+    }
   }
 }
