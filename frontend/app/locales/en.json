@@ -60,7 +60,8 @@
       "projects": "Projects",
       "imageEdit": "Image editor",
       "settings": "Settings",
-      "textToImage": "Text to Image"
+      "textToImage": "Text to Image",
+      "audioTts": "Audio Studio"
     },
     "banner": {
       "missing": "These capabilities are not ready: {types}",

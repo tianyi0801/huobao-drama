@@ -28,6 +28,10 @@
           <Wand2 :size="15" :stroke-width="1.8" />
           <span>{{ t('layout.nav.imageEdit') }}</span>
         </NuxtLink>
+        <NuxtLink to="/audio-tts" class="nav-link" :class="{ active: route.path === '/audio-tts' }">
+          <AudioLines :size="15" :stroke-width="1.8" />
+          <span>{{ t('layout.nav.audioTts') }}</span>
+        </NuxtLink>
         <NuxtLink to="/settings" class="nav-link" :class="{ active: route.path === '/settings' }">
           <Settings :size="15" :stroke-width="1.8" />
           <span>{{ t('layout.nav.settings') }}</span>
@@ -64,7 +68,7 @@
 </template>
 
 <script setup>
-import { LayoutGrid, Settings, TriangleAlert, Github, Wand2, ImagePlus } from 'lucide-vue-next'
+import { LayoutGrid, Settings, TriangleAlert, Github, Wand2, ImagePlus, AudioLines } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { aiConfigAPI, settingsAPI } from '~/composables/useApi'
 import brandLogo from '~/assets/brand-logo.png'

@@ -229,6 +229,18 @@ export const workflowAPI = {
     api.post<any>('/workflows/import', { presetIds, overwrite }),
 }
 
+// 本地配音（Breeze-TTS-2）：环境配置 / 检测 / 安装 / 生成，仅 Windows 支持
+export const localTtsAPI = {
+  status: () => api.get<any>('/local-tts'),
+  test: (deep = false) => api.post<any>('/local-tts/test', { deep }),
+  saveConfig: (data: any) => api.put<any>('/local-tts/config', data),
+  install: () => api.post<{ id: string }>('/local-tts/install'),
+  generate: (data: any) => api.post<{ id: string }>('/local-tts/generate', data),
+  job: (id: string, since = 0) => api.get<any>(`/local-tts/jobs/${id}?since=${since}`),
+  cancel: (id: string) => api.post<any>(`/local-tts/jobs/${id}/cancel`),
+  outputs: () => api.get<any[]>('/local-tts/outputs'),
+}
+
 // 服务器/Docker 部署的版本检查与更新（桌面版走 useDesktopBridge，不用此 API）
 export const serverUpdateAPI = {
   state: () => api.get('/server-update/state'),

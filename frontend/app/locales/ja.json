@@ -60,7 +60,8 @@
       "projects": "プロジェクト",
       "imageEdit": "画像編集",
       "settings": "設定",
-      "textToImage": "文生図"
+      "textToImage": "文生図",
+      "audioTts": "音声制作"
     },
     "banner": {
       "missing": "{types}モデルが未設定のため、AI 機能は使用できません",

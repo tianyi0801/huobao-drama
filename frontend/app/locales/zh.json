@@ -55,12 +55,99 @@
       "video": "视频"
     }
   },
+  "localTts": {
+    "title": "音频制作",
+    "sub": "Breeze-TTS-2 本地配音 · 仅 Windows",
+    "license": "权重为非商用许可，产出音频不可用于商业投放；克隆仅限你有权使用的声音。",
+    "status": {
+      "checking": "检测中",
+      "ready": "环境已就绪",
+      "notReady": "环境未就绪",
+      "unsupported": "当前系统不支持"
+    },
+    "winOnly": {
+      "title": "仅支持 Windows",
+      "desc": "本地配音依赖 Windows + NVIDIA CUDA 在本机推理。当前系统：{platform}。配置可查看，但安装与生成已停用。"
+    },
+    "env": {
+      "title": "项目环境配置",
+      "desc": "先指定推理工程目录与 Python，保存后可检测环境或一键安装。",
+      "projectDir": "工程目录",
+      "projectDirHint": "git clone 的目标目录，默认放在火宝数据目录下",
+      "gitUrl": "Git 仓库",
+      "pythonPath": "Python 解释器（可选）",
+      "pythonPathHint": "留空自动探测 python / py -3 / python3",
+      "modelDir": "权重目录（可选）",
+      "modelDirHint": "留空取工程目录下的 breeze-tts-2",
+      "pipArgs": "附加 pip 参数（可选）",
+      "pipArgsHint": "例如 -i https://pypi.tuna.tsinghua.edu.cn/simple，不经过 shell",
+      "useVenv": "使用独立虚拟环境（推荐）",
+      "save": "保存配置",
+      "saved": "配置已保存",
+      "detect": "检测环境",
+      "deepDetect": "深度检测",
+      "install": "一键安装环境",
+      "installHint": "自动执行 git clone → 创建 .venv → python -m pip install -r requirements.txt，已有内容自动跳过。",
+      "stop": "停止任务",
+      "cancelDone": "任务已停止"
+    },
+    "report": {
+      "title": "环境检测",
+      "untouched": "尚未检测，点上方「检测环境」开始",
+      "checkedAt": "检测时间",
+      "allGood": "环境检查通过，可以开始生成语音。",
+      "disk": "磁盘剩余"
+    },
+    "job": {
+      "title": "执行日志",
+      "idle": "暂无执行日志",
+      "running": "执行中…",
+      "done": "已完成",
+      "failed": "失败",
+      "expand": "展开",
+      "collapse": "收起",
+      "lines": "共 {n} 行"
+    },
+    "form": {
+      "title": "生成语音",
+      "locked": "环境未就绪：请先完成环境检测，或点「一键安装环境」。",
+      "modeDesign": "音色设计",
+      "modeClone": "声音克隆",
+      "modeDirection": "克隆 + 情绪",
+      "text": "要合成的文本",
+      "textPlaceholder": "输入要念的台词或旁白…",
+      "instruction": "音色描述",
+      "instructionPlaceholder": "二十岁出头、甜软、一点鼻音、细腻的气声、轻轻上挑",
+      "presets": "常用音色",
+      "refAudio": "参考音频",
+      "refAudioPick": "上传 8~15 秒录音",
+      "refAudioHint": "仅使用你有权使用的声音；逐字稿需与录音逐字一致",
+      "refTextPlaceholder": "录音里说的原话，逐字一致",
+      "refRequired": "请同时上传参考音频并填写逐字稿",
+      "name": "文件名（可选）",
+      "submit": "开始生成",
+      "generating": "生成中…"
+    },
+    "result": {
+      "title": "本次结果",
+      "empty": "还没有生成结果",
+      "download": "下载 wav",
+      "metrics": "时长 {duration}s · peak {peak} · rms {rms} · 静音 {silence}%",
+      "filePath": "文件路径",
+      "copy": "复制路径",
+      "copied": "路径已复制",
+      "play": "试听",
+      "history": "历史产出",
+      "noHistory": "暂无历史 wav"
+    }
+  },
   "layout": {
     "nav": {
       "projects": "项目",
       "imageEdit": "图片编辑",
       "settings": "设置",
-      "textToImage": "文生图"
+      "textToImage": "文生图",
+      "audioTts": "音频制作"
     },
     "banner": {
       "missing": "以下能力尚未就绪：{types}",

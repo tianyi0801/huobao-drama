@@ -25,6 +25,7 @@ import storage from './routes/storage.js'
 import serverUpdate from './routes/serverUpdate.js'
 import localEnv from './routes/localEnv.js'
 import workflows from './routes/workflows.js'
+import localTts from './routes/localTts.js'
 import { requestLogger, errorHandler } from './middleware/logger.js'
 import { resumeInterruptedTasks } from './services/generation.js'
 import { seedComfyDefaultsIfMissing, migrateComfyTemplateOptions, migrateComfyEditImageSlots } from './services/comfyui/bootstrap.js'
@@ -73,6 +74,7 @@ api.route('/settings', settings)
 api.route('/server-update', serverUpdate)
 api.route('/local-env', localEnv)
 api.route('/workflows', workflows)
+api.route('/local-tts', localTts)
 
 app.route('/api/v1', api)
 
