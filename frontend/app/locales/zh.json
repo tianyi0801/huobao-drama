@@ -58,6 +58,7 @@
   "layout": {
     "nav": {
       "projects": "项目",
+      "imageEdit": "图片编辑",
       "settings": "设置"
     },
     "banner": {
@@ -115,8 +116,7 @@
     "agent": {
       "busy": "操作执行中",
       "done": "完成",
-      "failed": "AI 执行失败"
-    ,
+      "failed": "AI 执行失败",
       "cancelled": "已停止，已保存内容保留"
     }
   },
@@ -291,8 +291,7 @@
       "langNameEn": "English",
       "langNameJa": "日本語",
       "langNameKo": "한국어",
-      "unifiedSwitchWarning": "已切换为 {lang}，界面与 AI 内容语言将同步更新，即将刷新…"
-    ,
+      "unifiedSwitchWarning": "已切换为 {lang}，界面与 AI 内容语言将同步更新，即将刷新…",
       "thinking": "模型思考模式",
       "thinkingSub": "让文本模型先推理再输出，质量更稳但更慢",
       "thinkingLabel": "开启后改写／提取／分镜会实时显示思考过程",
@@ -397,8 +396,7 @@
       "storyboardBreaker": "分镜拆解",
       "promptGenerator": "提示词",
       "langFallback": "跟随中文",
-      "followContentLang": "编辑语言跟随：{lang}（在「通用 → AI 内容语言」切换）"
-    ,
+      "followContentLang": "编辑语言跟随：{lang}（在「通用 → AI 内容语言」切换）",
       "effectHint": "保存后立即生效：下一次生成就会使用新提示词，不需要重启应用。",
       "overrideHint": "注意：安装新版内置模板时会覆盖该文件；被覆盖前的版本备份在 workspace/.backup 目录。"
     },
@@ -418,8 +416,7 @@
       "description": "描述",
       "descPlaceholder": "简短描述此 Skill 的用途",
       "create": "创建",
-      "created": "Skill 创建成功"
-    ,
+      "created": "Skill 创建成功",
       "effectHint": "保存后立即生效。若直接在磁盘修改 SKILL.md，需要重启后端或再在本页保存一次，技能缓存才会刷新。"
     },
     "cfg": {
@@ -561,10 +558,8 @@
       "timeline": "实时执行记录",
       "follow": "跟随最新",
       "reconnect": "重新连接",
-      "disconnected": "日志连接已断开，任务状态以工作台为准"
-    ,
-      "reasoning": "思考过程"
-    ,
+      "disconnected": "日志连接已断开，任务状态以工作台为准",
+      "reasoning": "思考过程",
       "stop": "停止"
     },
     "liveLog": {
@@ -949,8 +944,7 @@
       "aspectRatio": "画面比例",
       "stillRunning": "生成耗时较长，已停止自动等待；可在右上角任务列表查看进度",
       "confirmEta": "预计耗时",
-      "queued": "排队中"
-    ,
+      "queued": "排队中",
       "firstPassBadge": "一采预览 · 二采高清化中"
     },
     "inspector": {
@@ -983,11 +977,9 @@
       "sbN": "分镜 #{n}",
       "generic": "通用",
       "fullMerge": "整集拼接",
-      "mergeKind": "合并"
-    ,
+      "mergeKind": "合并",
       "cancel": "取消",
-      "cancelled": "任务已取消"
-    ,
+      "cancelled": "任务已取消",
       "cancelledStatus": "已取消"
     },
     "export": {
@@ -1072,6 +1064,7 @@
       "unknownSubmission": "提交结果待确认，请先核对上游记录",
       "downloading": "视频已生成，下载中",
       "diagnostics": "复制诊断信息",
+      "requestSnapshot": "请求内容",
       "copied": "诊断信息已复制",
       "confirmNew": "重新生成会提交新的任务，可能再次计费。确定继续吗？",
       "restoreFailed": "恢复视频({n})",
@@ -1148,5 +1141,173 @@
         "desc": "点这个「?」按钮可重新播放本页引导。祝创作顺利！"
       }
     }
+  },
+  "imageEdit": {
+    "title": "图片编辑",
+    "sub": "本地 ComfyUI · 参考图编辑与人物合成",
+    "engine": {
+      "ready": "本地算力已就绪",
+      "notEnabled": "本地算力未启用",
+      "notReady": "图片编辑工作流未就绪",
+      "checking": "检查中…",
+      "goSettings": "前往设置"
+    },
+    "input": {
+      "title": "选择图片与参考"
+    },
+    "slot": {
+      "base": "底图",
+      "baseHint": "要编辑的图片（图1）",
+      "ref": "参考图",
+      "refHint": "要融合进去的人物或素材（图2）",
+      "refOptional": "可选 · 点击上传或拖入图片",
+      "upload": "点击上传",
+      "drop": "也可直接拖入图片",
+      "replace": "更换",
+      "remove": "移除",
+      "max": "图1 为底图，可追加最多 3 张参考素材（图2~图4）",
+      "addRef": "添加参考图"
+    },
+    "region": {
+      "draw": "局部重绘",
+      "exit": "退出局部",
+      "clear": "清除选区",
+      "needBase": "上传底图后可框选局部区域",
+      "hintDraw": "在底图上拖拽框选要修改的区域，坐标会以 <bbox> 写进提示词，由 AI 整图重绘",
+      "hintSelected": "已框选 {rect}，AI 将按此区域整图重绘，选区外尽量保持不变",
+      "badgeUnit": "px"
+    },
+    "prompt": {
+      "label": "编辑指令",
+      "desc": "说清楚「改什么」和「保留什么」，效果更稳定",
+      "placeholder": "例如：把图2中的人物自然地放进图1的客厅，保持五官与身材一致，光线和透视与场景统一",
+      "quick": "快捷指令",
+      "fusion": "把图2中的人物自然地放进图1的场景里，保持人物五官与身材比例一致，光影、色调和透视与图1环境统一。",
+      "fusionShort": "人物入景",
+      "outfit": "保持图1中的人物不变，把图2的服装穿到人物身上，褶皱与受光自然。",
+      "outfitShort": "换上服装",
+      "style": "保持图1的内容、构图和人物不变，将整体风格转为电影质感，增强光影层次与色彩。",
+      "styleShort": "电影质感",
+      "cleanup": "移除图1中的杂物和多余人物，补全被遮挡的背景，保持画面连贯。",
+      "cleanupShort": "清理杂物",
+      "enhance": "提升图1的清晰度与细节，修复模糊和噪点，保持人物特征不变。",
+      "enhanceShort": "提升清晰度",
+      "oneImagePrefix": "图1是底图。",
+      "twoImagesPrefix": "图1是底图，图2是参考素材。",
+      "multiImagesPrefix": "图1是底图，图{from}~图{to}是参考素材。",
+      "regionMarked": "图1中红色矩形框标记的是需要修改的区域，请针对该区域执行后续指令，修改后的内容需与周围画面在光影、色调和透视上自然融合；红框仅用于指示位置，输出结果中不得保留红框。"
+    },
+    "adv": {
+      "title": "高级参数",
+      "quality": "清晰度",
+      "custom": "自定义",
+      "customSize": "输出像素",
+      "customPixelNote": "约 {mp} MP",
+      "steps": "采样步数",
+      "seed": "随机种子",
+      "seedPlaceholder": "留空则每次随机",
+      "randomSeed": "随机一个",
+      "seedRandom": "随机",
+      "negative": "负面提示词",
+      "negativePlaceholder": "例如：模糊、变形、多余手指、水印",
+      "negativeHint": "当前工作流 KSampler cfg=1，负面词不参与采样，只记录进请求快照便于排查。",
+      "persistHint": "清晰度与步数会写回「本地算力」的模板默认值，影响后续所有图片生成；种子与负面词仅本次生效。",
+      "saved": "已写回模板默认值",
+      "summary": "{quality} · {steps} 步 · {resolution} · 种子 {seed}",
+      "resolution": "输出分辨率",
+      "resolutionHint": "编辑模式的出图尺寸由工作流 resolution 决定：跟随参考图约 768px；1K/2K 更清晰但更慢",
+      "resLabel": "跟随参考图"
+    },
+    "output": {
+      "label": "输出比例",
+      "auto": "跟随底图",
+      "noteAuto": "底图 {w}×{h} → 输出 {size}"
+    },
+    "action": {
+      "generate": "开始编辑",
+      "regenerate": "重新生成",
+      "cancel": "取消生成",
+      "cancelDone": "已取消本次生成",
+      "retry": "重试",
+      "download": "下载",
+      "useAsBase": "作为底图继续",
+      "based": "已设为底图",
+      "view": "查看大图",
+      "close": "关闭",
+      "shortcut": "Ctrl / ⌘ + Enter 快速生成"
+    },
+    "result": {
+      "title": "编辑结果",
+      "hint": "结果只保留在本次会话中，请及时下载",
+      "empty": "上传底图并写明修改要求，结果会显示在这里",
+      "step1": "上传底图（图1）",
+      "step2": "可选：上传参考图（图2）",
+      "step3": "描述修改内容并开始生成",
+      "running": "本机正在推理，通常 20~120 秒",
+      "elapsed": "已用时 {s} 秒",
+      "done": "编辑完成",
+      "failed": "生成失败",
+      "session": "本次会话",
+      "sessionHint": "仅本次会话保留，刷新后清空，请及时下载",
+      "useSeed": "用这个种子重跑",
+      "seedHint": "同种子 + 同指令 + 同参考图可近似复现"
+    },
+    "err": {
+      "needBase": "请先上传底图",
+      "needPrompt": "请填写编辑指令",
+      "needRef": "该指令需要先上传参考图",
+      "notImage": "只能上传图片文件",
+      "tooLarge": "图片不能超过 15MB",
+      "uploadFailed": "图片上传失败，请重试",
+      "failed": "生成失败，请重试",
+      "timeout": "等待超时，请稍后重试",
+      "saveDefaults": "模板默认值保存失败"
+    },
+    "ctx": {
+      "pasted": "已粘贴图片",
+      "pastedTo": "已粘贴到 {target}"
+    }
+  },
+  "requestSnapshot": {
+    "title": "请求内容",
+    "subtitle": "这次生成真正提交给模型的提示词与参数",
+    "open": "请求内容",
+    "loading": "读取中…",
+    "noTask": "该分镜还没有生成任务",
+    "empty": "该任务没有记录请求快照（升级前生成的任务不回溯）",
+    "emptyPrompt": "（空提示词）",
+    "truncated": "已截断",
+    "provider": "厂商",
+    "mode": "形态",
+    "template": "工作流",
+    "method": "方法",
+    "bodySize": "请求体积",
+    "time": "提交时间",
+    "prompt": "提交的提示词",
+    "negativePrompt": "负向提示词",
+    "parameters": "生效参数",
+    "media": "素材顺序",
+    "region": {
+      "title": "局部编辑选区",
+      "rect": "选区（原图坐标）",
+      "area": "提交区域（含外扩）",
+      "crop": "裁切图",
+      "px": "px"
+    },
+    "bindings": "绑定链路",
+    "notes": "说明",
+    "body": "请求体",
+    "copyPrompt": "复制提示词",
+    "copyJson": "复制 JSON",
+    "copied": "已复制",
+    "close": "关闭",
+    "taskVideo": "视频",
+    "taskComposed": "分镜图",
+    "taskFirstFrame": "首帧",
+    "taskLastFrame": "尾帧",
+    "taskCharacter": "角色",
+    "taskScene": "场景",
+    "taskProp": "道具",
+    "taskImageEdit": "图片编辑"
   }
 }

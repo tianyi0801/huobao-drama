@@ -199,17 +199,58 @@ function contextValue(context: ComfyJobContext, source: ComfyBindingSource): unk
   }
 }
 
+/** 绑定链路快照（项目字段 → 节点输入），用于「请求内容」里核对中间变更 */
+export interface ComfyBindingTrace {
+  source: string
+  target: string
+  value: string
+}
+
+export interface ComfySubmissionTrace {
+  /** 本次生效的面板可调项 */
+  options: Record<string, any>
+  bindings: ComfyBindingTrace[]
+}
+
+export interface ComfySubmission {
+  graph: Record<string, ComfyApiNode>
+  trace: ComfySubmissionTrace
+}
+
+/** 快照里的值要短：提示词本身另有一份完整的，这里只证明「落到哪个节点」 */
+function previewValue(value: unknown): string {
+  if (value === undefined || value === null) return '(空)'
+  if (typeof value === 'string') {
+    const text = value.replace(/\s+/g, ' ').trim()
+    return text.length > 160 ? `${text.slice(0, 160)}…（${value.length} 字）` : text
+  }
+  if (Array.isArray(value)) {
+    const text = value.map(item => (typeof item === 'string' ? item : JSON.stringify(item))).join(' , ')
+    return text.length > 160 ? `${text.slice(0, 160)}…（${value.length} 项）` : text
+  }
+  try {
+    const text = JSON.stringify(value)
+    return text.length > 160 ? `${text.slice(0, 160)}…` : text
+  } catch {
+    return String(value)
+  }
+}
+
 /**
  * 生成提交图：应用可调项 → 应用绑定 → 剪枝
  * 任何绑定写错都会抛错，宁可失败在前端也不要提交一张参数错位的图。
+ *
+ * buildSubmissionDetailed 额外返回绑定链路，供请求快照展示「项目字段最终落在哪个节点」；
+ * buildSubmission 只是它的薄封装，行为完全一致。
  */
-export function buildSubmission(
+export function buildSubmissionDetailed(
   template: ComfyWorkflowTemplate,
   context: ComfyJobContext,
   savedOptionValues: Record<string, any>,
-): Record<string, ComfyApiNode> {
+): ComfySubmission {
   const graph = cloneGraph(template)
   const values = resolveOptionValues(template, savedOptionValues)
+  const bindings: ComfyBindingTrace[] = []
 
   // 1) 可调项
   for (const option of template.options || []) {
@@ -235,18 +276,36 @@ export function buildSubmission(
           removeTarget(graph, target)
           dropLinksTo(graph, target.node)
         }
+        bindings.push({
+          source: binding.index === undefined ? binding.source : `${binding.source}[${binding.index}]`,
+          target: binding.targets.map(t => `${t.node}.${t.input}`).join(', '),
+          value: '(未提供，可选槽位已移除)',
+        })
       }
       continue
     }
     const payload = binding.encoding === 'json' ? JSON.stringify(value) : value
     for (const target of binding.targets) setTarget(graph, target, payload)
+    bindings.push({
+      source: binding.index === undefined ? binding.source : `${binding.source}[${binding.index}]`,
+      target: binding.targets.map(t => `${t.node}.${t.input}`).join(', '),
+      value: previewValue(value),
+    })
   }
 
   // 3) 剪枝（同时天然清理掉未选中的互斥分支）
   // 预览节点必须一起保留，否则 ComfyUI 不会执行它，一采视频永远不落盘
   const outputs = [...new Set([...template.outputNodes, ...(template.previewOutputNodes || [])])]
     .filter(id => graph[id])
-  return pruneGraph(graph, outputs)
+  return { graph: pruneGraph(graph, outputs), trace: { options: values, bindings } }
+}
+
+export function buildSubmission(
+  template: ComfyWorkflowTemplate,
+  context: ComfyJobContext,
+  savedOptionValues: Record<string, any>,
+): Record<string, ComfyApiNode> {
+  return buildSubmissionDetailed(template, context, savedOptionValues).graph
 }
 
 /**

@@ -58,6 +58,7 @@
   "layout": {
     "nav": {
       "projects": "Projects",
+      "imageEdit": "Image editor",
       "settings": "Settings"
     },
     "banner": {
@@ -115,8 +116,7 @@
     "agent": {
       "busy": "Operation in progress",
       "done": "Done",
-      "failed": "Agent failed"
-    ,
+      "failed": "Agent failed",
       "cancelled": "Stopped; saved results are kept"
     }
   },
@@ -291,8 +291,7 @@
       "langNameEn": "English",
       "langNameJa": "Japanese",
       "langNameKo": "Korean",
-      "unifiedSwitchWarning": "Switched to {lang} — UI and AI content language update together. Refreshing…"
-    ,
+      "unifiedSwitchWarning": "Switched to {lang} — UI and AI content language update together. Refreshing…",
       "thinking": "Model thinking mode",
       "thinkingSub": "Let the text model reason before answering",
       "thinkingLabel": "Rewrite / extract / storyboard show reasoning live",
@@ -397,8 +396,7 @@
       "storyboardBreaker": "Storyboard Breaker",
       "promptGenerator": "Prompt Generator",
       "langFallback": "Falls back to Chinese",
-      "followContentLang": "Editing language: {lang} (switch in General → AI Content Language)"
-    ,
+      "followContentLang": "Editing language: {lang} (switch in General → AI Content Language)",
       "effectHint": "Takes effect immediately: the next generation uses the new prompt, no restart needed.",
       "overrideHint": "Note: installing a newer built-in template overwrites this file; the previous version is backed up under workspace/.backup."
     },
@@ -418,8 +416,7 @@
       "description": "Description",
       "descPlaceholder": "A short description of this skill",
       "create": "Create",
-      "created": "Skill created"
-    ,
+      "created": "Skill created",
       "effectHint": "Takes effect immediately. If you edit SKILL.md directly on disk, restart the backend or save once on this page to refresh the skill cache."
     },
     "cfg": {
@@ -561,10 +558,8 @@
       "timeline": "Live activity",
       "follow": "Follow latest",
       "reconnect": "Reconnect",
-      "disconnected": "Log disconnected; check the workbench for task status"
-    ,
-      "reasoning": "Reasoning"
-    ,
+      "disconnected": "Log disconnected; check the workbench for task status",
+      "reasoning": "Reasoning",
       "stop": "Stop"
     },
     "liveLog": {
@@ -949,8 +944,7 @@
       "aspectRatio": "Aspect Ratio",
       "stillRunning": "Still generating. Auto-waiting stopped — check progress in the task list (top right)",
       "confirmEta": "Estimated time",
-      "queued": "Queued"
-    ,
+      "queued": "Queued",
       "firstPassBadge": "First pass preview · refining"
     },
     "inspector": {
@@ -983,11 +977,9 @@
       "sbN": "Shot #{n}",
       "generic": "General",
       "fullMerge": "Full-episode merge",
-      "mergeKind": "Merge"
-    ,
+      "mergeKind": "Merge",
       "cancel": "Cancel",
-      "cancelled": "Task cancelled"
-    ,
+      "cancelled": "Task cancelled",
       "cancelledStatus": "Cancelled"
     },
     "export": {
@@ -1072,6 +1064,7 @@
       "unknownSubmission": "Submission uncertain. Check the upstream task before generating again.",
       "downloading": "Video generated; downloading",
       "diagnostics": "Copy diagnostics",
+      "requestSnapshot": "Request contents",
       "copied": "Diagnostics copied",
       "confirmNew": "This submits a new generation task and may incur another charge. Continue?",
       "restoreFailed": "Recover videos ({n})",
@@ -1148,5 +1141,173 @@
         "desc": "Click this \"?\" button to replay this page's guide. Happy creating!"
       }
     }
+  },
+  "imageEdit": {
+    "title": "Image Editor",
+    "sub": "Local ComfyUI · reference editing and subject compositing",
+    "engine": {
+      "ready": "Local engine ready",
+      "notEnabled": "Local engine disabled",
+      "notReady": "Image edit workflow missing",
+      "checking": "Checking…",
+      "goSettings": "Open settings"
+    },
+    "input": {
+      "title": "Pick image and reference"
+    },
+    "slot": {
+      "base": "Base image",
+      "baseHint": "The image to edit (image 1)",
+      "ref": "Reference",
+      "refHint": "Subject or material to blend in (image 2)",
+      "refOptional": "Optional · click or drop an image",
+      "upload": "Click to upload",
+      "drop": "Or drop an image here",
+      "replace": "Replace",
+      "remove": "Remove",
+      "max": "Image 1 is the base; add up to 3 reference images (2-4)",
+      "addRef": "Add reference"
+    },
+    "region": {
+      "draw": "Regional edit",
+      "exit": "Exit regional",
+      "clear": "Clear region",
+      "needBase": "Upload a base image first to draw a region",
+      "hintDraw": "Drag on the base image to select an area — its <bbox> coordinates are added to the prompt and the AI redraws the whole image",
+      "hintSelected": "Region {rect} selected — the AI redraws the full image following this region",
+      "badgeUnit": "px"
+    },
+    "prompt": {
+      "label": "Instruction",
+      "desc": "State what to change and what to keep for stable results",
+      "placeholder": "e.g. Place the person from image 2 into the living room of image 1, keep the face and body consistent, match lighting and perspective",
+      "quick": "Presets",
+      "fusion": "Place the person from image 2 naturally into the scene of image 1, keeping facial features and body proportions consistent, with lighting, color and perspective matched to image 1.",
+      "fusionShort": "Person into scene",
+      "outfit": "Keep the person in image 1 unchanged and dress them in the outfit from image 2, with natural folds and lighting.",
+      "outfitShort": "Change outfit",
+      "style": "Keep the content, composition and person of image 1 unchanged, but shift the overall style to a cinematic look with richer lighting and color.",
+      "styleShort": "Cinematic",
+      "cleanup": "Remove clutter and extra people from image 1, fill in the occluded background and keep the scene coherent.",
+      "cleanupShort": "Clean up",
+      "enhance": "Increase sharpness and detail of image 1, fix blur and noise while keeping the person unchanged.",
+      "enhanceShort": "Enhance detail",
+      "oneImagePrefix": "Image 1 is the base image. ",
+      "twoImagesPrefix": "Image 1 is the base image, image 2 is the reference material. ",
+      "multiImagesPrefix": "Image 1 is the base image, images {from}-{to} are reference materials. ",
+      "regionMarked": "The red rectangle in image 1 marks the region to edit. Apply the following instruction to that region and blend the result naturally with the surrounding lighting, color and perspective. The red box only indicates the location and must not appear in the output."
+    },
+    "adv": {
+      "title": "Advanced",
+      "quality": "Quality",
+      "custom": "Custom",
+      "customSize": "Output pixels",
+      "customPixelNote": "about {mp} MP",
+      "steps": "Steps",
+      "seed": "Seed",
+      "seedPlaceholder": "Empty = random each run",
+      "randomSeed": "Randomize",
+      "seedRandom": "random",
+      "negative": "Negative prompt",
+      "negativePlaceholder": "e.g. blurry, distorted, extra fingers, watermark",
+      "negativeHint": "The workflow runs KSampler with cfg=1, so the negative prompt does not affect sampling — it is only recorded in the request snapshot.",
+      "persistHint": "Quality and steps are written back as the local template defaults and affect all later image generations; seed and negative prompt apply to this run only.",
+      "saved": "Saved as template defaults",
+      "summary": "{quality} · {steps} steps · {resolution} · seed {seed}",
+      "resolution": "Resolution",
+      "resolutionHint": "Edit output size follows the workflow resolution: match-reference is ~768px; 1K/2K is sharper but slower",
+      "resLabel": "Match reference"
+    },
+    "output": {
+      "label": "Output ratio",
+      "auto": "Match base",
+      "noteAuto": "Base {w}×{h} → output {size}"
+    },
+    "action": {
+      "generate": "Start editing",
+      "regenerate": "Regenerate",
+      "cancel": "Cancel",
+      "cancelDone": "Generation cancelled",
+      "retry": "Retry",
+      "download": "Download",
+      "useAsBase": "Use as base",
+      "based": "Set as base image",
+      "view": "View full size",
+      "close": "Close",
+      "shortcut": "Ctrl / ⌘ + Enter to generate"
+    },
+    "result": {
+      "title": "Result",
+      "hint": "Results live only in this session, download them in time",
+      "empty": "Upload a base image, describe the change and the result shows up here",
+      "step1": "Upload the base image (image 1)",
+      "step2": "Optional: upload a reference (image 2)",
+      "step3": "Describe the change and start generating",
+      "running": "Running locally, usually 20-120 seconds",
+      "elapsed": "{s}s elapsed",
+      "done": "Editing finished",
+      "failed": "Generation failed",
+      "session": "This session",
+      "sessionHint": "Kept in this session only, cleared on refresh - download in time",
+      "useSeed": "Reuse this seed",
+      "seedHint": "Same seed, prompt and references reproduce a similar result"
+    },
+    "err": {
+      "needBase": "Upload a base image first",
+      "needPrompt": "Describe the edit first",
+      "needRef": "This preset needs a reference image",
+      "notImage": "Only image files are supported",
+      "tooLarge": "Image must be smaller than 15MB",
+      "uploadFailed": "Upload failed, please retry",
+      "failed": "Generation failed, please retry",
+      "timeout": "Timed out, please try again later",
+      "saveDefaults": "Failed to save template defaults"
+    },
+    "ctx": {
+      "pasted": "Image pasted",
+      "pastedTo": "Pasted into {target}"
+    }
+  },
+  "requestSnapshot": {
+    "title": "Request contents",
+    "subtitle": "What was actually sent to the model for this run",
+    "open": "Request",
+    "loading": "Loading…",
+    "noTask": "No generation task for this shot yet",
+    "empty": "No request snapshot for this task (tasks created before the upgrade are not backfilled)",
+    "emptyPrompt": "(empty prompt)",
+    "truncated": "Truncated",
+    "provider": "Provider",
+    "mode": "Mode",
+    "template": "Workflow",
+    "method": "Method",
+    "bodySize": "Payload",
+    "time": "Submitted",
+    "prompt": "Prompt sent",
+    "negativePrompt": "Negative prompt",
+    "parameters": "Effective parameters",
+    "media": "Media order",
+    "region": {
+      "title": "Regional edit",
+      "rect": "Selected region (base coords)",
+      "area": "Submitted area (with padding)",
+      "crop": "Crop image",
+      "px": "px"
+    },
+    "bindings": "Binding trace",
+    "notes": "Notes",
+    "body": "Request body",
+    "copyPrompt": "Copy prompt",
+    "copyJson": "Copy JSON",
+    "copied": "Copied",
+    "close": "Close",
+    "taskVideo": "Video",
+    "taskComposed": "Shot image",
+    "taskFirstFrame": "First frame",
+    "taskLastFrame": "Last frame",
+    "taskCharacter": "Character",
+    "taskScene": "Scene",
+    "taskProp": "Prop",
+    "taskImageEdit": "Image edit"
   }
 }

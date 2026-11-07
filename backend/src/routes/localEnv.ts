@@ -8,7 +8,7 @@
 import { Hono } from 'hono'
 import { success, badRequest } from '../utils/response.js'
 import { collectLocalEnv } from '../services/comfyui/env.js'
-import { saveComfyConfig } from '../services/comfyui/config.js'
+import { getComfyConfig, saveComfyConfig } from '../services/comfyui/config.js'
 import { summarizeComfyConfig } from './workflows.js'
 
 const app = new Hono()
@@ -35,6 +35,11 @@ app.put('/config', async (c) => {
     const patch: Record<string, unknown> = {}
     for (const key of ['enabled', 'url', 'optionValues', 'imagePixelBudget', 'continuityReference', 'poll', 'uploadSubfolder']) {
       if (key in body) patch[key] = body[key]
+    }
+    // 增量更新可调项：调用方通常只改一个参数（如图片编辑页改 steps），
+    // 直接传 optionValues 会整体覆盖视频等其它模板的取值，这里提供合并入口
+    if (body.optionPatch && typeof body.optionPatch === 'object' && !Array.isArray(body.optionPatch)) {
+      patch.optionValues = { ...getComfyConfig().optionValues, ...body.optionPatch }
     }
     if (!Object.keys(patch).length) return badRequest(c, '没有可更新的字段')
     const saved = saveComfyConfig(patch)

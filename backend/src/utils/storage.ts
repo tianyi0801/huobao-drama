@@ -146,6 +146,49 @@ export async function fetchImageAsCompressedDataUrl(
   return compressImageAsDataUrl(Buffer.from(await resp.arrayBuffer()), options)
 }
 
+/**
+ * 底图 + 选区 → 红框标注图（压缩 data URL）。
+ *
+ * 局部编辑的选区传达方式：把红框直接画在送入模型的底图上，配合提示词里的
+ * 自然语言指代（"红框标记的区域"）。这是 Qwen-Image-Edit 官方示例的做法——
+ * 视觉编码器对图中视觉标记的定位理解远可靠于纯文本坐标（实测 <bbox> 数字
+ * 串几乎没有约束力），同时整图重绘避免了蒙版拼接的边界割裂感。
+ *
+ * 红框画在原图坐标系（region 即原图像素坐标），画完再走统一压缩管线。
+ */
+export async function annotateImageRegionDataUrl(
+  relativePath: string,
+  region: { x: number; y: number; w: number; h: number },
+  options: {
+    maxWidth?: number
+    maxHeight?: number
+    quality?: number
+    color?: string
+  } = {},
+): Promise<string> {
+  const absPath = getAbsolutePath(relativePath)
+  const pipeline = sharp(absPath).rotate()
+  const metadata = await pipeline.metadata()
+  const width = Number(metadata.width || 0)
+  const height = Number(metadata.height || 0)
+  if (!width || !height) throw new Error(`底图无法读取尺寸: ${relativePath}`)
+
+  // 选区收敛到图内
+  const x = Math.min(Math.max(0, Math.round(region.x)), Math.max(0, width - 2))
+  const y = Math.min(Math.max(0, Math.round(region.y)), Math.max(0, height - 2))
+  const w = Math.min(width - x, Math.max(2, Math.round(region.w)))
+  const h = Math.min(height - y, Math.max(2, Math.round(region.h)))
+
+  // 框线宽度随图自适应：太大遮挡内容，太小压缩后看不清
+  const stroke = Math.max(3, Math.round(Math.min(width, height) / 150))
+  const color = options.color || '#ff1e1e'
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">`
+    + `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${color}" stroke-width="${stroke}"/></svg>`
+  const annotated = await pipeline.composite([{ input: Buffer.from(svg) }]).toBuffer()
+
+  return compressImageAsDataUrl(annotated, options)
+}
+
 /** sharp 输入 → 压缩 JPEG data URL（本地路径与远程下载共享同一压缩管线） */
 async function compressImageAsDataUrl(
   input: string | Buffer,

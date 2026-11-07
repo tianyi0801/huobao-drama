@@ -82,8 +82,8 @@ description: 分镜拆解专业规范 — 将剧本拆分为可承载多个子�
 ## 质量要求
 
 - `description` 按 `【镜头1】` 写清逐人位置、可见脸部、动作和原句对白；默认不再补 `【镜头2】`，旁白仅保留剧本原有内容
-- `video_prompt` 使用 MiniMax 官方 Ref2VA 六节结构（subject_definitions / summary / retention_analysis / detailed_description / overall_soundscape / non_diegetic_music），正文英文；每个可见配角都有独立 <Subject N> 与画面动作，不用泛称替代
-- 原句对白写成 <d>[Chinese] 原句</d>，只在 detailed_description 对应 Shot 写一次，并给实际发声者分配稳定 (Sx)；overall_soundscape 只写 1—4 句英文环境音与物理声，不列说话白名单、不重复对白
+- `video_prompt` 使用 MiniMax 官方 Ref2VA 六节结构（subject_definitions / summary / retention_analysis / detailed_description / overall_soundscape / non_diegetic_music），正文用简体中文、节名与关系标记保持英文；每个可见配角都有独立 <Subject N> 与画面动作，不用泛称替代
+- 原句对白写成 <d>[Chinese] 原句</d>，只在 detailed_description 对应 Shot 写一次，并给实际发声者分配稳定 (Sx)；overall_soundscape 只写 1—4 句中文环境音与物理声，不列说话白名单、不重复对白
 - non_diegetic_music 无配乐时写 N/A，不要根据 atmosphere 自动添加配音或音乐
 - 字段按保存工具 schema 填写，不要求不存在的 image_prompt、bgm_prompt、sound_effect
 - 如需增量调整，调用 `update_storyboard` 修改具体段落，不清空整集

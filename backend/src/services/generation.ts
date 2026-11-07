@@ -14,10 +14,19 @@ import { getComfyConfig } from './comfyui/config.js'
 import { watchComfyRun } from './comfyui/live-preview.js'
 import { appendVideoPromptSection } from './video-prompt-structure.js'
 import { now } from '../utils/response.js'
-import { downloadFile, fetchImageAsCompressedDataUrl, generateImageThumb, readImageAsCompressedDataUrl, readImageAsDataUrl, saveBase64Image } from '../utils/storage.js'
+import { annotateImageRegionDataUrl, downloadFile, fetchImageAsCompressedDataUrl, generateImageThumb, readImageAsCompressedDataUrl, readImageAsDataUrl, saveBase64Image } from '../utils/storage.js'
 import { extractVideoPoster } from '../utils/video-poster.js'
 import { getImageAdapter, getVideoAdapter } from './adapters/registry'
-import type { AIConfig } from './adapters/types'
+import { saveRequestSnapshot } from './request-snapshot.js'
+
+/** 局部编辑选区（底图像素坐标） */
+export interface RegionRect {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+import type { AIConfig, RequestDebug } from './adapters/types'
 import { logTaskError, logTaskPayload, logTaskProgress, logTaskStart, logTaskSuccess, logTaskWarn, redactUrl } from '../utils/task-logger.js'
 
 type TaskType = 'image' | 'video'
@@ -51,6 +60,14 @@ interface GenerateImageParams {
   referenceImages?: string[]
   frameType?: string
   configId?: number
+  /** 采样种子：为空由适配器随机，填定值可复现同一张图 */
+  seed?: number
+  /** 负面提示词：本地工作流 cfg=1 时对出图无影响，仅记录进请求快照 */
+  negativePrompt?: string
+  /** 本次请求覆盖模板可调项（如 steps），优先级高于全局默认值 */
+  optionOverrides?: Record<string, unknown>
+  /** 局部编辑选区（底图像素坐标）；提供时只重绘该区域并贴回原图 */
+  region?: RegionRect
 }
 
 interface GenerateVideoParams {
@@ -97,6 +114,15 @@ export async function generateImage(params: GenerateImageParams): Promise<number
     size: params.size || '1920x1080',
     frameType: params.frameType,
     referenceImages: params.referenceImages,
+    // 采样控制随任务落库，恢复/重跑时仍能还原本次参数
+    seed: Number.isFinite(Number(params.seed)) && Number(params.seed) > 0 ? Number(params.seed) : null,
+    negativePrompt: String(params.negativePrompt || '').trim() || null,
+    optionOverrides: params.optionOverrides && Object.keys(params.optionOverrides).length
+      ? params.optionOverrides
+      : null,
+    // 局部编辑选区（原图像素坐标）：随任务落库，仅用于记录与快照展示，
+    // 重绘指令由前端以 <bbox> 形式写进提示词，由模型整图重绘
+    region: params.region ?? null,
   })
 
   logTaskStart('ImageTask', 'enqueue', {
@@ -227,7 +253,8 @@ async function processTask(id: number, config: AIConfig) {
     if (!record) return
     const type = record.type as TaskType
     const label = taskLabel(type)
-    const params = parseTaskParams(record.params)
+    // let：局部编辑会在提交前把参考图换成裁切图并回写参数
+    let params = parseTaskParams(record.params)
 
     // 视频：同场景必须逐段放行。批量提交时若同时把 N 个任务交给 ComfyUI，
     // 提交图在提交那一刻就固定了，后面的镜头拿不到上一段尾帧，衔接会失效。
@@ -271,17 +298,35 @@ async function processTask(id: number, config: AIConfig) {
     })
 
     let url: string, method: string, headers: Record<string, string>, body: unknown
+    // 适配器自述的真实请求内容（提示词 / 参数 / 素材顺序 / 绑定链路），用于落库快照
+    let debug: RequestDebug | undefined
 
     if (type === 'image') {
       const adapter = getImageAdapter(config.provider)
-      const resolvedReferenceImages = await normalizeReferenceImages(params.referenceImages)
-      ;({ url, method, headers, body } = await adapter.buildGenerateRequest(config, {
+      // 局部编辑：把红框画在底图（图1）上再送模型——视觉编码器看得见框，
+      // 配合提示词里的"红框标记区域"指代，比纯文本 <bbox> 坐标可靠得多；
+      // 整图重绘也让新内容与周围自然融合，避免蒙版拼接的边界割裂感
+      let referenceSources = params.referenceImages
+      if (params.region && Array.isArray(referenceSources) && referenceSources.length) {
+        const basePath = String(referenceSources[0])
+        // 仅本地 static 素材支持画框（图片编辑页的底图天然满足）；失败直接终止，
+        // 避免提示词声称"红框标记"但图上没有框，误导模型
+        const annotated = await annotateImageRegionDataUrl(basePath, params.region)
+        referenceSources = [annotated, ...referenceSources.slice(1)]
+      }
+      const resolvedReferenceImages = await normalizeReferenceImages(referenceSources)
+      ;({ url, method, headers, body, debug } = await adapter.buildGenerateRequest(config, {
         id: record.id,
         model: record.model,
         prompt: record.prompt,
         size: params.size,
         frameType: params.frameType,
         referenceImages: resolvedReferenceImages.length ? JSON.stringify(resolvedReferenceImages) : null,
+        seed: params.seed,
+        negativePrompt: params.negativePrompt,
+        optionOverrides: params.optionOverrides,
+        // 局部编辑选区（仅用于请求快照展示；重绘指令已由前端以 <bbox> 写进提示词）
+        region: params.region ? JSON.stringify({ rect: params.region }) : null,
       }))
     } else {
       const adapter = getVideoAdapter(config.provider)
@@ -300,7 +345,7 @@ async function processTask(id: number, config: AIConfig) {
       const resolvedReferenceFileUrl = localEngine
         ? (String(params.referenceFileUrl || '').trim() || null)
         : resolvePublicMediaUrl(params.referenceFileUrl, 'file')
-      ;({ url, method, headers, body } = await adapter.buildGenerateRequest(config, {
+      ;({ url, method, headers, body, debug } = await adapter.buildGenerateRequest(config, {
         id: record.id,
         model: record.model,
         prompt: record.prompt,
@@ -336,6 +381,17 @@ async function processTask(id: number, config: AIConfig) {
       id, method, url, headers,
       // multipart 表单（如 OpenAI /v1/images/edits）无法 JSON 化，记录字段摘要
       body: isMultipart ? `[multipart/form-data: ${[...(body as FormData).keys()].join(', ')}]` : body,
+    })
+
+    // 请求快照落库：「查看发送内容」读的就是这份，写失败不阻断生成
+    await saveRequestSnapshot(id, {
+      type,
+      provider: config.provider,
+      url,
+      method,
+      body,
+      debug,
+      prompt: record.prompt,
     })
 
     const resp = await fetch(url, {

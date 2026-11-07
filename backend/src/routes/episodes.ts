@@ -292,7 +292,11 @@ app.get('/:id/generation-tasks', async (c) => {
 
   return success(c, {
     // 合并一采预览状态：任务还在跑时前端也能先看到一采画面
-    tasks: toSnakeCaseArray(tasks.map(task => decorateTaskWithPreview(task))),
+    // 请求快照体积较大，列表接口一律剔除，按任务 id 单独读取
+    tasks: toSnakeCaseArray(tasks.map((task) => {
+      const { requestSnapshot: _snapshot, ...rest } = decorateTaskWithPreview(task)
+      return rest
+    })),
     merges: toSnakeCaseArray(merges),
   })
 })

@@ -77,7 +77,7 @@ Dialogue that does not fit must be moved to the next segment; cramming unperform
 
 ## Quality Requirements
 
-- Default to `【镜头1】` with exact positions, faces and actions. Use the official MiniMax Ref2VA six sections for `video_prompt` (subject_definitions / summary / retention_analysis / detailed_description / overall_soundscape / non_diegetic_music) written in English, with an independent <Subject N> for every visible character; use @ references only for actual available images
-- Original dialogue appears once in its Shot as <d>[Chinese] ...</d> with a stable (Sx) speaker ID. overall_soundscape contains 1-4 English sentences of ambience and physical sounds only, with no speaker whitelist and no repeated dialogue
+- Default to `【镜头1】` with exact positions, faces and actions. Use the official MiniMax Ref2VA six sections for `video_prompt` (subject_definitions / summary / retention_analysis / detailed_description / overall_soundscape / non_diegetic_music) with a Simplified Chinese body (section names and retention markers stay in English), with an independent <Subject N> for every visible character; use @ references only for actual available images
+- Original dialogue appears once in its Shot as <d>[Chinese] ...</d> with a stable (Sx) speaker ID. overall_soundscape contains 1-4 Chinese sentences of ambience and physical sounds only, with no speaker whitelist and no repeated dialogue
 - retention_analysis uses only official markers (fully_preserved / partially_preserved / attribute_transfer / weak_reference); non_diegetic_music is N/A unless music is explicitly requested; do not design sound from atmosphere alone
 - Use only the save tool schema fields. Incremental `update_storyboard` edits never clear the episode

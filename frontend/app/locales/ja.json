@@ -58,6 +58,7 @@
   "layout": {
     "nav": {
       "projects": "プロジェクト",
+      "imageEdit": "画像編集",
       "settings": "設定"
     },
     "banner": {
@@ -115,8 +116,7 @@
     "agent": {
       "busy": "処理を実行中です",
       "done": "完了",
-      "failed": "エージェントの実行に失敗しました"
-    ,
+      "failed": "エージェントの実行に失敗しました",
       "cancelled": "停止しました。保存済みの内容は残ります"
     }
   },
@@ -291,8 +291,7 @@
       "langNameEn": "英語",
       "langNameJa": "日本語",
       "langNameKo": "韓国語",
-      "unifiedSwitchWarning": "{lang} に切替しました。UI と AI コンテンツ言語が同期され、まもなく再読み込みします…"
-    ,
+      "unifiedSwitchWarning": "{lang} に切替しました。UI と AI コンテンツ言語が同期され、まもなく再読み込みします…",
       "thinking": "モデル思考モード",
       "thinkingSub": "テキストモデルに推論させてから出力します",
       "thinkingLabel": "有効にすると改写／抽出／絵コンテで思考過程をリアルタイム表示",
@@ -391,8 +390,7 @@
       "storyboardBreaker": "分镜分解",
       "promptGenerator": "プロンプト生成",
       "langFallback": "中国語にフォールバック",
-      "followContentLang": "編集言語：{lang}（「一般 → AI コンテンツ言語」で切替）"
-    ,
+      "followContentLang": "編集言語：{lang}（「一般 → AI コンテンツ言語」で切替）",
       "effectHint": "保存後すぐに反映されます。次回の生成から新しいプロンプトが使われ、再起動は不要です。",
       "overrideHint": "注意：新しい内蔵テンプレートをインストールするとこのファイルは上書きされます。上書き前の版は workspace/.backup に保存されます。"
     },
@@ -412,8 +410,7 @@
       "description": "説明",
       "descPlaceholder": "この Skill の用途を簡単に記述",
       "create": "作成",
-      "created": "Skill を作成しました"
-    ,
+      "created": "Skill を作成しました",
       "effectHint": "保存後すぐに反映されます。SKILL.md を直接編集した場合は、バックエンド再起動か本画面での再保存が必要です。"
     },
     "cfg": {
@@ -505,10 +502,8 @@
       "timeline": "リアルタイム実行記録",
       "follow": "最新に追従",
       "reconnect": "再接続",
-      "disconnected": "ログ切断・タスク状態は作業画面で確認"
-    ,
-      "reasoning": "思考プロセス"
-    ,
+      "disconnected": "ログ切断・タスク状態は作業画面で確認",
+      "reasoning": "思考プロセス",
       "stop": "停止"
     },
     "liveLog": {
@@ -893,8 +888,7 @@
       "aspectRatio": "アスペクト比",
       "stillRunning": "生成に時間がかかっています。自動待機を停止しました。右上のタスク一覧で進捗を確認できます",
       "confirmEta": "所要時間の目安",
-      "queued": "待機中"
-    ,
+      "queued": "待機中",
       "firstPassBadge": "一次生成プレビュー・高画質化中"
     },
     "inspector": {
@@ -927,11 +921,9 @@
       "sbN": "分镜 #{n}",
       "generic": "汎用",
       "fullMerge": "話全体の結合",
-      "mergeKind": "結合"
-    ,
+      "mergeKind": "結合",
       "cancel": "キャンセル",
-      "cancelled": "タスクをキャンセルしました"
-    ,
+      "cancelled": "タスクをキャンセルしました",
       "cancelledStatus": "キャンセル済み"
     },
     "export": {
@@ -1016,6 +1008,7 @@
       "unknownSubmission": "送信結果が不明です。再生成前に上流のタスクを確認してください。",
       "downloading": "動画生成済み・ダウンロード中",
       "diagnostics": "診断情報をコピー",
+      "requestSnapshot": "リクエスト内容",
       "copied": "診断情報をコピーしました",
       "confirmNew": "新しい生成タスクを送信します。再度料金が発生する可能性があります。続行しますか？",
       "restoreFailed": "動画を復旧 ({n})",
@@ -1092,5 +1085,173 @@
         "desc": "この「?」ボタンでこのページのガイドを再表示できます。良い制作を！"
       }
     }
+  },
+  "imageEdit": {
+    "title": "画像編集",
+    "sub": "ローカル ComfyUI · 参考画像の編集と人物合成",
+    "engine": {
+      "ready": "ローカル環境 準備完了",
+      "notEnabled": "ローカル環境が無効",
+      "notReady": "画像編集ワークフロー未設定",
+      "checking": "確認中…",
+      "goSettings": "設定へ"
+    },
+    "input": {
+      "title": "画像と参考画像を選択"
+    },
+    "slot": {
+      "base": "ベース画像",
+      "baseHint": "編集する画像（画像1）",
+      "ref": "参考画像",
+      "refHint": "合成したい人物や素材（画像2）",
+      "refOptional": "任意 · クリックまたは画像をドロップ",
+      "upload": "クリックしてアップロード",
+      "drop": "画像をここにドロップも可",
+      "replace": "差し替え",
+      "remove": "削除",
+      "max": "画像1がベース、最大3枚の参考画像（画像2〜4）を追加できます",
+      "addRef": "参考画像を追加"
+    },
+    "region": {
+      "draw": "部分リタッチ",
+      "exit": "部分編集を終了",
+      "clear": "選択をクリア",
+      "needBase": "ベース画像をアップロードすると範囲選択できます",
+      "hintDraw": "ベース画像をドラッグして編集範囲を選択。<bbox> 座標がプロンプトに追加され、AIが画像全体を再生成します",
+      "hintSelected": "{rect} を選択中 — AIがこの範囲に従って画像全体を再生成します",
+      "badgeUnit": "px"
+    },
+    "prompt": {
+      "label": "編集指示",
+      "desc": "「変える部分」と「残す部分」を明記すると結果が安定します",
+      "placeholder": "例：画像2の人物を画像1のリビングに自然に配置し、顔立ちと体型を保ち、光と遠近感を画像1に合わせる",
+      "quick": "定型指示",
+      "fusion": "画像2の人物を画像1のシーンに自然に配置し、顔立ちと体型の比率を保ち、光・色調・遠近感を画像1の環境に合わせる。",
+      "fusionShort": "人物を合成",
+      "outfit": "画像1の人物はそのままに、画像2の衣装を着せ、シワと受光を自然にする。",
+      "outfitShort": "衣装を変更",
+      "style": "画像1の内容・構図・人物は変えず、全体を映画のような質感にし、光と色彩の階調を豊かにする。",
+      "styleShort": "映画風",
+      "cleanup": "画像1の不要物と余計な人物を取り除き、隠れた背景を補完して画面の連続性を保つ。",
+      "cleanupShort": "不要物を削除",
+      "enhance": "画像1の解像感とディテールを高め、ぼけやノイズを補正しつつ人物の特徴を保つ。",
+      "enhanceShort": "高精細化",
+      "oneImagePrefix": "画像1はベース画像です。",
+      "twoImagesPrefix": "画像1はベース画像、画像2は参考素材です。",
+      "multiImagesPrefix": "画像1はベース画像、画像{from}〜{to}は参考素材です。",
+      "regionMarked": "画像1の赤い矩形枠が編集対象の領域です。この領域に対して続く指示を実行し、変更後の内容は周囲の光・色調・遠近感と自然に融合させてください。赤枠は位置の指示のみに用い、出力結果に赤枠を残さないでください。"
+    },
+    "adv": {
+      "title": "詳細設定",
+      "quality": "画質",
+      "custom": "カスタム",
+      "customSize": "出力ピクセル",
+      "customPixelNote": "約 {mp} MP",
+      "steps": "サンプリング回数",
+      "seed": "シード",
+      "seedPlaceholder": "空欄なら毎回ランダム",
+      "randomSeed": "ランダム生成",
+      "seedRandom": "ランダム",
+      "negative": "ネガティブプロンプト",
+      "negativePlaceholder": "例：ぼけ、歪み、指の過多、透かし",
+      "negativeHint": "現在のワークフローは KSampler cfg=1 のため、ネガティブプロンプトはサンプリングに影響しません。リクエスト記録にのみ残ります。",
+      "persistHint": "画質とステップ数はローカルテンプレートの既定値として保存され、以降のすべての画像生成に影響します。シードとネガティブプロンプトは今回のみ有効です。",
+      "saved": "テンプレート既定値に保存しました",
+      "summary": "{quality} · {steps} ステップ · {resolution} · シード {seed}",
+      "resolution": "出力解像度",
+      "resolutionHint": "編集時のサイズはワークフローの resolution で決まります：参照に合わせるは約768px、1K/2Kは高精細ですが遅くなります",
+      "resLabel": "参照に合わせる"
+    },
+    "output": {
+      "label": "出力比率",
+      "auto": "ベースに合わせる",
+      "noteAuto": "ベース {w}×{h} → 出力 {size}"
+    },
+    "action": {
+      "generate": "編集を開始",
+      "regenerate": "再生成",
+      "cancel": "生成を中止",
+      "cancelDone": "生成を中止しました",
+      "retry": "再試行",
+      "download": "ダウンロード",
+      "useAsBase": "ベースにして続ける",
+      "based": "ベース画像に設定しました",
+      "view": "拡大表示",
+      "close": "閉じる",
+      "shortcut": "Ctrl / ⌘ + Enter で生成"
+    },
+    "result": {
+      "title": "編集結果",
+      "hint": "結果は今回のセッション内のみ保持されます。早めに保存してください",
+      "empty": "ベース画像をアップし変更内容を書くと、ここに結果が表示されます",
+      "step1": "ベース画像（画像1）をアップロード",
+      "step2": "任意：参考画像（画像2）をアップロード",
+      "step3": "変更内容を書いて生成を開始",
+      "running": "ローカルで推論中。通常 20〜120 秒",
+      "elapsed": "経過 {s} 秒",
+      "done": "編集が完了しました",
+      "failed": "生成に失敗しました",
+      "session": "今回のセッション",
+      "sessionHint": "セッション内のみ保持、再読み込みで消えます。早めに保存してください",
+      "useSeed": "このシードで再実行",
+      "seedHint": "同じシード・指示・参考画像でほぼ再現できます"
+    },
+    "err": {
+      "needBase": "先にベース画像をアップロードしてください",
+      "needPrompt": "編集指示を入力してください",
+      "needRef": "この指示には参考画像が必要です",
+      "notImage": "画像ファイルのみ対応しています",
+      "tooLarge": "画像は 15MB 以内にしてください",
+      "uploadFailed": "アップロードに失敗しました。再試行してください",
+      "failed": "生成に失敗しました。再試行してください",
+      "timeout": "待機がタイムアウトしました。しばらくして再試行してください",
+      "saveDefaults": "テンプレート既定値の保存に失敗しました"
+    },
+    "ctx": {
+      "pasted": "画像を貼り付けました",
+      "pastedTo": "{target} に貼り付けました"
+    }
+  },
+  "requestSnapshot": {
+    "title": "リクエスト内容",
+    "subtitle": "この生成で実際にモデルへ送られたプロンプトとパラメータ",
+    "open": "リクエスト内容",
+    "loading": "読み込み中…",
+    "noTask": "このカットにはまだ生成タスクがありません",
+    "empty": "このタスクにはリクエスト記録がありません（アップグレード前のタスクは記録されません）",
+    "emptyPrompt": "（プロンプトなし）",
+    "truncated": "切り詰め",
+    "provider": "プロバイダ",
+    "mode": "形態",
+    "template": "ワークフロー",
+    "method": "メソッド",
+    "bodySize": "サイズ",
+    "time": "送信時刻",
+    "prompt": "送信プロンプト",
+    "negativePrompt": "ネガティブプロンプト",
+    "parameters": "有効パラメータ",
+    "media": "素材順序",
+    "region": {
+      "title": "部分編集エリア",
+      "rect": "選択範囲（元画像座標）",
+      "area": "送信領域（余白込み）",
+      "crop": "切り出し画像",
+      "px": "px"
+    },
+    "bindings": "バインディング",
+    "notes": "備考",
+    "body": "リクエスト本文",
+    "copyPrompt": "プロンプトをコピー",
+    "copyJson": "JSON をコピー",
+    "copied": "コピーしました",
+    "close": "閉じる",
+    "taskVideo": "動画",
+    "taskComposed": "カット画像",
+    "taskFirstFrame": "先頭フレーム",
+    "taskLastFrame": "末尾フレーム",
+    "taskCharacter": "キャラクター",
+    "taskScene": "シーン",
+    "taskProp": "小道具",
+    "taskImageEdit": "画像編集"
   }
 }

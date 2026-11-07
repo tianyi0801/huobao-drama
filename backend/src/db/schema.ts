@@ -218,6 +218,8 @@ export const sysTask = sqliteTable('sys_task', {
   // image: {size, frameType, referenceImages[]}
   // video: {referenceMode, firstFrameUrl, lastFrameUrl, referenceImageUrls[], referenceVideoUrls[], referenceAudioUrls[], referenceFileUrl, referenceLinkUrl, generateAudio, duration, aspectRatio, resolution, seed, promptExtend, watermark}
   params: text('params'),
+  // 请求快照：真实提交给模型的提示词 + 生效参数 + 素材顺序 + 绑定链路（JSON）
+  requestSnapshot: text('request_snapshot'),
   taskId: text('task_id'),
   resultUrl: text('result_url'),
   localPath: text('local_path'),

@@ -113,6 +113,22 @@
                 "input": "steps"
               }
             ]
+          },
+          {
+            "id": "resolution",
+            "label": "输出分辨率 (Resolution)",
+            "type": "number",
+            "default": 0,
+            "min": 0,
+            "max": 4096,
+            "step": 32,
+            "targets": [
+              {
+                "node": "459:452",
+                "input": "resolution"
+              }
+            ],
+            "hint": "0 跟随参考图尺寸（参考图发送前会压到 768px，故约 768px 出图）；1024 / 2048 会把参考图缩放到约该尺寸并按此出图，更清晰但更慢"
           }
         ]
       }
@@ -220,6 +236,28 @@
                 "input": "filename_prefix"
               }
             ]
+          },
+          {
+            "source": "images",
+            "index": 2,
+            "optional": true,
+            "targets": [
+              {
+                "node": "huobao-ref-3",
+                "input": "image"
+              }
+            ]
+          },
+          {
+            "source": "images",
+            "index": 3,
+            "optional": true,
+            "targets": [
+              {
+                "node": "huobao-ref-4",
+                "input": "image"
+              }
+            ]
           }
         ],
         "options": [
@@ -250,6 +288,22 @@
                 "input": "steps"
               }
             ]
+          },
+          {
+            "id": "resolution",
+            "label": "输出分辨率 (Resolution)",
+            "type": "number",
+            "default": 0,
+            "min": 0,
+            "max": 4096,
+            "step": 32,
+            "targets": [
+              {
+                "node": "459:474",
+                "input": "resolution"
+              }
+            ],
+            "hint": "0 跟随参考图尺寸（参考图发送前会压到 768px，故约 768px 出图）；1024 / 2048 会把参考图缩放到约该尺寸并按此出图，更清晰但更慢"
           }
         ]
       }

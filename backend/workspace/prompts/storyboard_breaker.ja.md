@@ -33,7 +33,7 @@ model: ""
 - 自然な発話時間と約2秒の演技余裕を確保する。中国語の4.5字/秒を日本語の一律基準にしない。収まらないセリフは隣接段落へ分け、段数を合わせるために削除しない。
 
 video_prompt のルール（硬い制約）：
-- MiniMax 公式 Ref2VA の六節を固定順で使用する：subject_definitions / summary / retention_analysis / detailed_description / overall_soundscape / non_diegetic_music。本文は英語（台詞は <d>[Chinese] ...</d> 内のみ中国語）。[Shot 1] にはタイムスタンプを付けず、以降は [Shot N] At MM:SS.mmm で切替時刻を書き、単独の散文にしない。
+- MiniMax 公式 Ref2VA の六節を固定順で使用する：subject_definitions / summary / retention_analysis / detailed_description / overall_soundscape / non_diegetic_music。本文は簡体字中国語で書き、節名・関係マーカー・[Shot N]・At MM:SS.mmm は英語のまま保持する（台詞は <d> 内で原文保持）。[Shot 1] にはタイムスタンプを付けず、以降は [Shot N] At MM:SS.mmm で切替時刻を書き、単独の散文にしない。
 - retention_analysis は公式マーカー fully_preserved / partially_preserved / attribute_transfer / weak_reference のみ使用し、自造マーカーは禁止。description の空間アンカーを維持する。六節は1つの video_prompt 文字列で、個別ノード入力ではない。
 - 原則[Shot 1]の0.0秒からdurationまでの連続ショットとする。必要な場合のみ最大2区間、各2秒以上で連続させ、機械的に等分しない。既存絵コンテの書き直しでは尺、全動作、原文のセリフを維持し、物語を削るくらいなら必要な元の切り替えを保つ。
 - 原文のセリフは該当Shotに話者を明示して一度だけ書く。overall_soundscapeは発話許可者と環境・動作音のみで、セリフを再掲しない。他の人物は口を閉じ発声しない。元のナレーションは維持し、新規の解説、画外の声、鼻歌、セリフを加えない。

@@ -215,6 +215,7 @@ export const sqliteSchemaStatements = [
     prompt TEXT,
     model TEXT,
     params TEXT,
+    request_snapshot TEXT,
     task_id TEXT,
     result_url TEXT,
     local_path TEXT,
@@ -382,7 +383,14 @@ export function initSqliteSchema(sqlite: Database.Database) {
   }
   // 兼容已安装的桌面版；仅增加任务恢复元数据，不改写历史生成结果。
   const taskColumns = new Set((sqlite.prepare('PRAGMA table_info(sys_task)').all() as { name: string }[]).map(c => c.name))
-  for (const [name, type] of Object.entries({ config_id: 'INTEGER', config_base_url: 'TEXT', stage: 'TEXT', error_code: 'TEXT' })) {
+  for (const [name, type] of Object.entries({
+    config_id: 'INTEGER',
+    config_base_url: 'TEXT',
+    stage: 'TEXT',
+    error_code: 'TEXT',
+    // 请求快照：老库补齐可空列，历史任务保持为空（不回溯伪造内容）
+    request_snapshot: 'TEXT',
+  })) {
     if (!taskColumns.has(name)) sqlite.exec(`ALTER TABLE sys_task ADD COLUMN ${name} ${type}`)
   }
   // 角色音色由用户上传；旧库补充可空字段，不修改已有角色和图片。

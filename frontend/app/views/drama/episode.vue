@@ -622,14 +622,24 @@
                       <div v-if="videoModerationHint(task.error)" class="video-task-error-hint">{{ videoModerationHint(task.error) }}</div>
                     </div>
                   </div>
-                  <button
-                    class="btn btn-icon btn-sm video-task-action"
-                    :title="videoTaskActionLabel(task.storyboard)"
-                    :disabled="videoTaskState(task.storyboard) === 'pending'"
-                    @click.stop="genVid(task.storyboard)"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-                  </button>
+                  <div class="video-task-actions">
+                    <button
+                      class="btn btn-icon btn-sm video-task-action"
+                      :title="t('episode.recovery.requestSnapshot')"
+                      :disabled="!hasShotTasks(task.storyboard)"
+                      @click.stop="openShotRequest(task.storyboard)"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                    </button>
+                    <button
+                      class="btn btn-icon btn-sm video-task-action"
+                      :title="videoTaskActionLabel(task.storyboard)"
+                      :disabled="videoTaskState(task.storyboard) === 'pending'"
+                      @click.stop="genVid(task.storyboard)"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                    </button>
+                  </div>
                 </div>
                 </div>
               </section>
@@ -1559,6 +1569,13 @@
         @confirm="confirmDeleteMerge"
         @cancel="!mergeDelete.loading && (mergeDelete.open = false)"
       />
+
+      <!-- 请求内容：该分镜真实发给模型的提示词与参数 -->
+      <RequestSnapshotDialog
+        :open="requestDialog.open"
+        :items="requestDialog.items"
+        @update:open="(v) => { requestDialog.open = v }"
+      />
     </main>
     </div>
   </div>
@@ -2154,6 +2171,57 @@ function latestVideoTask(id) {
   return genTasks.value.filter(task => task.type === 'video' && task.storyboard_id === id)
     .sort((a, b) => b.id - a.id)[0]
 }
+// ========== 请求内容（真实发给模型的提示词与参数） ==========
+const requestDialog = ref({ open: false, items: [] })
+
+/**
+ * 一个分镜可能产生多条任务：视频、分镜图（首/尾/合成图）、以及绑定的角色/场景/道具图。
+ * 全部列出来，用户才能顺着看到提示词是怎么一步步拼出来的。
+ */
+function shotRequestItems(sb) {
+  if (!sb) return []
+  const items = []
+  const video = latestVideoTask(sb.id)
+  if (video) items.push({ id: video.id, label: `${t('requestSnapshot.taskVideo')} #${video.id}` })
+
+  const frameLabels = {
+    first_frame: t('requestSnapshot.taskFirstFrame'),
+    last_frame: t('requestSnapshot.taskLastFrame'),
+  }
+  for (const task of genTasks.value.filter(item => item.type === 'image' && item.storyboard_id === sb.id)) {
+    // frameType 存在 params JSON 里，不是独立列
+    let frameType = task.frame_type
+    if (!frameType) {
+      try { frameType = JSON.parse(task.params || '{}').frameType } catch { frameType = '' }
+    }
+    const label = frameLabels[frameType] || t('requestSnapshot.taskComposed')
+    items.push({ id: task.id, label: `${label} #${task.id}` })
+  }
+
+  const assetGroups = [
+    { kind: 'character', list: getStoryboardCharacters(sb), name: item => item?.name, label: t('requestSnapshot.taskCharacter') },
+    { kind: 'scene', list: [getStoryboardScene(sb)].filter(Boolean), name: item => item?.location, label: t('requestSnapshot.taskScene') },
+    { kind: 'prop', list: getStoryboardProps(sb), name: item => item?.name, label: t('requestSnapshot.taskProp') },
+  ]
+  for (const group of assetGroups) {
+    for (const asset of group.list) {
+      const task = latestImageTask(group.kind, asset?.id)
+      if (!task) continue
+      const name = group.name(asset) || `#${asset?.id}`
+      items.push({ id: task.id, label: `${group.label}·${name} #${task.id}` })
+    }
+  }
+  return items
+}
+
+function hasShotTasks(sb) {
+  return shotRequestItems(sb).length > 0
+}
+
+function openShotRequest(sb) {
+  requestDialog.value = { open: true, items: shotRequestItems(sb) }
+}
+
 const recoverableVideoCount = computed(() => sbs.value.filter(sb => canRecoverVideo(sb.id)).length)
 function canRecoverVideo(id) {
   const task = latestVideoTask(id)
@@ -3302,7 +3370,7 @@ async function genVideoPrompt(sb) {
 
 该分镜信息:时长 ${sb.duration || 5}s;场景:${getSceneName(sb) || '未绑定'};角色:${charNames};道具:${propNames}。
 
-先调用 read_storyboard_context 读取 target_storyboard 的 description、atmosphere、duration、绑定素材及 available_image_references，按 MiniMax 官方 Ref2VA 六节结构（subject_definitions / summary / retention_analysis / detailed_description / overall_soundscape / non_diegetic_music）生成，六节正文用英文、对白放在 <d>[Chinese] 原句</d> 中。summary 用官方任务类型前缀，retention_analysis 用官方关系标记，detailed_description 的 [Shot 1] 不带时间戳，后续镜头用 At MM:SS.mmm。description 的【镜头N】是镜头数唯一来源：有几个镜头就写几个 [Shot N]，不得合并、不得新增；只有 description 本身单镜头时才写单个 Shot。直接复制 image_reference（如 @角色名/@场景名/@道具名）引用实际素材，不手写图片编号。主角与配角均有独立身份和清晰脸部，明确每人位置与动作。原句对白只在对应 Shot 写一次，不新增配音或配乐，无配乐写 N/A。调用 update_storyboard 保存到分镜 ID:${sb.id}，参数仅 storyboard_id 与 video_prompt，不改其他字段，不重新拆分整集。`,
+先调用 read_storyboard_context 读取 target_storyboard 的 description、atmosphere、duration、绑定素材及 available_image_references，按 MiniMax 官方 Ref2VA 六节结构（subject_definitions / summary / retention_analysis / detailed_description / overall_soundscape / non_diegetic_music）生成，六节正文一律用简体中文、对白放在 <d>[Chinese] 原句</d> 中，节名与关系标记、时间码保持英文原样。summary 用官方任务类型前缀，retention_analysis 用官方关系标记，detailed_description 的 [Shot 1] 不带时间戳，后续镜头用 At MM:SS.mmm。description 的【镜头N】是镜头数唯一来源：有几个镜头就写几个 [Shot N]，不得合并、不得新增；只有 description 本身单镜头时才写单个 Shot。直接复制 image_reference（如 @角色名/@场景名/@道具名）引用实际素材，不手写图片编号。主角与配角均有独立身份和清晰脸部，明确每人位置与动作。原句对白只在对应 Shot 写一次，不新增配音或配乐，无配乐写 N/A。调用 update_storyboard 保存到分镜 ID:${sb.id}，参数仅 storyboard_id 与 video_prompt，不改其他字段，不重新拆分整集。`,
       drama_id: dramaId,
       episode_id: epId.value,
       model: chatModelOverride() || undefined,
@@ -5893,6 +5961,13 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
 .video-task-state.is-done { color: var(--success); }
 .video-task-state.is-pending { color: var(--accent-text); }
 .video-task-state.is-failed { color: var(--warning); }
+/* 一行动作区：请求内容 + 生成/恢复，保持右对齐不换行 */
+.video-task-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-self: end;
+}
 .video-task-action {
   justify-self: end;
   align-self: center;
@@ -6676,7 +6751,7 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
     grid-template-columns: 56px minmax(0, 1fr);
   }
 
-  .video-task-action {
+  .video-task-actions {
     justify-self: start;
   }
 

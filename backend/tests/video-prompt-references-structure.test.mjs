@@ -56,6 +56,46 @@ test('中文生产模板、技能、默认及批量消息不再强制短视频�
   }
 })
 
+test('视频提示词正文统一为中文，结构锚点保持英文，防串台词规则各入口一致', () => {
+  const zhFiles = [
+    'workspace/prompts/storyboard_breaker.md',
+    'workspace/prompts/prompt_generator.md',
+    'workspace/skills/prompt-generator/video-prompt/SKILL.md',
+    'workspace/skills/storyboard-breaker/SKILL.md',
+    'src/agents/index.ts',
+    'src/agents/local-contract.ts',
+    'src/services/video-prompts.ts',
+  ]
+  for (const file of zhFiles) {
+    const text = read(file)
+    assert.doesNotMatch(text, /正文一律英文|正文用英文|正文英文/, file)
+    assert.match(text, /简体中文|中文正文|用中文/, file)
+  }
+  // 多语言模板同样固定中文正文，只是表述语言不同
+  for (const language of ['en', 'ja', 'ko']) {
+    for (const file of [
+      `workspace/prompts/storyboard_breaker.${language}.md`,
+      `workspace/prompts/prompt_generator.${language}.md`,
+      `workspace/skills/storyboard-breaker/SKILL.${language}.md`,
+    ]) {
+      const text = read(file)
+      assert.doesNotMatch(text, /written in English|本文はすべて英語|본문은 영어/, file)
+      assert.match(text, /Simplified Chinese|簡体字中国語|간체 중국어/, file)
+    }
+  }
+  // 单 Shot 单说话人 + 元指令禁令必须写进所有强制入口
+  for (const file of [
+    'workspace/prompts/storyboard_breaker.md',
+    'workspace/skills/prompt-generator/video-prompt/SKILL.md',
+    'src/agents/index.ts',
+    'src/agents/local-contract.ts',
+  ]) {
+    const text = read(file)
+    assert.match(text, /一个 Shot 只允许一个说话人 ID/, file)
+    assert.match(text, /元指令/, file)
+  }
+})
+
 test('分镜模板和所有入口按内容确定时长，支持多子镜头且保留原切镜', () => {
   for (const file of [
     'workspace/prompts/storyboard_breaker.md',

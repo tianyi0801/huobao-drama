@@ -16,7 +16,7 @@ import type {
 } from './types'
 import { ComfyClient, collectFiles } from '../comfyui/client.js'
 import { getComfyConfig } from '../comfyui/config.js'
-import { buildSubmission, type ComfyJobContext } from '../comfyui/template.js'
+import { buildSubmissionDetailed, type ComfyJobContext } from '../comfyui/template.js'
 import { stageMany, taskSubfolder } from '../comfyui/staging.js'
 import { resolveSeed, viewUrl } from './comfyui-image.js'
 import { normalizeVideoPromptSections, validateVideoPromptTimeline } from '../video-prompt-structure.js'
@@ -235,12 +235,46 @@ export class ComfyUiVideoAdapter implements VideoProviderAdapter {
       filenamePrefix: `${comfy.uploadSubfolder}/video-${record.id ?? Date.now()}`,
     }
 
-    const graph = buildSubmission(template, context, comfy.optionValues)
+    const submission = buildSubmissionDetailed(template, context, comfy.optionValues)
     return {
       url: `${comfy.url.replace(/\/+$/, '')}/prompt`,
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: { prompt: graph, client_id: `huobao-video-${record.id ?? 'na'}` },
+      body: { prompt: submission.graph, client_id: `huobao-video-${record.id ?? 'na'}` },
+      // 请求快照：视频提示词经过风格注入 / 六节归一 / @素材编号后，这里给出真正提交的版本
+      debug: {
+        mode: 'video',
+        prompt: context.prompt,
+        parameters: {
+          ...submission.trace.options,
+          resolution: context.resolution,
+          aspectRatio: context.aspectRatio,
+          width: context.width,
+          height: context.height,
+          durationSeconds: context.durationSeconds,
+          fps: context.fps,
+          seed: context.seed,
+          secondPass: secondPassOn,
+          secondPassScale: secondPassOn ? secondPassScale : 1,
+          requestedResolution: record.resolution || null,
+          requestedAspectRatio: record.aspectRatio || null,
+        },
+        template: template.name,
+        media: media.map((item, index) => ({
+          index: index + 1,
+          kind: String(item.media_type || 'image'),
+          path: item.subfolder ? `${item.subfolder}/${item.filename}` : String(item.filename || ''),
+        })),
+        bindings: submission.trace.bindings,
+        graph: {
+          nodes: Object.keys(submission.graph).length,
+          bytes: JSON.stringify(submission.graph).length,
+        },
+        notes: [
+          ...(prompt !== rawPrompt ? ['提示词已改写后提交（六节结构归一 / 音色引用标记），上方为最终版本'] : []),
+          '素材顺序即 @图片N / @视频N / @音频N 的编号来源，顺序变化会改变提示词指向',
+        ],
+      },
     }
   }
 

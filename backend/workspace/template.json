@@ -1,5 +1,5 @@
 {
-  "version": 9,
-  "updatedAt": "2026-11-03",
-  "notes": "统一模板同步机制：升级时覆盖内置 prompts / skills（同名），用户新建的技能目录保留；覆盖前备份到 .backup/。修改本目录下的 prompt 或 skill 后请递增 version。"
+  "version": 10,
+  "updatedAt": "2026-11-07",
+  "notes": "视频提示词正文改为简体中文（六节名、关系标记、[Shot N]、At MM:SS.mmm 保持英文）；补充单个 Shot 只允许一个说话人 ID、元指令禁令、禁止段内时间段。统一模板同步机制：升级时覆盖内置 prompts / skills（同名），用户新建的技能目录保留；覆盖前备份到 .backup/。修改本目录下的 prompt 或 skill 后请递增 version。"
 }

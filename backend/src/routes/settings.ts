@@ -27,6 +27,9 @@ app.get('/local-engine', async (c) => {
     url: config.url,
     imageReady: isComfyReadyFor('image'),
     videoReady: isComfyReadyFor('video'),
+    // 图片侧当前默认值：图片编辑页要按全局默认回显清晰度与步数（不发起网络探测）
+    imagePixelBudget: config.imagePixelBudget,
+    optionValues: config.optionValues,
   })
 })
 

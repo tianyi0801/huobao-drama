@@ -27,7 +27,7 @@ import localEnv from './routes/localEnv.js'
 import workflows from './routes/workflows.js'
 import { requestLogger, errorHandler } from './middleware/logger.js'
 import { resumeInterruptedTasks } from './services/generation.js'
-import { seedComfyDefaultsIfMissing } from './services/comfyui/bootstrap.js'
+import { seedComfyDefaultsIfMissing, migrateComfyTemplateOptions, migrateComfyEditImageSlots } from './services/comfyui/bootstrap.js'
 import { syncWorkspaceTemplate } from './agents/workspace-sync.js'
 import { DATA_ROOT } from './utils/paths.js'
 
@@ -103,6 +103,8 @@ try {
 }
 // 首次启动预置本地 ComfyUI 工作流模板（已有配置时不覆盖）
 seedComfyDefaultsIfMissing()
+migrateComfyTemplateOptions()
+migrateComfyEditImageSlots()
 await resumeInterruptedTasks()
 
 serve({ fetch: app.fetch, port })

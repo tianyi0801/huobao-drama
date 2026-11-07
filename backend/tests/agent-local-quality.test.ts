@@ -47,9 +47,12 @@ test('官方六节的风格与衔接注入保持声音节干净，时间轴不�
   const style = 'high-quality 3D CG animation still, modern game-engine cinematic render, crisp detailed textures, volumetric lighting, avoid flat lighting, avoid anime line art'
   const styled = injectStyleOpening(prompt(), style)
   assert.ok(styled.startsWith('subject_definitions:'))
-  assert.match(styled, /The target video uses high-quality 3D CG animation still/)
-  assert.ok(styled.indexOf('The target video uses') < styled.indexOf('[Shot 1]'))
+  assert.match(styled, /画面风格：high-quality 3D CG animation still/)
+  assert.ok(styled.indexOf('画面风格') < styled.indexOf('[Shot 1]'))
   assert.doesNotMatch(styled, /avoid/)
+  // 重复注入只保留一句风格句，历史英文风格句也要被替换掉
+  assert.equal(injectStyleOpening(styled, style).match(/画面风格/g).length, 1)
+  assert.doesNotMatch(injectStyleOpening(`The target video uses old style.\n${prompt()}`, style), /The target video uses/)
   const text = appendVideoPromptSection(styled, 'retention_analysis', buildContinuityPromptSuffix(1).trim())
   assert.ok(text.indexOf('weak_reference') < text.indexOf('detailed_description:'))
   assert.ok(!text.slice(text.indexOf('overall_soundscape:')).includes('weak_reference'))
@@ -69,6 +72,8 @@ test('官方时间轴拒绝错误切镜与重复小节，兼容旧式起止秒�
     assert.throws(() => validateVideoPromptTimeline(prompt(timeline), 5), /时间|编号|切镜|时间戳/)
   }
   assert.throws(() => validateVideoPromptTimeline(`${prompt()}\noverall_soundscape: rain`, 5), /六节/)
+  // 中文正文里模型可能在 [Shot 1] 开头补段内时间段，不能因此把整篇误判成旧格式
+  assert.doesNotThrow(() => validateVideoPromptTimeline(prompt('[Shot 1] 0-3秒：小明抬头。\n[Shot 2] At 00:03.000, 镜头切至近景。'), 5))
   const legacy = ['subject_definitions: N/A', 'shot_summary: 窗边雨景', 'reference_usage: N/A',
     'detailed_description:\n[Shot 1] 0-2.5: 雨。\n[Shot 2] 2.5-5: 雨。', 'overall_soundscape: 雨声。', 'non_diegetic_music: N/A'].join('\n')
   assert.doesNotThrow(() => validateVideoPromptTimeline(legacy, 5))

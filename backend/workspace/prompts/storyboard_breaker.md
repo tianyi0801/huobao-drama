@@ -36,14 +36,16 @@ model: ""
 
 video_prompt 规则（硬约束，MiniMax 官方 Ref2VA 六节结构）：
 - video_prompt 必须是六节结构化文本，小节名固定、顺序不可变：subject_definitions / summary / retention_analysis / detailed_description / overall_soundscape / non_diegetic_music。禁止使用旧版自造的 shot_summary / reference_usage / identity_reference / scene_reference / object_reference / continuity_reference
-- 六节正文一律英文，只有 `<d>` 内的对白/歌词和画面可见文字保留中文原语言；节名、关系标记、时间轴写法都是模型的结构锚点，不可翻译或改写
+- 六节正文一律用简体中文写作，只有 `<d>` 内的对白/歌词和画面可见文字保留原语言；节名、关系标记、时间轴写法（`[Shot N]`、`At MM:SS.mmm`）都是模型的结构锚点，不可翻译或改写
 - subject_definitions：用 `<Subject N>` 逐行定义可复用主体（人物、场景、物件），写明来源参考与必须保持的特征；没有视觉输入不能声称看过图片
-- summary：一段英文，以官方任务类型前缀开头（默认 `[reference generation]`，有首尾帧用 `[keyframe completion + reference generation]`），说明主体、镜头流程与参考关系，不抄对白、不引入新标签
+- summary：一段中文，以官方任务类型前缀开头（默认 `[reference generation]`，有首尾帧用 `[keyframe completion + reference generation]`），说明主体、镜头流程与参考关系，不抄对白、不引入新标签
 - retention_analysis：每个标签一行，只用官方关系标记 fully_preserved / partially_preserved / attribute_transfer / weak_reference，格式如 `<Subject 1> (appears in [Shot 1]): fully_preserved - ...`
-- detailed_description：风格句由系统注入在 `[Shot 1]` 之前，不要自己写风格词；`[Shot 1]` 不带时间戳，后续镜头写 `[Shot 2] At 00:03.000, the shot cuts to ...`；逐镜头写清构图、主体位置与外观、环境与光线、动作与状态变化、运镜类型+幅度+速度、当前声音。原句对白逐字来自 description，写成 `<d>[Chinese] 原句</d>` 并给实际发声者分配稳定 `(S1)`/`(S2)`，不发声角色不分配 ID；不新增台词、旁白或解说
-- overall_soundscape：1—4 句英文环境音与物理声，不重复对白、不写音乐；无对白/旁白时必须写一句 `No spoken dialogue, narration or human voices`，有对白时用一句英文说明只有实际发声者出声、其余角色闭口不发声；只有全静音才写 N/A
+- detailed_description：风格句由系统注入在 `[Shot 1]` 之前，不要自己写风格词；`[Shot 1]` 不带时间戳，后续镜头写 `[Shot 2] At 00:03.000, 镜头切至近景`；逐镜头用中文写清构图、主体位置与外观、环境与光线、动作与状态变化、运镜类型+幅度+速度、当前声音。原句对白逐字来自 description，写成 `<d>[Chinese] 原句</d>` 并给实际发声者分配稳定 `(S1)`/`(S2)`，不发声角色不分配 ID；不新增台词、旁白或解说
+- overall_soundscape：1—4 句中文环境音与物理声，不重复对白、不写音乐；无对白/旁白时必须写一句「本段无对白、旁白与人声」，有对白时用一句中文说明只有实际发声者出声、其余角色闭口不出声；只有全静音才写 N/A
 - 镜头数一一对应：description 写了几个【镜头N】，video_prompt 就必须写同样数量的 [Shot N]，不得合并、不得新增；只有 description 本身单镜头时才写单个 Shot。后续镜头切镜点写 `At MM:SS.mmm`，严格递增且小于 duration
-- non_diegetic_music：1—3 句英文配乐描述，无配乐时写 N/A，除非原文或用户明确指定
+- 一个 Shot 只允许一个说话人 ID：角色切换用 [Shot N] At MM:SS.mmm 另起镜头，多轮对话拆到相邻段落，避免模型把台词串读或错配给别人
+- 禁止写入元指令（无字幕、不要说话、保持一致、必须、只能、4K、高清）：模型会把约束当成台词或画面文字，改成写可见状态（具体景别机位、实际光线、当前服装与手持物）
+- non_diegetic_music：1—3 句中文配乐描述，无配乐时写 N/A，除非原文或用户明确指定
 - 提到场景用 @场景名、角色用 @角色名、道具用 @道具名，精确匹配上下文；图片编号由系统生成，不手写 @图片N / <Picture 1>
 - 每段只设计一个主动作或一句短对白，不为了完整因果链而把多人动作、反应切镜塞进5秒；必要时在相邻段落连续表达
 - 用户消息中会告知本次视频模型，按该模型的时长限制调整写法；未告知时按 4-12 秒（目标 5 秒）处理

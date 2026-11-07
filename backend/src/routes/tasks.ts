@@ -6,7 +6,7 @@ import { ComfyClient } from '../services/comfyui/client.js'
 import { decorateTaskWithPreview, getPreview, resolveByteRange } from '../services/comfyui/live-preview.js'
 import { generateImage, generateVideo, recoverVideoTask } from '../services/generation.js'
 import { safeTaskError } from '../services/video-download.js'
-import { getActiveConfig, getConfigById, resolveGenerationConfigId } from '../services/ai.js'
+import { COMFY_VIRTUAL_CONFIG_ID, getActiveConfig, getConfigById, resolveGenerationConfigId } from '../services/ai.js'
 import { getComfyConfig } from '../services/comfyui/config.js'
 import { injectStyleOpening } from '../services/video-prompt-structure.js'
 import { getDramaStylePrompt } from '../services/style-preset.js'
@@ -169,6 +169,45 @@ app.post('/', async (c) => {
 
   if (type === 'image') {
     if (!body.prompt) return badRequest(c, '提示词必填')
+    // 采样控制：种子决定可复现性。ComfyUI 的 KSampler 支持 2^64，这里按 JS 安全整数收敛
+    if (body.seed !== undefined && body.seed !== null && body.seed !== '') {
+      const seed = Number(body.seed)
+      if (!Number.isSafeInteger(seed) || seed <= 0) {
+        return badRequest(c, 'seed 必须是正整数')
+      }
+    }
+    if (body.negative_prompt !== undefined && body.negative_prompt !== null && typeof body.negative_prompt !== 'string') {
+      return badRequest(c, 'negative_prompt 必须为字符串')
+    }
+    // 模板可调项覆盖：只接受标量，避免把整张图塞进配置
+    if (body.option_overrides !== undefined && body.option_overrides !== null) {
+      if (typeof body.option_overrides !== 'object' || Array.isArray(body.option_overrides)) {
+        return badRequest(c, 'option_overrides 必须为对象')
+      }
+      for (const [key, value] of Object.entries(body.option_overrides)) {
+        if (typeof value !== 'number' && typeof value !== 'boolean') {
+          return badRequest(c, `option_overrides.${key} 必须为数字或布尔值`)
+        }
+      }
+    }
+    // 局部编辑选区：x/y/w/h 像素坐标，超出底图的交给服务端收敛
+    if (body.region !== undefined && body.region !== null) {
+      const region = body.region
+      if (typeof region !== 'object' || Array.isArray(region)
+        || !['x', 'y', 'w', 'h'].every(key => Number.isFinite(Number(region[key])))) {
+        return badRequest(c, 'region 必须是包含 x/y/w/h 数值的选区对象')
+      }
+      if (Number(region.w) < 8 || Number(region.h) < 8) return badRequest(c, '选区太小（最小 8×8 像素）')
+    }
+    // 图片编辑工作台只允许走本机 ComfyUI：显式 local_only 时绝不回退云端配置，
+    // 避免「本地没配好」静默切到云端模型并产生费用
+    if (body.local_only === true) {
+      const comfy = getComfyConfig()
+      if (!comfy.enabled) return badRequest(c, '本地算力已关闭，请到「设置 → 本地算力」启用后再试')
+      if (!comfy.imageEdit?.outputNodes?.length) {
+        return badRequest(c, '未配置「图片编辑」工作流，请到「设置 → 本地算力」导入')
+      }
+    }
   }
 
   const videoBody = type === 'video' ? normalizeVideoRequest(body) : null
@@ -185,7 +224,10 @@ app.post('/', async (c) => {
     }
     // 请求显式指定 config_id（工作台模型下拉跨厂商切换）时优先；
     // 未指定才回退到集锁定配置，避免锁定配置与所选模型错配（如锁定 Seedance 却传 MiniMax 模型名）
-    let configId: number | undefined = body.config_id
+    // local_only：固定用本机引擎的虚拟配置 id，generateImage 解析时只认 ComfyUI
+    let configId: number | undefined = body.local_only === true
+      ? COMFY_VIRTUAL_CONFIG_ID
+      : body.config_id
     let episodeResolution: string | undefined
     let storyboardDramaId: number | undefined
     if (body.storyboard_id) {
@@ -248,6 +290,15 @@ app.post('/', async (c) => {
         size: imageSize,
         referenceImages: body.reference_images,
         frameType: body.frame_type,
+        seed: body.seed,
+        negativePrompt: body.negative_prompt,
+        optionOverrides: body.option_overrides,
+        region: body.region ? {
+          x: Math.round(Number(body.region.x)),
+          y: Math.round(Number(body.region.y)),
+          w: Math.round(Number(body.region.w)),
+          h: Math.round(Number(body.region.h)),
+        } : undefined,
         configId,
       })
       : await generateVideo({
@@ -357,7 +408,8 @@ app.get('/', async (c) => {
   if (storyboardId) rows = rows.filter(r => r.storyboardId === Number(storyboardId))
   if (dramaId) rows = rows.filter(r => r.dramaId === Number(dramaId))
 
-  return success(c, rows)
+  // 请求快照体积较大，列表接口一律剔除，按任务 id 单独读取（GET /tasks/:id）
+  return success(c, rows.map(({ requestSnapshot: _snapshot, ...rest }) => rest))
 })
 
 // DELETE /tasks/:id

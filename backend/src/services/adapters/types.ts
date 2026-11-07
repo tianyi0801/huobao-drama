@@ -73,6 +73,36 @@ export interface ProviderRequest {
    * 此时 headers 不要设置 Content-Type，边界由 fetch 自动生成。
    */
   body: any
+  /** 适配器自述的请求内容（真实提示词 / 生效参数 / 素材顺序 / 绑定链路），用于请求快照 */
+  debug?: RequestDebug
+}
+
+/**
+ * 请求快照：适配器把「真正送进模型的东西」原样交出来，
+ * 避免用户只能翻后端控制台才知道提示词被改写成了什么样。
+ */
+export interface RequestDebug {
+  /** 调用形态，如 text_to_image / image_edit / video */
+  mode: string
+  /** 实际提交给模型的提示词（已完成风格注入、节名归一、@素材编号等改写） */
+  prompt: string
+  negativePrompt?: string
+  /** 实际生效的参数（尺寸、种子、步数、清晰度、时长等） */
+  parameters?: Record<string, unknown>
+  /** 命中的工作流模板名（本地 ComfyUI） */
+  template?: string
+  /** 提交顺序即素材编号（图1/图2、@图片N），顺序错位会直接改变成片 */
+  media?: Array<{ index: number; kind: string; path: string }>
+  /** 工作流绑定链路：项目字段 → 节点输入，便于确认中间变更落在哪 */
+  bindings?: Array<{ source: string; target: string; value: string }>
+  /** 提交图规模（节点数 / 序列化字节数） */
+  graph?: { nodes: number; bytes: number }
+  /** 局部编辑选区（原图像素坐标，rect） */
+  region?: {
+    rect: Record<string, number>
+  }
+  /** 补充说明（被丢弃的素材、降级原因等） */
+  notes?: string[]
 }
 
 export interface AIConfig {
@@ -92,6 +122,12 @@ export interface ImageGenerationRecord {
   referenceImages?: string | null
   /** 可选种子；为空时由适配器随机生成，避免重复生成出同一张图 */
   seed?: number | null
+  /** 负面提示词；本地工作流若 cfg=1 则对出图无影响，仅作记录 */
+  negativePrompt?: string | null
+  /** 本次请求覆盖模板可调项（如 steps），优先级高于全局默认值 */
+  optionOverrides?: Record<string, unknown> | null
+  /** 局部编辑几何信息（JSON：regionRect/regionArea/regionCrop），仅用于请求快照展示 */
+  region?: string | null
   // ... 其他字段
 }
 

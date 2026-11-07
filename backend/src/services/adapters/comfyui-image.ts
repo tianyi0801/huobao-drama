@@ -19,7 +19,7 @@ import type {
 } from './types'
 import { ComfyClient, collectFiles } from '../comfyui/client.js'
 import { getComfyConfig, pickImageTemplate, type ComfyWorkflowTemplate } from '../comfyui/config.js'
-import { buildSubmission, type ComfyJobContext } from '../comfyui/template.js'
+import { buildSubmissionDetailed, type ComfyJobContext } from '../comfyui/template.js'
 import { stageMany, taskSubfolder } from '../comfyui/staging.js'
 
 const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.gif']
@@ -32,6 +32,23 @@ function parseJsonArray(raw: unknown): string[] {
     return Array.isArray(parsed) ? parsed.map(v => String(v)).filter(Boolean) : []
   } catch {
     return []
+  }
+}
+
+/**
+ * 局部编辑参数以 JSON 字符串形式随 record 传入（只含选区 rect，原图像素坐标）。
+ * 这里只负责还原结构给快照用；格式不符视为普通整图编辑。
+ */
+function parseRegion(raw: unknown): { rect: Record<string, number> } | null {
+  if (typeof raw !== 'string' || !raw.trim()) return null
+  try {
+    const parsed = JSON.parse(raw)
+    const value = parsed?.rect
+    const rect = { x: Number(value?.x), y: Number(value?.y), w: Number(value?.w), h: Number(value?.h) }
+    if (!Object.values(rect).every(Number.isFinite)) return null
+    return { rect }
+  } catch {
+    return null
   }
 }
 
@@ -112,8 +129,14 @@ export class ComfyUiImageAdapter implements ImageProviderAdapter {
       : []
 
     const { width, height } = parseSize(record.size, comfy.imagePixelBudget)
+    // 负面提示词：模板里绑定到 negative_prompt，未提供时保留模板原值
+    const negativePrompt = String(record.negativePrompt || '').trim()
+
+    // 局部编辑选区（仅用于快照展示；重绘指令已由前端以 <bbox> 写进提示词）
+    const region = parseRegion(record.region)
     const context: ComfyJobContext = {
       prompt: String(record.prompt || ''),
+      ...(negativePrompt ? { negativePrompt } : {}),
       width,
       height,
       seed: resolveSeed(record.seed),
@@ -121,12 +144,43 @@ export class ComfyUiImageAdapter implements ImageProviderAdapter {
       images: staged.map(s => s.path),
     }
 
-    const graph = buildSubmission(template, context, comfy.optionValues)
+    // 本次请求的可调项覆盖（如图片编辑页调步数）优先于全局模板默认值
+    const optionValues = { ...comfy.optionValues, ...(record.optionOverrides || {}) }
+    const submission = buildSubmissionDetailed(template, context, optionValues)
     return {
       url: `${comfy.url.replace(/\/+$/, '')}/prompt`,
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: { prompt: graph, client_id: `huobao-image-${record.id ?? 'na'}` },
+      body: { prompt: submission.graph, client_id: `huobao-image-${record.id ?? 'na'}` },
+      // 请求快照：真实提示词 + 生效参数 + 素材顺序 + 绑定链路，供界面核对
+      debug: {
+        mode: references.length ? 'image_edit' : 'text_to_image',
+        prompt: context.prompt,
+        ...(negativePrompt ? { negativePrompt } : {}),
+        parameters: {
+          ...submission.trace.options,
+          width,
+          height,
+          seed: context.seed,
+          requestedSize: record.size || null,
+          pixelBudget: comfy.imagePixelBudget,
+          referenceCount: references.length,
+        },
+        template: template.name,
+        media: staged.map((item, index) => ({ index: index + 1, kind: 'image', path: item.path })),
+        bindings: submission.trace.bindings,
+        graph: {
+          nodes: Object.keys(submission.graph).length,
+          bytes: JSON.stringify(submission.graph).length,
+        },
+        notes: [
+          ...(references.length ? ['参考图顺序即工作流图1/图2，调换会改变编辑对象'] : []),
+          ...(negativePrompt ? ['负面提示词已写入 negative_prompt；当前工作流 KSampler cfg=1，对出图结果无影响'] : []),
+          ...(region ? ['局部编辑：红框已画在图1上标记目标区域，模型整图重绘并围绕该区域修改，输出不含红框'] : []),
+        ],
+        // 局部编辑选区（原图像素坐标），供「请求内容」核对
+        ...(region ? { region } : {}),
+      },
     }
   }
 

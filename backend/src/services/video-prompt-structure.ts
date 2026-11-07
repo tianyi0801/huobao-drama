@@ -65,7 +65,7 @@ export function appendVideoPromptSection(prompt: string, section: H3Section, tex
 }
 
 /**
- * 把项目视觉风格压成官方要求的 1 句英文风格句。
+ * 把项目视觉风格压成官方要求的 1 句中文风格句（正文中文，风格短语本身保持原样）。
  * 预设里的风格词是一长串逗号短语并带大量 avoid 否定句，
  * 官方只允许 [Shot 1] 前 1—2 句，长否定串会压过剧情。
  */
@@ -77,8 +77,11 @@ export function toStyleOpening(style: string): string {
     .replace(/[,;.\s]+$/, '')
   if (!cleaned) return ''
   const phrases = cleaned.split(/,\s*/).slice(0, 4)
-  return `The target video uses ${phrases.join(', ')}.`
+  return `画面风格：${phrases.join('、')}。`
 }
+
+/** 历史英文风格句与现行中文风格句都要能剔除，重复注入才保持幂等 */
+const STYLE_OPENING_PATTERN = /^(?:The target video uses [^\n]*|画面风格[：:][^\n]*)\n?/m
 
 /**
  * 官方规定风格句写在 [Shot 1] 之前，不能追加到 detailed_description 末尾。
@@ -88,7 +91,7 @@ export function injectStyleOpening(prompt: string, style: string): string {
   const opening = toStyleOpening(style)
   if (!opening) return prompt
   const base = normalizeVideoPromptSections(prompt)
-    .replace(/^The target video uses [^\n]*\.\n?/m, '')
+    .replace(STYLE_OPENING_PATTERN, '')
   const headings = sectionHeadings(base)
   if (!isOfficialStructure(base, headings)) return `${opening}\n${base}`
   const { bodyStart } = detailBodyRange(base, headings)
@@ -173,8 +176,10 @@ export function validateVideoPromptTimeline(prompt: string, duration: number): v
     throw new Error('H3 镜头编号必须连续，请重新生成提示词')
   }
 
-  // 兼容历史提示词：起止秒必须从 0 连续衔接，且总长等于 duration
-  if (shots.some(shot => LEGACY_RANGE.test(shot[2]))) {
+  // 兼容历史提示词：只有「全部镜头」都是 0.0-5.0秒 旧格式才按旧规则校验。
+  // 中文正文里模型可能只在 [Shot 1] 开头补了段内时间段（如 0-3秒：抬头），
+  // 若按 any 判定会把整篇误当成旧格式，官方格式的合法提示词会被误杀。
+  if (shots.every(shot => LEGACY_RANGE.test(shot[2]))) {
     let endSec = 0
     for (const shot of shots) {
       const range = LEGACY_RANGE.exec(shot[2])

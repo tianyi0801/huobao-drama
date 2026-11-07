@@ -196,6 +196,14 @@
       "images.image_2": [
         "475",
         0
+      ],
+      "images.image_3": [
+        "huobao-ref-3",
+        0
+      ],
+      "images.image_4": [
+        "huobao-ref-4",
+        0
       ]
     },
     "class_type": "TextEncodeQwenImage21",
@@ -296,6 +304,24 @@
     "class_type": "TextGenerate",
     "_meta": {
       "title": "TextGenerate"
+    }
+  },
+  "huobao-ref-3": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "example.png"
+    },
+    "_meta": {
+      "title": "参考图 3"
+    }
+  },
+  "huobao-ref-4": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "example.png"
+    },
+    "_meta": {
+      "title": "参考图 4"
     }
   }
 }
