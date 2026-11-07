@@ -199,6 +199,11 @@ app.post('/', async (c) => {
       }
       if (Number(region.w) < 8 || Number(region.h) < 8) return badRequest(c, '选区太小（最小 8×8 像素）')
     }
+    // 工作台来源标记：用于把生成结果单独记入图片历史（刷新页面可回看）
+    if (body.workspace_kind !== undefined && body.workspace_kind !== null
+      && !['text2image', 'image_edit'].includes(String(body.workspace_kind))) {
+      return badRequest(c, 'workspace_kind 必须为 text2image 或 image_edit')
+    }
     // 图片工作台只允许走本机 ComfyUI：显式 local_only 时绝不回退云端配置，
     // 避免「本地没配好」静默切到云端模型并产生费用。
     // 校验要按实际会用到的模板槽：无参考图走「文生图」槽，有参考图走「图片编辑」槽
@@ -301,6 +306,7 @@ app.post('/', async (c) => {
         seed: body.seed,
         negativePrompt: body.negative_prompt,
         optionOverrides: body.option_overrides,
+        workspaceKind: body.workspace_kind ? String(body.workspace_kind) : undefined,
         region: body.region ? {
           x: Math.round(Number(body.region.x)),
           y: Math.round(Number(body.region.y)),

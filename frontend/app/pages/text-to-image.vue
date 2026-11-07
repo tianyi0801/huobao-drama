@@ -242,13 +242,21 @@
         <footer v-if="history.length" class="iep-history">
           <span class="iep-history-label">{{ t('textToImage.result.session') }}</span>
           <div class="iep-history-list">
-            <div v-for="(item, i) in history" :key="item.at" class="iep-history-item">
+            <div v-for="(item, i) in history" :key="item.id || item.at" class="iep-history-item">
               <button class="iep-history-thumb" :title="t('textToImage.action.view')" @click="preview = item.url">
                 <img :src="item.url" alt="" loading="lazy" />
               </button>
               <div class="iep-history-ops">
                 <button class="btn btn-sm btn-icon" :title="t('textToImage.action.download')" @click="download(item)">
                   <Download :size="11" :stroke-width="1.9" />
+                </button>
+                <button
+                  v-if="item.id"
+                  class="btn btn-sm btn-icon"
+                  :title="t('textToImage.action.removeHistory')"
+                  @click="removeHistory(item)"
+                >
+                  <Trash2 :size="11" :stroke-width="1.9" />
                 </button>
               </div>
               <span class="iep-history-index">#{{ history.length - i }}</span>
@@ -289,10 +297,11 @@ import {
   PenLine,
   SlidersHorizontal,
   Sparkles,
+  Trash2,
   TriangleAlert,
   X,
 } from 'lucide-vue-next'
-import { localEnvAPI, settingsAPI, taskAPI } from '~/composables/useApi'
+import { localEnvAPI, settingsAPI, taskAPI, workspaceImageAPI } from '~/composables/useApi'
 import { mapError, toastError } from '~/composables/useToast'
 
 const { t } = useI18n()
@@ -378,11 +387,40 @@ const outputNote = computed(() => t('textToImage.output.note', { size: outputSiz
 
 onMounted(() => {
   loadEngine()
+  loadHistory()
 })
 onBeforeUnmount(() => {
   stopTimer()
   cancelledByUser = true
 })
+/** 从服务端恢复历史：记录带 id，便于逐条删除；加载失败不阻断工作台 */
+async function loadHistory() {
+  try {
+    const rows = await workspaceImageAPI.list('text2image')
+    history.value = (Array.isArray(rows) ? rows : []).map(row => {
+      const path = String(row.local_path || row.localPath || '')
+      return {
+        id: row.id,
+        url: path.startsWith('/') ? path : `/${path}`,
+        path,
+        prompt: String(row.prompt || ''),
+        at: Date.parse(row.created_at || row.createdAt || '') || Date.now(),
+        seed: Number(row.seed) > 0 ? Number(row.seed) : null,
+      }
+    })
+  } catch { /* 历史不可用不影响生成 */ }
+}
+
+async function removeHistory(item) {
+  if (!item.id) return
+  try {
+    await workspaceImageAPI.del(item.id)
+    history.value = history.value.filter(entry => entry.id !== item.id)
+  } catch (e) {
+    toastError(e, { fallback: 'textToImage.err.failed' })
+  }
+}
+
 async function loadEngine() {
   engineLoading.value = true
   try {
@@ -482,6 +520,8 @@ async function generate() {
     const task = await taskAPI.generate({
       type: 'image',
       // 不传 reference_images：后端据此选择「文生图」模板槽，走纯文生图工作流
+      // workspace_kind：后端在出图时把结果写入独立历史表，刷新页面可回看
+      workspace_kind: 'text2image',
       prompt: prompt.value.trim(),
       size: outputSize(),
       // 本次强制覆盖步数与输出分辨率；种子留空则由后端随机（实际值可从请求内容里查到）
@@ -567,8 +607,9 @@ async function pollTask(id) {
       const url = path.startsWith('/') ? path : `/${path}`
       const item = { url, path, prompt: prompt.value.trim(), at: Date.now(), seed: readUsedSeed(res) }
       result.value = item
-      // 仅会话内保留，刷新即丢失（不写入素材库）
-      history.value = [item, ...history.value].slice(0, 12)
+      // 先本地立即展示，再用服务端已落库的历史覆盖（带上 id 才能逐条删除）
+      history.value = [item, ...history.value].slice(0, 24)
+      void loadHistory()
       toast.success(t('textToImage.result.done'))
       return
     }

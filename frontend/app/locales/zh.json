@@ -1322,7 +1322,8 @@
       "based": "已设为底图",
       "view": "查看大图",
       "close": "关闭",
-      "shortcut": "Ctrl / ⌘ + Enter 快速生成"
+      "shortcut": "Ctrl / ⌘ + Enter 快速生成",
+      "removeHistory": "从历史中删除"
     },
     "result": {
       "title": "编辑结果",
@@ -1335,8 +1336,8 @@
       "elapsed": "已用时 {s} 秒",
       "done": "编辑完成",
       "failed": "生成失败",
-      "session": "本次会话",
-      "sessionHint": "仅本次会话保留，刷新后清空，请及时下载",
+      "session": "历史记录",
+      "sessionHint": "已保存到本地，刷新后仍在，可逐条删除",
       "useSeed": "用这个种子重跑",
       "seedHint": "同种子 + 同指令 + 同参考图可近似复现"
     },
@@ -1460,7 +1461,8 @@
       "download": "下载",
       "view": "查看大图",
       "close": "关闭",
-      "shortcut": "Ctrl / ⌘ + Enter 快速生成"
+      "shortcut": "Ctrl / ⌘ + Enter 快速生成",
+      "removeHistory": "从历史中删除"
     },
     "result": {
       "title": "编辑结果",
@@ -1473,8 +1475,8 @@
       "elapsed": "已用时 {s} 秒",
       "done": "编辑完成",
       "failed": "生成失败",
-      "session": "本次会话",
-      "sessionHint": "仅本次会话保留，刷新后清空，请及时下载",
+      "session": "历史记录",
+      "sessionHint": "已保存到本地，刷新后仍在，可逐条删除",
       "useSeed": "用这个种子重跑",
       "seedHint": "同种子 + 同指令 + 同参考图可近似复现"
     },

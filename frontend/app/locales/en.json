@@ -1236,7 +1236,8 @@
       "based": "Set as base image",
       "view": "View full size",
       "close": "Close",
-      "shortcut": "Ctrl / ⌘ + Enter to generate"
+      "shortcut": "Ctrl / ⌘ + Enter to generate",
+      "removeHistory": "Remove from history"
     },
     "result": {
       "title": "Result",
@@ -1249,8 +1250,8 @@
       "elapsed": "{s}s elapsed",
       "done": "Editing finished",
       "failed": "Generation failed",
-      "session": "This session",
-      "sessionHint": "Kept in this session only, cleared on refresh - download in time",
+      "session": "History",
+      "sessionHint": "Saved locally, kept after refresh; remove items individually",
       "useSeed": "Reuse this seed",
       "seedHint": "Same seed, prompt and references reproduce a similar result"
     },
@@ -1374,7 +1375,8 @@
       "download": "Download",
       "view": "View full size",
       "close": "Close",
-      "shortcut": "Ctrl / ⌘ + Enter to generate"
+      "shortcut": "Ctrl / ⌘ + Enter to generate",
+      "removeHistory": "Remove from history"
     },
     "result": {
       "title": "Result",
@@ -1387,8 +1389,8 @@
       "elapsed": "{s}s elapsed",
       "done": "Editing finished",
       "failed": "Generation failed",
-      "session": "This session",
-      "sessionHint": "Kept in this session only, cleared on refresh - download in time",
+      "session": "History",
+      "sessionHint": "Saved locally, kept after refresh; remove items individually",
       "useSeed": "Reuse this seed",
       "seedHint": "Same seed, prompt and references reproduce a similar result"
     },

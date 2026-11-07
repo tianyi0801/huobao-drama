@@ -230,6 +230,20 @@ export const sysTask = sqliteTable('sys_task', {
   completedAt: text('completed_at'),
 })
 
+// 工作台图片历史：文生图 / 图片编辑页生成的结果，独立于任务生命周期，刷新页面可回看。
+// 不用 sys_task 兼历史，是因为那里混有剧集素材图/分镜图，且任务删除会抹掉记录。
+export const workspaceImages = sqliteTable('workspace_images', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  kind: text('kind').notNull(), // text2image | image_edit
+  taskId: integer('task_id'),
+  prompt: text('prompt'),
+  seed: integer('seed'),
+  size: text('size'),
+  negativePrompt: text('negative_prompt'),
+  localPath: text('local_path').notNull(),
+  createdAt: text('created_at').notNull(),
+})
+
 export const videoMerges = sqliteTable('video_merges', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   episodeId: integer('episode_id'),

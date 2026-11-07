@@ -1180,7 +1180,8 @@
       "based": "기본 이미지로 설정했습니다",
       "view": "크게 보기",
       "close": "닫기",
-      "shortcut": "Ctrl / ⌘ + Enter 로 생성"
+      "shortcut": "Ctrl / ⌘ + Enter 로 생성",
+      "removeHistory": "기록에서 삭제"
     },
     "result": {
       "title": "편집 결과",
@@ -1193,8 +1194,8 @@
       "elapsed": "{s}초 경과",
       "done": "편집이 완료되었습니다",
       "failed": "생성에 실패했습니다",
-      "session": "이번 세션",
-      "sessionHint": "세션에만 보관되며 새로고침하면 사라집니다. 빠르게 다운로드하세요",
+      "session": "기록",
+      "sessionHint": "로컬에 저장되어 새로고침 후에도 유지되며 개별 삭제할 수 있습니다",
       "useSeed": "이 시드로 다시 실행",
       "seedHint": "같은 시드·지시·참조 이미지면 거의 동일하게 재현됩니다"
     },
@@ -1318,7 +1319,8 @@
       "download": "다운로드",
       "view": "크게 보기",
       "close": "닫기",
-      "shortcut": "Ctrl / ⌘ + Enter 로 생성"
+      "shortcut": "Ctrl / ⌘ + Enter 로 생성",
+      "removeHistory": "기록에서 삭제"
     },
     "result": {
       "title": "편집 결과",
@@ -1331,8 +1333,8 @@
       "elapsed": "{s}초 경과",
       "done": "편집이 완료되었습니다",
       "failed": "생성에 실패했습니다",
-      "session": "이번 세션",
-      "sessionHint": "세션에만 보관되며 새로고침하면 사라집니다. 빠르게 다운로드하세요",
+      "session": "기록",
+      "sessionHint": "로컬에 저장되어 새로고침 후에도 유지되며 개별 삭제할 수 있습니다",
       "useSeed": "이 시드로 다시 실행",
       "seedHint": "같은 시드·지시·참조 이미지면 거의 동일하게 재현됩니다"
     },

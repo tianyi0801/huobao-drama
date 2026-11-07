@@ -68,6 +68,8 @@ interface GenerateImageParams {
   optionOverrides?: Record<string, unknown>
   /** 局部编辑选区（底图像素坐标）；提供时只重绘该区域并贴回原图 */
   region?: RegionRect
+  /** 工作台来源（text2image / image_edit）：有值时把结果记入图片历史表 */
+  workspaceKind?: string
 }
 
 interface GenerateVideoParams {
@@ -121,8 +123,9 @@ export async function generateImage(params: GenerateImageParams): Promise<number
       ? params.optionOverrides
       : null,
     // 局部编辑选区（原图像素坐标）：随任务落库，仅用于记录与快照展示，
-    // 重绘指令由前端以 <bbox> 形式写进提示词，由模型整图重绘
+    // 重绘指令由前端以自然语言指代图上的红框，由模型整图重绘
     region: params.region ?? null,
+    workspaceKind: params.workspaceKind || null,
   })
 
   logTaskStart('ImageTask', 'enqueue', {
@@ -589,10 +592,44 @@ async function pollTaskInner(record: SysTaskRecord, config: AIConfig, taskId: st
   await failTask(record.id, 'Timeout: polling attempts exhausted')
 }
 
+/**
+ * 工作台图片结果单独落历史表。写在 status=completed 之前：前端轮询到完成时列表已可见。
+ * 失败只记日志，不阻断生成流程；task_id 唯一索引保证任务恢复/重试不重复记录。
+ */
+async function recordWorkspaceImage(record: SysTaskRecord, localPath: string) {
+  const params = parseTaskParams(record.params)
+  const kind = String(params.workspaceKind || '')
+  if (kind !== 'text2image' && kind !== 'image_edit') return
+  try {
+    // 实际生效的种子可能由适配器随机生成，优先取请求快照里的值
+    const [fresh] = await db.select({ requestSnapshot: schema.sysTask.requestSnapshot })
+      .from(schema.sysTask).where(eq(schema.sysTask.id, record.id))
+    let seed: number | null = Number(params.seed) > 0 ? Number(params.seed) : null
+    try {
+      const snap = fresh?.requestSnapshot ? JSON.parse(fresh.requestSnapshot) : null
+      const used = Number(snap?.parameters?.seed)
+      if (Number.isFinite(used) && used > 0) seed = used
+    } catch { /* 快照不可解析时退回用户填的种子 */ }
+    await db.insert(schema.workspaceImages).values({
+      kind,
+      taskId: record.id,
+      prompt: record.prompt || null,
+      seed,
+      size: params.size ? String(params.size) : null,
+      negativePrompt: params.negativePrompt ? String(params.negativePrompt) : null,
+      localPath,
+      createdAt: now(),
+    }).onConflictDoNothing()
+  } catch (err) {
+    logTaskWarn('ImageTask', 'workspace-history-failed', { id: record.id, error: (err as Error).message })
+  }
+}
+
 async function handleImageComplete(record: SysTaskRecord, imageUrl: string) {
   const localPath = await downloadFile(imageUrl, 'images')
   // 列表页缩略图（前端按命名约定推导地址，失败不影响主流程）
   await generateImageThumb(localPath)
+  await recordWorkspaceImage(record, localPath)
 
   await db.update(schema.sysTask)
     .set({ resultUrl: imageUrl, localPath, status: 'completed', stage: 'completed', completedAt: now(), updatedAt: now() })
@@ -606,6 +643,7 @@ async function handleImageComplete(record: SysTaskRecord, imageUrl: string) {
 async function handleImageCompleteBase64(record: SysTaskRecord, base64Data: string, mimeType: string) {
   const localPath = await saveBase64Image(base64Data, mimeType, 'images')
   await generateImageThumb(localPath)
+  await recordWorkspaceImage(record, localPath)
 
   await db.update(schema.sysTask)
     .set({ localPath, status: 'completed', stage: 'completed', completedAt: now(), updatedAt: now() })

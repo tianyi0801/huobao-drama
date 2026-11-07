@@ -229,6 +229,20 @@ export const sqliteSchemaStatements = [
   `CREATE INDEX IF NOT EXISTS idx_sys_task_drama_id ON sys_task (drama_id)`,
   `CREATE INDEX IF NOT EXISTS idx_sys_task_storyboard_id ON sys_task (storyboard_id)`,
 
+  `CREATE TABLE IF NOT EXISTS workspace_images (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL,
+    task_id INTEGER,
+    prompt TEXT,
+    seed INTEGER,
+    size TEXT,
+    negative_prompt TEXT,
+    local_path TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_workspace_images_kind_created ON workspace_images (kind, created_at DESC)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_workspace_images_task ON workspace_images (task_id)`,
+
   `CREATE TABLE IF NOT EXISTS video_merges (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     episode_id INTEGER,

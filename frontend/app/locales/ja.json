@@ -1180,7 +1180,8 @@
       "based": "ベース画像に設定しました",
       "view": "拡大表示",
       "close": "閉じる",
-      "shortcut": "Ctrl / ⌘ + Enter で生成"
+      "shortcut": "Ctrl / ⌘ + Enter で生成",
+      "removeHistory": "履歴から削除"
     },
     "result": {
       "title": "編集結果",
@@ -1193,8 +1194,8 @@
       "elapsed": "経過 {s} 秒",
       "done": "編集が完了しました",
       "failed": "生成に失敗しました",
-      "session": "今回のセッション",
-      "sessionHint": "セッション内のみ保持、再読み込みで消えます。早めに保存してください",
+      "session": "履歴",
+      "sessionHint": "ローカルに保存され、再読み込み後も残ります。個別に削除できます",
       "useSeed": "このシードで再実行",
       "seedHint": "同じシード・指示・参考画像でほぼ再現できます"
     },
@@ -1318,7 +1319,8 @@
       "download": "ダウンロード",
       "view": "拡大表示",
       "close": "閉じる",
-      "shortcut": "Ctrl / ⌘ + Enter で生成"
+      "shortcut": "Ctrl / ⌘ + Enter で生成",
+      "removeHistory": "履歴から削除"
     },
     "result": {
       "title": "編集結果",
@@ -1331,8 +1333,8 @@
       "elapsed": "経過 {s} 秒",
       "done": "編集が完了しました",
       "failed": "生成に失敗しました",
-      "session": "今回のセッション",
-      "sessionHint": "セッション内のみ保持、再読み込みで消えます。早めに保存してください",
+      "session": "履歴",
+      "sessionHint": "ローカルに保存され、再読み込み後も残ります。個別に削除できます",
       "useSeed": "このシードで再実行",
       "seedHint": "同じシード・指示・参考画像でほぼ再現できます"
     },

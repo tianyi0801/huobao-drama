@@ -115,6 +115,13 @@ export const taskAPI = {
   listByEpisode: (episodeId: number) => api.get<{ tasks: any[]; merges: any[] }>(`/episodes/${episodeId}/generation-tasks`),
 }
 
+// 工作台图片历史（文生图 / 图片编辑），独立于任务生命周期，刷新页面可回看
+export const workspaceImageAPI = {
+  list: (kind: 'text2image' | 'image_edit', limit = 24) =>
+    api.get(`/workspace-images?kind=${kind}&limit=${limit}`),
+  del: (id: number) => api.del(`/workspace-images/${id}`),
+}
+
 async function uploadReq<T = any>(path: string, file: File): Promise<T> {
   const fd = new FormData()
   fd.append('file', file)

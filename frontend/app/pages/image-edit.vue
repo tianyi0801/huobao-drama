@@ -383,7 +383,7 @@
         <footer v-if="history.length" class="iep-history">
           <span class="iep-history-label">{{ t('imageEdit.result.session') }}</span>
           <div class="iep-history-list">
-            <div v-for="(item, i) in history" :key="item.at" class="iep-history-item">
+            <div v-for="(item, i) in history" :key="item.id || item.at" class="iep-history-item">
               <button class="iep-history-thumb" :title="t('imageEdit.action.view')" @click="preview = item.url">
                 <img :src="item.url" alt="" loading="lazy" />
               </button>
@@ -393,6 +393,14 @@
                 </button>
                 <button class="btn btn-sm btn-icon" :title="t('imageEdit.action.download')" @click="download(item)">
                   <Download :size="11" :stroke-width="1.9" />
+                </button>
+                <button
+                  v-if="item.id"
+                  class="btn btn-sm btn-icon"
+                  :title="t('imageEdit.action.removeHistory')"
+                  @click="removeHistory(item)"
+                >
+                  <Trash2 :size="11" :stroke-width="1.9" />
                 </button>
               </div>
               <span class="iep-history-index">#{{ history.length - i }}</span>
@@ -437,11 +445,12 @@ import {
   SlidersHorizontal,
   Sparkles,
   SquareDashedMousePointer,
+  Trash2,
   TriangleAlert,
   Wand2,
   X,
 } from 'lucide-vue-next'
-import { localEnvAPI, settingsAPI, taskAPI, uploadAPI } from '~/composables/useApi'
+import { localEnvAPI, settingsAPI, taskAPI, uploadAPI, workspaceImageAPI } from '~/composables/useApi'
 import { mapError, toastError } from '~/composables/useToast'
 
 const { t } = useI18n()
@@ -794,6 +803,7 @@ const outputNote = computed(() => {
 
 onMounted(() => {
   loadEngine()
+  loadHistory()
   window.addEventListener('paste', onPaste)
 })
 
@@ -850,6 +860,34 @@ async function routeImage(file) {
   // 4) 都满了 → 替换底图
   await acceptFile('base', file)
   toast.success(t('imageEdit.ctx.pastedTo', { target: t('imageEdit.slot.base') }))
+}
+
+/** 从服务端恢复历史：记录带 id，便于逐条删除；加载失败不阻断工作台 */
+async function loadHistory() {
+  try {
+    const rows = await workspaceImageAPI.list('image_edit')
+    history.value = (Array.isArray(rows) ? rows : []).map(row => {
+      const path = String(row.local_path || row.localPath || '')
+      return {
+        id: row.id,
+        url: path.startsWith('/') ? path : `/${path}`,
+        path,
+        prompt: String(row.prompt || ''),
+        at: Date.parse(row.created_at || row.createdAt || '') || Date.now(),
+        seed: Number(row.seed) > 0 ? Number(row.seed) : null,
+      }
+    })
+  } catch { /* 历史不可用不影响生成 */ }
+}
+
+async function removeHistory(item) {
+  if (!item.id) return
+  try {
+    await workspaceImageAPI.del(item.id)
+    history.value = history.value.filter(entry => entry.id !== item.id)
+  } catch (e) {
+    toastError(e, { fallback: 'imageEdit.err.failed' })
+  }
 }
 
 async function loadEngine() {
@@ -1060,6 +1098,8 @@ async function generate() {
     const seedValue = Number(seed.value)
     const task = await taskAPI.generate({
       type: 'image',
+      // workspace_kind：后端在出图时把结果写入独立历史表，刷新页面可回看
+      workspace_kind: 'image_edit',
       prompt: composePrompt(),
       // 顺序即工作流的图 1 / 图 2…，禁止调换；空槽位不参与提交
       reference_images: [
@@ -1153,8 +1193,9 @@ async function pollTask(id) {
       const url = path.startsWith('/') ? path : `/${path}`
       const item = { url, path, prompt: prompt.value.trim(), at: Date.now(), seed: readUsedSeed(res) }
       result.value = item
-      // 仅会话内保留，刷新即丢失（不写入素材库）
-      history.value = [item, ...history.value].slice(0, 12)
+      // 先本地立即展示，再用服务端已落库的历史覆盖（带上 id 才能逐条删除）
+      history.value = [item, ...history.value].slice(0, 24)
+      void loadHistory()
       toast.success(t('imageEdit.result.done'))
       return
     }
