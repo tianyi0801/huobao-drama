@@ -265,7 +265,7 @@
           <p v-else class="tts-playing-name">{{ playingName }}</p>
         </section>
 
-        <section class="card tts-card">
+        <section class="card tts-card tts-log-card">
           <div class="tts-card-head">
             <div>
               <h2><ScrollText :size="14" /> {{ t('localTts.job.title') }}</h2>
@@ -419,7 +419,14 @@ function restoreConfigOpen() {
     if (saved !== null) { configOpen.value = saved === '1'; configUserSet.value = true }
   } catch {}
 }
-function toggleLog() { logExpanded.value = !logExpanded.value }
+async function toggleLog() {
+  logExpanded.value = !logExpanded.value
+  await nextTick()
+  // 展开后把日志卡滚到顶部（避开固定顶栏）：小屏下卡片头与「收起」按钮始终可见
+  if (logExpanded.value) {
+    logBox.value?.closest('.tts-log-card')?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+  }
+}
 
 function onLogScroll() {
   const el = logBox.value
@@ -798,10 +805,13 @@ onUnmounted(stopWatch)
 .tts-path-label { font-size: 10px; color: var(--text-3); flex: none; }
 .tts-path-value { flex: 1; min-width: 0; font-size: 11px; color: var(--text-2); word-break: break-all; user-select: all; }
 .tts-empty { font-size: 11px; color: var(--text-3); padding: 6px 0; }
-.tts-log-tools { display: flex; align-items: center; gap: 8px; }
-.tts-log { max-height: 240px; overflow-y: auto; padding: 10px; border-radius: 8px; background: var(--bg-2); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; line-height: 1.65; }
-.tts-log.expanded { max-height: 70vh; }
-.tts-log-line { white-space: pre-wrap; word-break: break-all; color: var(--text-2); }
+.tts-log-card { scroll-margin-top: 72px; }
+.tts-log-tools { display: flex; align-items: center; gap: 8px; flex: none; min-width: 0; }
+/* 高度随视口自适应：720 高的小屏收起约 216px、展开约 396px，卡片不会顶出视口；
+   大屏保留 240px / 560px 上限。固定 240px / 70vh 在矮屏会形成整屏嵌套滚动 */
+.tts-log { min-width: 0; min-height: 0; max-height: clamp(140px, 30vh, 240px); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 10px; border-radius: 8px; background: var(--bg-2); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; line-height: 1.65; }
+.tts-log.expanded { max-height: clamp(240px, 55vh, 560px); }
+.tts-log-line { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; color: var(--text-2); }
 .tts-log-line.err { color: var(--action-danger); }
 .tts-log-line.ok { color: var(--success); }
 .tts-history { display: flex; flex-direction: column; gap: 2px; max-height: 220px; overflow-y: auto; }
@@ -818,5 +828,12 @@ onUnmounted(stopWatch)
 @media (max-width: 1000px) {
   .tts-layout { grid-template-columns: minmax(0, 1fr); }
   .tts-params { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* 窄屏：日志卡片头部的状态与展开按钮换行，别把标题挤成竖排 */
+@media (max-width: 720px) {
+  .tts-page { padding: 14px 12px 32px; }
+  .tts-log-card .tts-card-head { flex-wrap: wrap; }
+  .tts-log-card .tts-log-tools { width: 100%; justify-content: flex-start; }
+  .tts-log { padding: 8px; }
 }
 </style>
