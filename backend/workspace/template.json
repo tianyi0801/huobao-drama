@@ -1,5 +1,5 @@
 {
-  "version": 10,
-  "updatedAt": "2026-11-07",
-  "notes": "视频提示词正文改为简体中文（六节名、关系标记、[Shot N]、At MM:SS.mmm 保持英文）；补充单个 Shot 只允许一个说话人 ID、元指令禁令、禁止段内时间段。统一模板同步机制：升级时覆盖内置 prompts / skills（同名），用户新建的技能目录保留；覆盖前备份到 .backup/。修改本目录下的 prompt 或 skill 后请递增 version。"
+  "version": 11,
+  "updatedAt": "2026-11-08",
+  "notes": "H3 Ref2VA六节说明正文采用官方英文baseline，原句台词/歌词/可见文字保持原语言；使用[Shot 1]及后续真实切镜At MM:SS.mmm。新分段内容驱动4—12整数秒，取消5秒目标，采用每生成片段一个主要说话人的本地稳态策略；已有分镜重写保留时长、镜头数及全部内容。视频细则集中video-prompt，分镜技能负责因果和节奏，声音节仅环境/物理/合理非语言声。统一模板同步机制：升级时覆盖内置 prompts / skills（同名），用户新建的技能目录保留；覆盖前备份到 .backup/。修改本目录下的 prompt 或 skill 后请递增 version。"
 }

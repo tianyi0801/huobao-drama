@@ -47,12 +47,13 @@ test('官方六节的风格与衔接注入保持声音节干净，时间轴不�
   const style = 'high-quality 3D CG animation still, modern game-engine cinematic render, crisp detailed textures, volumetric lighting, avoid flat lighting, avoid anime line art'
   const styled = injectStyleOpening(prompt(), style)
   assert.ok(styled.startsWith('subject_definitions:'))
-  assert.match(styled, /画面风格：high-quality 3D CG animation still/)
-  assert.ok(styled.indexOf('画面风格') < styled.indexOf('[Shot 1]'))
-  assert.doesNotMatch(styled, /avoid/)
-  // 重复注入只保留一句风格句，历史英文风格句也要被替换掉
-  assert.equal(injectStyleOpening(styled, style).match(/画面风格/g).length, 1)
+  assert.match(styled, /Visual style: 3D CG animation, modern game-engine cinematic render/)
+  assert.ok(styled.indexOf('Visual style:') < styled.indexOf('[Shot 1]'))
+  assert.doesNotMatch(styled, /avoid|high-quality|still|grade quality/)
+  // 重复注入只保留一句风格句，历史中英文风格句也会被替换
+  assert.equal(injectStyleOpening(styled, style).match(/Visual style:/g).length, 1)
   assert.doesNotMatch(injectStyleOpening(`The target video uses old style.\n${prompt()}`, style), /The target video uses/)
+  assert.doesNotMatch(injectStyleOpening(prompt().replace('[Shot 1]', '画面风格：旧风格\n[Shot 1]'), style), /旧风格/)
   const text = appendVideoPromptSection(styled, 'retention_analysis', buildContinuityPromptSuffix(1).trim())
   assert.ok(text.indexOf('weak_reference') < text.indexOf('detailed_description:'))
   assert.ok(!text.slice(text.indexOf('overall_soundscape:')).includes('weak_reference'))
@@ -91,10 +92,10 @@ test('视频提示词镜头数与description一一对应，台词必须逐字来
   await assert.rejects(call(tools.update_storyboard, { storyboard_id: a.id, video_prompt: oneShot }, target), /镜头数必须一一对应/)
 
   const invented = prompt('[Shot 1] 0.0-3.0秒：小明抬头。\n[Shot 2] 3.0-6.0秒：小明说，<d>[Chinese] 你怎么现在才来。</d>')
-  await assert.rejects(call(tools.update_storyboard, { storyboard_id: a.id, video_prompt: invented }, target), /不在 description 原文中/)
+  await assert.rejects(call(tools.update_storyboard, { storyboard_id: a.id, video_prompt: invented }, target), /description.*改写/)
 
   const dropped = prompt('[Shot 1] 0.0-3.0秒：小明抬头。\n[Shot 2] 3.0-6.0秒：小明保持沉默。')
-  await assert.rejects(call(tools.update_storyboard, { storyboard_id: a.id, video_prompt: dropped }, target), /必须用 <d>/)
+  await assert.rejects(call(tools.update_storyboard, { storyboard_id: a.id, video_prompt: dropped }, target), /<d>.*不能省略/)
 
   const valid = prompt('[Shot 1] 0.0-3.0秒：小明抬头看向门口。\n[Shot 2] 3.0-6.0秒：小明(S1)说，<d>[Chinese] 你来了。</d>随后闭口。')
   const saved = await call(tools.update_storyboard, { storyboard_id: a.id, video_prompt: valid }, target)
@@ -109,6 +110,46 @@ test('视频提示词镜头数与description一一对应，台词必须逐字来
   // 还原共享夹具，避免影响后续用例
   db.update(schema.storyboards).set({ description: a.description, duration: a.duration, videoPrompt: a.videoPrompt })
     .where(eq(schema.storyboards.id, a.id)).run()
+})
+
+test('逐句台词拒绝漏句、截句、重复、错镜头、错主体与说话人串用', async () => {
+  const target = buildAgentRequestContext({ dramaId: drama.id, episodeId: episode.id, targetStoryboardId: a.id })
+  const tools = registerAgentTools({ updateVideoPrompt })
+  const description = '【镜头1】小明说：「钥匙在这里。」小红说：「给我吧。」\n【镜头2】小明说：「拿好了。」'
+  db.update(schema.storyboards).set({ description, duration: 10 }).where(eq(schema.storyboards.id, a.id)).run()
+  const first = '<Subject 1> (S1) says, <d>[Chinese] 钥匙在这里。</d>'
+  const second = '<Subject 2> (S2) says, <d>[Chinese] 给我吧。</d>'
+  const last = '<Subject 1> (S1) says, <d>[Chinese] 拿好了。</d>'
+  const text = prompt(`[Shot 1] ${first} ${second}\n[Shot 2] At 00:06.000, ${last}`)
+    .replace('subject_definitions: N/A', 'subject_definitions:\n<Subject 1> is @小明, a man in a blue jacket.\n<Subject 2> is @小红, a woman in a red coat.')
+  try {
+    await call(tools.update_storyboard, { storyboard_id: a.id, video_prompt: text }, target)
+    for (const bad of [
+      text.replace(second, ''),
+      text.replace('钥匙在这里。', '在这里。'),
+      text.replace('钥匙在这里。', '钥匙在这里!'),
+      text.replace(second, `${second} ${second}`),
+      text.replace(first, second).replace(`${second} ${second}`, `${second} ${first}`),
+      text.replace(second, second.replace('<Subject 2>', '<Subject 1>')),
+      text.replace(second, second.replace('(S2)', '(S1)')),
+      text.replace(last, last.replace('(S1)', '(S3)')),
+      text.replace(first, first.replace('(S1)', '')),
+      text.replace(first, '<Subject 1> (S1) listens. <Subject 2> says, <d>[Chinese] 钥匙在这里。</d>'),
+      text.replace(`${first} ${second}`, `${first} ${last}`).replace(`00:06.000, ${last}`, `00:06.000, ${second}`),
+    ]) await assert.rejects(call(tools.update_storyboard, { storyboard_id: a.id, video_prompt: bad }, target), /台词|说话人/)
+    assert.throws(() => validateVideoPromptTimeline(text.replace('non_diegetic_music: N/A', 'non_diegetic_music: 只有 (S1) 出声。'), 10), /声音节/)
+    assert.throws(() => validateVideoPromptTimeline(text.replace(first, '<d>缺少语言标签</d>'), 10), /标签/)
+    // 用户原台词中的否定词不属于写作元指令。
+    const quoted = prompt('[Shot 1] 小明 (S1) says, <d>[Chinese] 不要说话。</d>')
+    assert.doesNotThrow(() => validateVideoPromptTimeline(quoted, 4))
+    assert.throws(() => validateVideoPromptTimeline(prompt('[Shot 1] Rain falls. No subtitles.'), 4), /元指令/)
+    const quotedStyle = prompt('[Shot 1] 小明 (S1) says, <d>[English]\nVisual style: noir.\n</d>')
+    const styledDialogue = injectStyleOpening(quotedStyle, 'cinematic lighting')
+    assert.ok(styledDialogue.includes('<d>[English]\nVisual style: noir.\n</d>'))
+    assert.doesNotThrow(() => validateVideoPromptTimeline(styledDialogue, 4))
+  } finally {
+    db.update(schema.storyboards).set({ description: a.description, duration: a.duration, videoPrompt: a.videoPrompt }).where(eq(schema.storyboards.id, a.id)).run()
+  }
 })
 
 test('提示词窄工具保护目标分镜与字段，保存回执不能用旧值冒充', async () => {
@@ -210,6 +251,11 @@ test('镜头衔接等待前段完成后才取新尾帧，跨场景或失败不�
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   try {
     saveComfyConfig({ enabled: true, url: `http://127.0.0.1:${(server.address() as any).port}`, video: buildTemplateFromPreset('minimax-h3-ref2va'), continuityReference: true })
+    const count = db.select().from(schema.sysTask).all().length
+    await assert.rejects(generateVideo({ storyboardId: current.id, dramaId: drama.id,
+      prompt: prompt('[Shot 1] 小明 (S1) says, <d>[Chinese] 临时新增的配音。</d>'), duration: 5 }), /不能省略、重复或新增/)
+    assert.equal(db.select().from(schema.sysTask).all().length, count)
+    assert.equal(submitted, undefined)
     const id = await generateVideo({ storyboardId: current.id, dramaId: drama.id, prompt: prompt(), duration: 5 })
     await new Promise(resolve => setTimeout(resolve, 100))
     assert.equal(submitted, undefined)
@@ -225,6 +271,11 @@ test('镜头衔接等待前段完成后才取新尾帧，跨场景或失败不�
     assert.doesNotMatch(saved.params!, /old_lastframe/)
     assert.match(submitted['2'].inputs.prompt, /@图片1: weak_reference/)
     assert.ok(submitted['2'].inputs.prompt.indexOf('weak_reference') < submitted['2'].inputs.prompt.indexOf('detailed_description:'))
+    const snapshot = JSON.parse(saved.requestSnapshot!)
+    assert.equal(snapshot.provider, 'comfyui')
+    assert.equal(snapshot.prompt, submitted['2'].inputs.prompt)
+    assert.equal(snapshot.promptTruncated, undefined)
+    assert.doesNotMatch(snapshot.prompt, /保持同一|不重置构图/)
     db.update(schema.sysTask).set({ status: 'failed' }).where(eq(schema.sysTask.id, before.id)).run()
     assert.equal(await resolvePreviousShotFrame(current.id), null)
     db.update(schema.sysTask).set({ status: 'completed' }).where(eq(schema.sysTask.id, before.id)).run()

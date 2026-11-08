@@ -724,7 +724,9 @@ onUnmounted(stopWatch)
 </script>
 
 <style scoped>
-.tts-page { display: flex; flex-direction: column; gap: 16px; padding: 20px 24px 40px; }
+/* 外层 .content 是 overflow:hidden 的固定高度 flex 容器，页面必须自己承担纵向滚动，
+   否则右列下方的「本次结果」/ 日志 / 历史会被直接裁掉且无法滚动查看 */
+.tts-page { display: flex; flex-direction: column; gap: 16px; padding: 20px 24px 40px; height: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .tts-topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .tts-brand { display: flex; align-items: baseline; gap: 12px; }
 .tts-title { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 700; color: var(--text-0); }
@@ -738,7 +740,8 @@ onUnmounted(stopWatch)
 .tts-notice strong { font-size: 13px; }
 .tts-notice p { margin-top: 4px; font-size: 12px; line-height: 1.6; opacity: .9; }
 
-.tts-layout { display: grid; grid-template-columns: minmax(330px, 400px) minmax(0, 1fr); gap: 16px; align-items: start; }
+/* 不参与纵向 flex 收缩：两列按内容撑开，由 .tts-page 统一滚动 */
+.tts-layout { display: grid; grid-template-columns: minmax(330px, 400px) minmax(0, 1fr); gap: 16px; align-items: start; flex: none; }
 .tts-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .tts-card { padding: 16px; display: flex; flex-direction: column; gap: 13px; }
 .tts-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }

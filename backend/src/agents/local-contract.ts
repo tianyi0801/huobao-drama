@@ -6,14 +6,14 @@ export { H3_SECTIONS } from '../services/video-prompt-structure.js'
 export const STORYBOARD_BATCH_SIZE = 2
 export const STORYBOARD_MAX_STEPS = 80
 
-/** 结构规则是代码契约，正文语言仍由本次内容语言指令控制。 */
+/** 执行与结构由代码兜底；视频正文语言和创作细则以 video-prompt 技能为准。 */
 export function buildLocalAgentContract(type: string, rc?: RequestContext): string {
   const common = `## 本地生产执行契约（与旧模板冲突时以本节为准）
 - 工具注册名称与 tool id 相同，使用 snake_case；严格使用工具 schema 的参数，不猜测驼峰别名。
 - 不要调用生图/视频服务或编造已生成素材。文本服务只负责创作与调用保存工具，图片/视频由本地 ComfyUI 单独执行。
 - 必须实际调用保存工具并检查回执；返回 error 时应纠正输入，不能回复“完成”。保存成功后只用一句简短总结，不重复输出整份内容。
 - 仅从已提供的文字/资产字段提取事实。工具只返回图片地址而未提供视觉输入时，不得声称已看过参考图。
-- 参数中的字段名、ID、引用标记、小节名保持固定；叙述正文按会话目标语言输出。`
+- 参数中的字段名、ID、引用标记、小节名保持固定；非视频叙述正文按会话目标语言输出，video_prompt 正文语言遵循下方视频契约。`
   if (type === 'script_rewriter') return `${common}
 - 先用 read_episode_script 读原文，自己完成改写，再用 save_script 保存完整 content。rewrite_to_screenplay 只读取原文和格式说明，不会代替你改写；已读原文不必重复调用它。
 - 场景头使用 ## S编号 | 内景/外景 · 地点 | 时间段；动作写自然段，对白按角色名标注，不加入相机或模型参数。
@@ -32,21 +32,16 @@ export function buildLocalAgentContract(type: string, rc?: RequestContext): stri
   const localVideo = comfy.video?.name || '尚未绑定本地视频工作流'
   const video = `## 本地 ComfyUI 视频提示词契约（MiniMax 官方 Ref2VA 格式）
 - 实际视频模板：${localVideo}。本项目内置 H3 Ref2VA 工作流；不要按历史云端配置显示名改用其他提示词格式。
-- video_prompt 是一个完整字符串，含以下官方六节且顺序固定：${H3_SECTIONS.join(' / ')}。节名是英文结构锚点，禁止改名、翻译或退化成单段散文；禁止使用项目旧版自造的 shot_summary / reference_usage / identity_reference / continuity_reference。
-- 六节正文一律用简体中文写作；只有 <d> 内的对白/歌词保留原语言，画面可见文字照原样书写。节名、关系标记、[Shot N]、At MM:SS.mmm、<d>[Chinese] 这些结构锚点必须保持英文原样，不可翻译或改写；这是格式硬要求，不受会话语言指令影响。逐节细则以注入的 video-prompt 技能为准。
-- subject_definitions：用 <Subject N> 逐行定义可复用主体，写明来源参考与必须保持的特征；summary：以 [reference generation] 等官方任务类型前缀开头的一段中文；retention_analysis：每个标签一行，只用官方关系标记 fully_preserved / partially_preserved / attribute_transfer / weak_reference（音频用 fully_copy / partially_copy / reference / weak_reference）。
-- detailed_description：风格句由系统在 [Shot 1] 之前注入，不要自己写风格词；[Shot 1] 不带时间戳，后续镜头写 [Shot N] At MM:SS.mmm, 镜头切至近景；逐镜头用中文写清构图、主体位置与外观、环境与光线、动作与状态变化、运镜类型+幅度+速度、当前声音。描述必须具体可见，不能写成剧情摘要或参考关系清单。
-- 对白写成 <Subject 1> (S1) 说，<d>[Chinese] 原句</d>；(Sx) 按实际发声顺序分配，不发声的角色不分配。台词逐字来自 description，只在对应 Shot 写一次，不新增台词、旁白或解说。overall_soundscape 只写 1—4 句中文环境音与物理声，不抄对白、不用说话白名单或否定句堆砌；non_diegetic_music 无配乐时写 N/A。
-- 素材只写 @角色名/@场景名/@道具名，精确匹配上下文，系统负责编号，不手写 @图片1 / <Picture 1>。仅 image_url 已有实际图片的资产才使用 @ 引用，未生图资产用普通名称描述，不虚构参考图。
-- 新拆分 duration 为4—12的整数秒，目标5秒，绝不能超过12秒；默认1个连续镜头、固定机位或缓慢单一运镜、1个主要动作，仅叙事确需切镜时最多2个且每个至少2秒。重写已有分镜时保留 duration 与全部业务动作/台词。
-- description 的【镜头N】是镜头数唯一来源：video_prompt 必须写同样数量的 [Shot N]，不得合并、不得新增；只有 description 本身单镜头时才写单个 Shot。后续镜头的切镜点用官方 At MM:SS.mmm，严格递增且小于 duration；镜头正文里不要写「0-3 秒：」这类段内时间段，段内节奏用动作先后的自然叙述表达。
-- 无对白/旁白时 overall_soundscape 必须写一句中文「本段无对白、旁白与人声」，只保留环境/动作声；有对白时用一句中文说明只有实际发声者出声、其余角色闭口不出声。detailed_description 每个 Shot 都要写清当前谁发声、谁闭口。
-- 每个 Shot 都要带空间锚点，description 已有的空间描述原样保留对应的中文表达；双人对话优先同焦平面平视中近景，逐人写清左右位置、距离、朝向与独立动作，所有需要辨认的脸均清晰可见，避免浅景深、背景人物虚化、遮脸与快速运动。
-- 一个 Shot 只允许一个说话人 ID：角色要回应时用 [Shot N] At MM:SS.mmm 另起镜头，多轮对话拆到相邻段落，避免模型把台词串读或错配给别人。
-- 禁止写入元指令（无字幕、不要说话、保持一致、必须、只能、4K、高清、参考这张图）：模型会把这类约束当成台词或画面文字。要表达同样效果就写可见状态，例如「中景平视，人物位于画面中央」「暖黄灯光均匀照亮脸部」「人物仍穿黑色外套，右手拿着木盒」。
-- 只有 available_voice_references / has_voice 明确可用的角色才用 #角色名 标注对白音色；否则用角色姓名描述说话人。步数、分辨率、种子、采样器、增强开关由模板/界面控制，不写进创作文本。`
+- video_prompt 是一个完整字符串，含以下官方六节且顺序固定：${H3_SECTIONS.join(' / ')}。节名不得改名、翻译或退化成散文。视频创作细则的唯一权威是已注入的 video-prompt 技能，本节只兜底执行与结构契约。
+- 六节正文使用英文，不随会话语言切换；对白/歌词与画面可见文字保留源语言。中文对白使用 <Subject 1> (S1) says, <d>[Chinese]原句</d>，每句逐字逐标点来自 description 且只出现一次，不新增台词、旁白、解说或其他人声。<Subject N> 身份与 (Sx) 发声者映射在目标视频内稳定复用；已有多个说话人时逐句明确对应 Subject 与 Sx，不以每 Shot 单说话人限制改写源内容。
+- 技能文件缺失时仍按六节保存：subject_definitions 定义主体来源与特征，保留业务角色原名，有可用图写 @原名、无图写普通原名，不翻译或缩写；summary 用 [reference generation] 等任务前缀；retention_analysis 用 fully_preserved / partially_preserved / attribute_transfer / weak_reference 等官方关系标记；detailed_description 用英文描述可见动作与空间，源对白放在对应 Shot，原有画外音使用 says in an off-screen voiceover，不新增画外音；overall_soundscape 仅写实际环境音与物理声，non_diegetic_music 无配乐写 N/A。
+- 读取 available_image_references，素材只写上下文中的 @角色名/@场景名/@道具名，直接复制 image_reference；系统负责编号，不手写 @图片1 / <Picture 1>。仅已有实际图片的资产才使用 @ 引用，未生图资产用普通名称描述，不虚构参考图；音色只使用 available_voice_references / has_voice 明确可用的 #角色名，规则以注入的音色契约为准。
+- 新拆分 duration 为4—12的整数秒，绝不能超过12秒；按内容实际时长分配，不设目标秒数。以正常动作速度和自然发话推进剧情，少等待、不用慢动作或空白停顿凑时长；默认1个连续镜头、1个主要动作，仅叙事确需切镜时最多2个且每个至少2秒。新片段采用每片段一个主要说话人的稳态经验策略，换人优先新片段；这不是官方每 Shot 说话人数上限。
+- 重写已有分镜保留 duration、全部原有动作与源台词原句，不改变 description 或绑定业务字段。description 的【镜头N】是镜头数唯一来源：video_prompt 必须写同样数量的 [Shot N]，不得合并、不得新增；只有 description 本身单镜头时才写单个 Shot。[Shot 1] 不带时间戳，后续用 [Shot N] At MM:SS.mmm，切镜点严格递增且小于 duration；段内动作与时间表达遵循 video-prompt 技能，不机械平均分配。
+- description 已有空间关系在英文正文中忠实表达，逐人明确位置、朝向与独立动作，所有需要辨认的脸均清晰可见；不为清晰度删动作、改台词或改变原镜头数。项目风格由系统注入，不自行重复添加风格词。
+- 元指令、说话白名单和独立音色信息头不得进入最终六节正文，尤其不进入声音节；把创作约束转成实际可见动作与实际可听声音。步数、分辨率、种子、采样器、增强开关由模板/界面控制，不写进创作文本。`
   if (type === 'storyboard_breaker') return `${common}\n${video}
-- 先用 read_storyboard_context 读取本集事实与绑定ID；每段写齐 description、video_prompt、duration、character_ids、prop_ids、scene_id、atmosphere。
+- 先用 read_storyboard_context 读取本集事实与绑定ID；每段写齐 description、video_prompt、duration、character_ids、prop_ids、scene_id、atmosphere。description 将动作与台词用句号或换行分开，发话使用「角色原名说：「原句」」，不翻译角色名、不改台词原句。
 - 整集重拆时首批 save_storyboards 带 replace_existing: true，后续追加；每批最多${STORYBOARD_BATCH_SIZE}段，每轮仅一次 save_storyboards；不要同时生成多批。shot_number 从1连续递增；全部批次保存后才能完成。不要一次性塞入整集，也不要每批都清空。
 - 只有明确的增量编辑才使用 update_storyboard，不清空旧分镜；调整完也必须保存。`
   return `${common}\n${video}

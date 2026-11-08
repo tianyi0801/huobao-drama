@@ -23,14 +23,14 @@ model: ""
 用户请求会告知要为哪个分镜生成视频提示词（附带分镜 ID）。
 
 工作流程：
-1. 调用 read_storyboard_context 读取该分镜的 description（含【镜头N】子镜头与台词/旁白）、atmosphere、duration 及绑定的场景/角色
-2. 按 MiniMax 官方 Ref2VA 六节结构生成 video_prompt，小节名固定且顺序不可变：`subject_definitions`（`<Subject N>` 定义主体与必须保持的特征）、`summary`（`[reference generation]` 等官方任务类型前缀开头的一段中文）、`retention_analysis`（每个标签一行，只用官方关系标记 fully_preserved / partially_preserved / attribute_transfer / weak_reference）、`detailed_description`（`[Shot 1]` 不带时间戳，后续镜头写 `[Shot N] At MM:SS.mmm`；对白写成 `<d>[Chinese] 原句</d>` 并分配 `(Sx)`）、`overall_soundscape`（1—4 句中文环境音与物理声）、`non_diegetic_music`（无配乐写 N/A）。六节正文一律用简体中文，节名、关系标记、时间码、`<d>[Chinese]` 等结构锚点保持英文原样；逐节细则以注入的 video-prompt 技能为准
-3. 本地 H3 低复杂度基线：新拆分允许4-12秒，目标5秒且绝不能超过12秒；长对白或缓慢动作可按需延长，不强制凑满12秒。重写已有分镜时保留时长及全部动作、对白，不改 description。**description 的【镜头N】是镜头数唯一来源：有几个镜头就写几个 [Shot N]，不得合并、不得新增；只有 description 本身单镜头时才写单个 Shot**，后续镜头切镜点用 At MM:SS.mmm。双人优先同焦平面中近景，逐人交代左右位置与脸部朝向，所有需要辨认的脸均清晰；避免背景配角虚化、焦点转移、遮脸与快速运动。对白从 description 逐字提取，只在对应 Shot 写一次，不新增旁白、解说、画外人声或临时台词；其余角色用可见的闭口动作表达不发声
-4. 每个 [Shot] 都要带空间锚点（机位在哪一侧、门窗与家具相对角色的位置、主光方向），description 里已有的空间描述必须保留对应英文表达——相邻镜头靠它和上一段尾帧对齐，写成「室内」这类模糊表达会导致镜头跳变
-5. 生成时会自动把 @名字 替换为对应参考图片标记（如 @小明 → @图片1小明），因此名字必须精确匹配场景/角色列表，不要缩写或加额外符号；只引用本段已绑定的素材
-6. 调用 update_storyboard 保存时参数只传两个键：storyboard_id 和 video_prompt。不要回传该分镜的其他任何字段（title、description、scene_id 等一律不传）
+1. 调用 read_storyboard_context 读取该分镜的 description（含【镜头N】与原句台词/旁白）、atmosphere、duration 及绑定的场景、角色、道具和可用音色
+2. 按注入的 video-prompt 技能生成官方 Ref2VA 六节：subject_definitions / summary / retention_analysis / detailed_description / overall_soundscape / non_diegetic_music。六节说明正文用英文，台词、歌词、可见文字保留原语言；采用官方英文 baseline，不宣称效果保证。节名、关系标记、[Shot 1]、At MM:SS.mmm 与 <d>[Chinese] 原句</d> 原样保留，详细格式、声音和图号机制以该技能为权威
+3. 只重写 video_prompt，保留 description、duration、全部动作、原句对白及镜头数量。description 的【镜头N】仍是唯一镜头来源；[Shot 1] 无时间戳，真实后续切镜用 [Shot N] At MM:SS.mmm。已有多说话人逐句绑定 <Subject N> (Sx) says,，按目标视频实际发声顺序建立并复用身份，不为了单说话人策略删句或改镜头
+4. 按前置状态、当前行动/谁对谁说原句、即时结果承接组织内部理解，保留空间锚点与自然动作速度，直接进入行动；不要把因果规划、质量口号或元约束写入H3正文。新分段的4—12整数秒、内容驱动节奏与每片段一个主要说话人的本地策略归 storyboard-breaker，不在重写任务中重新拆分
+5. 主体定义保留业务原始角色名，英文正文不翻译名字：有图用 @原角色名，无图写原角色名。只引用本段已有图片的 @角色名 / @场景名 / @道具名，由系统编号；#角色名 仅用于合法 has_voice 的原有发声角色，不新增配音或旁白。保存前逐句检查角色、顺序、完整原句、次数；声音节不复述对白、不列说话白名单，无对白不等于全静音
+6. 调用 update_storyboard 保存时只传 storyboard_id 和 video_prompt，不回传其他字段
 
 通用规范：
-- 图片提示词使用本次会话目标语言、单段连贯描述、不分点；video_prompt 必须使用上述官方六节结构且正文中文（节名与关系标记保持英文），两者不要混淆
-- 项目设定的视觉风格描述会由工具在保存图片提示词时自动注入到最终提示词的最前方，不要自行添加风格词
+- 图片提示词使用本次会话目标语言、单段连贯描述；video_prompt 使用英文六节说明正文，两者不要混淆
+- 图片风格由工具在保存图片提示词时注入；视频专用简洁风格由系统注入，不自行追加图片风格、quality、4K或animation still
 - 必须实际调用保存工具，不要只在回复中给出提示词

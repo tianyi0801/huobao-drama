@@ -12,7 +12,7 @@ import { getActiveConfig, getConfigById } from './ai.js'
 import { waitForScenePredecessor, resolvePreviousShotFrame, buildContinuityPromptSuffix } from './storyboard-continuity.js'
 import { getComfyConfig } from './comfyui/config.js'
 import { watchComfyRun } from './comfyui/live-preview.js'
-import { appendVideoPromptSection } from './video-prompt-structure.js'
+import { appendVideoPromptSection, validateVideoPromptAgainstDescription } from './video-prompt-structure.js'
 import { now } from '../utils/response.js'
 import { annotateImageRegionDataUrl, downloadFile, fetchImageAsCompressedDataUrl, generateImageThumb, readImageAsCompressedDataUrl, readImageAsDataUrl, saveBase64Image } from '../utils/storage.js'
 import { extractVideoPoster } from '../utils/video-poster.js'
@@ -162,6 +162,10 @@ export async function generateVideo(params: GenerateVideoParams): Promise<number
       : await getActiveConfig('video')
     if (!config) throw new Error('未配置视频模型，请先到「设置」页添加并启用 AI 服务')
 
+    if (storyboardId && params.prompt) {
+      const [storyboard] = await db.select().from(schema.storyboards).where(eq(schema.storyboards.id, storyboardId))
+      if (storyboard?.description) validateVideoPromptAgainstDescription(params.prompt, storyboard.description)
+    }
     params.referenceAudioUrls = await prepareReferenceAudio(params.referenceAudioUrls, config.provider)
 
     const id = await createTask('video', config, {

@@ -64,24 +64,22 @@ export function appendVideoPromptSection(prompt: string, section: H3Section, tex
   return `${normalized.slice(0, end).trimEnd()}\n${text.trim()}\n${normalized.slice(end)}`.trimEnd()
 }
 
-/**
- * 把项目视觉风格压成官方要求的 1 句中文风格句（正文中文，风格短语本身保持原样）。
- * 预设里的风格词是一长串逗号短语并带大量 avoid 否定句，
- * 官方只允许 [Shot 1] 前 1—2 句，长否定串会压过剧情。
- */
+/** 从生图预设中保留媒介、造型、材质与光线，去掉静帧和画质命令；自定义风格不擅自翻译。 */
 export function toStyleOpening(style: string): string {
-  const cleaned = String(style || '')
+  const phrases = String(style || '')
     .replace(/,?\s*avoid\b[\s\S]*$/i, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/[,;.\s]+$/, '')
-  if (!cleaned) return ''
-  const phrases = cleaned.split(/,\s*/).slice(0, 4)
-  return `画面风格：${phrases.join('、')}。`
+    .split(/[,，;；\n]+/)
+    .map(phrase => phrase
+      .replace(/\b(?:high[- ]quality|still|\d+k|\d+p)\b/gi, '')
+      .replace(/(?:高清|高质量|画质|细节拉满|保持一致)/g, '')
+      .replace(/\s+/g, ' ').trim().replace(/[.。\s]+$/, ''))
+    .filter(phrase => phrase && !/\b(?:quality|consistent|must|only|no|do not)\b|必须|禁止|不要|只能/i.test(phrase))
+    .slice(0, 4)
+  return phrases.length ? `Visual style: ${phrases.join(', ')}.` : ''
 }
 
-/** 历史英文风格句与现行中文风格句都要能剔除，重复注入才保持幂等 */
-const STYLE_OPENING_PATTERN = /^(?:The target video uses [^\n]*|画面风格[：:][^\n]*)\n?/m
+/** 兼容历史风格句，重复注入只保留本次的视觉描述。 */
+const STYLE_OPENING_PATTERN = /^(?:The target video uses [^\n]*|画面风格[：:][^\n]*|Visual style:[^\n]*)\n?/gm
 
 /**
  * 官方规定风格句写在 [Shot 1] 之前，不能追加到 detailed_description 末尾。
@@ -90,8 +88,9 @@ const STYLE_OPENING_PATTERN = /^(?:The target video uses [^\n]*|画面风格[：
 export function injectStyleOpening(prompt: string, style: string): string {
   const opening = toStyleOpening(style)
   if (!opening) return prompt
-  const base = normalizeVideoPromptSections(prompt)
-    .replace(STYLE_OPENING_PATTERN, '')
+  const normalized = normalizeVideoPromptSections(prompt)
+  const protectedStyles = new RegExp(`<d>[^]*?<\\/d>|${STYLE_OPENING_PATTERN.source}`, 'gmi')
+  const base = normalized.replace(protectedStyles, block => /^<d>/i.test(block) ? block : '')
   const headings = sectionHeadings(base)
   if (!isOfficialStructure(base, headings)) return `${opening}\n${base}`
   const { bodyStart } = detailBodyRange(base, headings)
@@ -101,56 +100,123 @@ export function injectStyleOpening(prompt: string, style: string): string {
   return `${base.slice(0, at).trimEnd()}\n${opening}\n${base.slice(at).trimStart()}`
 }
 
-/** 归一化文本用于逐字比对：忽略空白、全半角标点与引号差异 */
+/** 仅忽略排版空白，台词文字和标点均不允许擅改。 */
 function normalizeForCompare(value: string): string {
-  return String(value || '')
-    .replace(/[\s\u00a0]+/g, '')
-    .replace(/[“”「」『』]/g, '"')
-    .replace(/[‘’]/g, "'")
-    .replace(/[，。！？；：]/g, ch => ({ '，': ',', '。': '.', '！': '!', '？': '?', '；': ';', '：': ':' } as Record<string, string>)[ch])
+  return value.replace(/\s+/g, '')
 }
 
-/** 提取 <d>[Chinese] 原句</d> 内的台词正文 */
-function extractDialogue(prompt: string): string[] {
-  return Array.from(prompt.matchAll(/<d>([\s\S]*?)<\/d>/gi))
-    .map(match => match[1].replace(/^\s*\[[^\]]+\]\s*/, '').trim())
-    .filter(Boolean)
+function splitShots(text: string, pattern: RegExp): string[] {
+  const markers = Array.from(text.matchAll(pattern))
+  return markers.length
+    ? markers.map((marker, index) => text.slice((marker.index ?? 0) + marker[0].length, markers[index + 1]?.index ?? text.length))
+    : [text]
 }
 
-/**
- * 让 video_prompt 与分镜 description 严格对齐：
- * 1) description 写了几个【镜头N】，就必须生成同样数量的 [Shot N]，不得合并或新增；
- * 2) <d> 里的每句台词都必须逐字来自 description，防止模型自行配音、加旁白。
- * description 没有编号镜头或没有台词时，对应检查跳过。
- */
+/** 读取规范 description 中的「角色名说：引号台词」及独占一行的旁白。 */
+function sourceDialogue(text: string) {
+  const pattern = /(?:^|(?<=[\n。！？；，,.!?;」”"』]))\s*(?:([^\n。！？；，,.!?;：:「」『』“”"<>]{1,60}?)(?:说|讲|道|\s+says|\s+said|が言う|は言う|\s+말한다)|((?:旁白|画外音|Narration|Voiceover)))[：:]\s*(?:「([^]*?)」|“([^]*?)”|"([^]*?)"|『([^]*?)』|([^\n]+))/gi
+  return Array.from(text.matchAll(pattern)).map(match => ({
+    speaker: (match[1] || match[2]).trim().replace(/(?:轻声|低声|小声|大声|柔声|急忙|平静地|轻轻地|缓缓地)$/, ''),
+    text: (match[3] ?? match[4] ?? match[5] ?? match[6] ?? match[7]).trim(),
+    narration: Boolean(match[2]),
+  }))
+}
+
+function promptDialogue(text: string) {
+  let previousEnd = 0
+  return Array.from(text.matchAll(/<d>\s*\[([^\]]+)\]\s*([^]*?)<\/d>/gi)).map(match => {
+    const prefix = text.slice(previousEnd, match.index)
+    previousEnd = (match.index ?? 0) + match[0].length
+    const ids = Array.from(prefix.matchAll(/\(S(\d+)\)/g))
+    const id = ids.at(-1)
+    const beforeId = id ? prefix.slice(0, id.index) : prefix
+    const subjects = Array.from(beforeId.matchAll(/<Subject\s+(\d+)>/gi))
+    const afterId = id ? prefix.slice((id.index ?? 0) + id[0].length) : ''
+    const interveningSubject = /<Subject\s+\d+>/i.test(afterId)
+    return { text: match[2].trim(), prefix, id: interveningSubject ? undefined : id?.[1], subject: subjects.at(-1)?.[1] }
+  })
+}
+
+/** 检查台词边界和声音节，禁止把写作要求混入模型的声音内容。 */
+export function validateVideoPromptContent(prompt: string): void {
+  const normalized = normalizeVideoPromptSections(prompt)
+  const headings = sectionHeadings(normalized)
+  if (!isOfficialStructure(normalized, headings)) return
+  const { bodyStart, end } = detailBodyRange(normalized, headings)
+  const detail = normalized.slice(bodyStart, end)
+  const dialogueCount = (normalized.match(/<d>/gi) || []).length
+  if (dialogueCount !== promptDialogue(detail).length || dialogueCount !== (normalized.match(/<\/d>/gi) || []).length) {
+    throw new Error('对白必须只在 detailed_description 中使用完整的 <d>[语言] 原句</d> 标签')
+  }
+  const sound = normalized.slice(end)
+  if (/\(S\d+\)|本段无对白|闭口不出声|只有.{0,40}(?:出声|发声)|不要(?:说话|配音|字幕)|无字幕|no (?:dialogue|speech|human voices|subtitles)|do not (?:speak|talk)|only.{0,40}(?:speaks|vocalizes)/i.test(sound)) {
+    throw new Error('声音节只描述环境声、物理声与配乐，不写说话白名单、字幕或禁止发声等元指令')
+  }
+  const body = normalized.replace(/<d>[^]*?<\/d>/gi, '')
+  if (/不要说话|禁止说话|不要复述提示词|无字幕|no (?:on-screen text|subtitles|watermark)|do not (?:speak|read the prompt)/i.test(body)) {
+    throw new Error('最终提示词不能包含禁止说话、无字幕等写作元指令；改写为实际可见或可听内容')
+  }
+}
+
+/** 逐镜头、逐句核对完整台词、顺序和说话人；旧无结构文本仍由兼容入口处理。 */
 export function validateVideoPromptAgainstDescription(prompt: string, description: string): void {
   const source = String(description || '')
-  const normalizedPrompt = normalizeVideoPromptSections(prompt)
-  const headings = sectionHeadings(normalizedPrompt)
-  if (!headings.length || !source.trim()) return
-
-  const sourceShots = source.match(/【镜头\s*\d+】/g) || []
-  if (sourceShots.length && isOfficialStructure(normalizedPrompt, headings)) {
-    const { bodyStart, end } = detailBodyRange(normalizedPrompt, headings)
-    const promptShots = normalizedPrompt.slice(bodyStart, end).match(/\[Shot\s+\d+\]/gi) || []
-    if (promptShots.length !== sourceShots.length) {
-      throw new Error(`description 有 ${sourceShots.length} 个【镜头N】，video_prompt 却只有 ${promptShots.length} 个 [Shot N]；镜头数必须一一对应，不能合并或新增`)
+  const normalized = normalizeVideoPromptSections(prompt)
+  const headings = sectionHeadings(normalized)
+  if (!isOfficialStructure(normalized, headings) || !source.trim()) return
+  validateVideoPromptContent(normalized)
+  const { bodyStart, end } = detailBodyRange(normalized, headings)
+  const sourceShots = splitShots(source, /【镜头\s*\d+】/g)
+  const targetShots = splitShots(normalized.slice(bodyStart, end), /\[Shot\s+\d+\]/gi)
+  const hasSourceShots = /【镜头\s*\d+】/.test(source)
+  if (hasSourceShots && sourceShots.length !== targetShots.length) {
+    throw new Error(`description 有 ${sourceShots.length} 个【镜头N】，video_prompt 却只有 ${targetShots.length} 个 [Shot N]；镜头数必须一一对应，不能合并或新增`)
+  }
+  const definitions = normalized.slice(0, headings[1].index)
+  const speakerNames = sourceShots.flatMap(shot => sourceDialogue(shot)).filter(line => !line.narration).map(line => line.speaker)
+  const subjectNames = new Map<string, string[]>()
+  for (const match of definitions.matchAll(/<Subject\s+(\d+)>[^\n]*/gi)) {
+    const references = Array.from(match[0].matchAll(/@(?:图片\d+)?([^\s@#，。；,:;<>()[\]「」“”"]+)/g)).map(item => item[1].replace(/[.!?]+$/, ''))
+    const names = references.length ? references : speakerNames.filter(name => match[0].includes(name))
+    subjectNames.set(match[1], names)
+  }
+  const idOwners = new Map<string, string>()
+  const actorIds = new Map<string, string>()
+  const actorSubjects = new Map<string, string>()
+  const subjectOwners = new Map<string, string>()
+  const compare = (expected: ReturnType<typeof sourceDialogue>, actual: ReturnType<typeof promptDialogue>) => {
+    if (expected.length !== actual.length) {
+      throw new Error('description 的每句台词或旁白必须用 <d>[语言] 原句</d> 完整保留一次，不能省略、重复或新增')
+    }
+    for (let index = 0; index < expected.length; index++) {
+      const line = expected[index]
+      const spoken = actual[index]
+      if (normalizeForCompare(line.text) !== normalizeForCompare(spoken.text)) {
+        throw new Error(`video_prompt 台词「${spoken.text.slice(0, 40)}」与 description 不在同一原文顺序或被改写；必须逐字完整保留`)
+      }
+      if (!spoken.id) throw new Error(`台词「${line.text.slice(0, 30)}」缺少明确的说话人 (Sx)`)
+      const names = spoken.subject ? subjectNames.get(spoken.subject) || [] : []
+      if (!line.narration && (spoken.subject ? !names.includes(line.speaker) : !spoken.prefix.includes(line.speaker))) {
+        throw new Error(`台词「${line.text.slice(0, 30)}」的说话人应为 ${line.speaker}，不能挂到其他主体名下`)
+      }
+      const owner = line.speaker
+      if ((idOwners.has(spoken.id) && idOwners.get(spoken.id) !== owner) || (actorIds.has(owner) && actorIds.get(owner) !== spoken.id)) {
+        throw new Error(`说话人 ${owner} 与 (S${spoken.id}) 的绑定发生变化，同一目标视频内必须稳定复用`)
+      }
+      if (spoken.subject) {
+        if ((actorSubjects.has(owner) && actorSubjects.get(owner) !== spoken.subject)
+          || (subjectOwners.has(spoken.subject) && subjectOwners.get(spoken.subject) !== owner)) {
+          throw new Error(`说话人 ${owner} 的 <Subject ${spoken.subject}> 身份发生变化，不能混用主体`)
+        }
+        actorSubjects.set(owner, spoken.subject)
+        subjectOwners.set(spoken.subject, owner)
+      }
+      idOwners.set(spoken.id, owner)
+      actorIds.set(owner, spoken.id)
     }
   }
-
-  const dialogues = extractDialogue(normalizedPrompt)
-  if (!dialogues.length) {
-    if (/[说讲道][：:]\s*[「"“]|旁白[：:]/.test(source)) {
-      throw new Error('description 含有台词或旁白，video_prompt 必须用 <d>[Chinese] 原句</d> 保留，不能省略')
-    }
-    return
-  }
-  const normalizedSource = normalizeForCompare(source)
-  for (const line of dialogues) {
-    if (!normalizedSource.includes(normalizeForCompare(line))) {
-      throw new Error(`video_prompt 中的台词「${line.slice(0, 40)}」不在 description 原文中，禁止新增配音、旁白或改写台词`)
-    }
-  }
+  if (hasSourceShots) sourceShots.forEach((shot, index) => compare(sourceDialogue(shot), promptDialogue(targetShots[index])))
+  else compare(sourceDialogue(source), promptDialogue(normalized.slice(bodyStart, end)))
 }
 
 /** 旧格式 [Shot N] 0.0-5.0秒 / 官方格式 [Shot N] At MM:SS.mmm */
@@ -169,6 +235,7 @@ export function validateVideoPromptTimeline(prompt: string, duration: number): v
     throw new Error('H3 视频提示词必须包含顺序固定且不重复的官方六节（summary / retention_analysis），请重新生成提示词')
   }
   if (!Number.isFinite(duration) || duration <= 0) throw new Error('视频时长必须为正数')
+  validateVideoPromptContent(normalized)
   const { bodyStart, end } = detailBodyRange(normalized, headings)
   const shots = Array.from(normalized.slice(bodyStart, end).matchAll(/\[Shot\s+(\d+)\]([^\n]*)/gi))
   if (!shots.length) throw new Error('H3 提示词缺少 [Shot N] 镜头段，请重新生成提示词')

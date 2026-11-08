@@ -170,7 +170,7 @@ export class ComfyUiVideoAdapter implements VideoProviderAdapter {
     const isH3 = Object.values(template.api).some(node => node.class_type.includes('MiniMaxH3EasyV'))
     const rawPrompt = String(record.prompt || '').trim()
     // 历史分镜用的是自造节名，提交前归一成官方六节，避免旧数据仍以 shot_summary / reference_usage 进入模型
-    const withVoice = isH3 ? rawPrompt.replace(/（音色参考音频(\d+)）/g, '（音色参考@音频$1）') : rawPrompt
+    const withVoice = isH3 ? rawPrompt.replace(/（音色参考@?音频(\d+)）/g, '(voice timbre from @音频$1)') : rawPrompt
     const prompt = isH3 ? normalizeVideoPromptSections(withVoice) : withVoice
     if (isH3 && !prompt) throw new Error('本地 H3 视频提示词不能为空，请先生成或填写分镜提示词')
     if (isH3) validateVideoPromptTimeline(prompt, Number(record.duration ?? 5))

@@ -39,12 +39,13 @@
 
           <div v-if="!snapshot" class="rs-state">
             <Info :size="18" :stroke-width="1.7" />
-            <span>{{ t('requestSnapshot.empty') }}</span>
+            <span>{{ emptyState }}</span>
           </div>
 
           <template v-else>
             <!-- 请求元信息 -->
             <div class="rs-meta">
+              <span class="rs-meta-item"><em>{{ t('requestSnapshot.taskId') }}</em>#{{ activeTask.id }}</span>
               <span class="rs-meta-item"><em>{{ t('requestSnapshot.provider') }}</em>{{ snapshot.provider || '-' }}</span>
               <span class="rs-meta-item"><em>{{ t('requestSnapshot.mode') }}</em>{{ snapshot.mode || '-' }}</span>
               <span v-if="snapshot.template" class="rs-meta-item"><em>{{ t('requestSnapshot.template') }}</em>{{ snapshot.template }}</span>
@@ -63,6 +64,7 @@
                   {{ t('requestSnapshot.copyPrompt') }}
                 </button>
               </div>
+              <p class="rs-sub">{{ t('requestSnapshot.finalHint') }}</p>
               <pre class="rs-prompt">{{ snapshot.prompt || t('requestSnapshot.emptyPrompt') }}</pre>
               <div v-if="snapshot.negativePrompt" class="rs-negative">
                 <span class="rs-label">{{ t('requestSnapshot.negativePrompt') }}</span>
@@ -134,6 +136,7 @@
       </div>
 
       <div class="dialog-foot">
+        <button class="btn btn-sm" :disabled="loading || !items.length" @click="load(true)">{{ t('common.refresh') }}</button>
         <button class="btn btn-sm" :disabled="!snapshot" @click="copyJson">{{ t('requestSnapshot.copyJson') }}</button>
         <button class="btn btn-sm btn-primary" @click="close">{{ t('requestSnapshot.close') }}</button>
       </div>
@@ -157,6 +160,7 @@ import { toastError } from '~/composables/useToast'
 const props = defineProps({
   open: { type: Boolean, default: false },
   items: { type: Array, default: () => [] },
+  loadTask: { type: Function, default: null },
 })
 const emit = defineEmits(['update:open'])
 
@@ -172,12 +176,19 @@ const activeTask = computed(() => loaded.value[activeIndex.value] || null)
 const snapshot = computed(() => {
   const raw = activeTask.value?.row?.requestSnapshot ?? activeTask.value?.row?.request_snapshot
   if (!raw) return null
-  if (typeof raw === 'object') return raw
   try {
-    return JSON.parse(raw)
+    const value = typeof raw === 'string' ? JSON.parse(raw) : raw
+    return value && typeof value === 'object' && !Array.isArray(value) && typeof value.prompt === 'string' ? value : null
   } catch {
     return null
   }
+})
+
+const emptyState = computed(() => {
+  const task = activeTask.value
+  const raw = task?.row?.requestSnapshot ?? task?.row?.request_snapshot
+  if (task?.error || (raw && !snapshot.value)) return t('requestSnapshot.loadFailed')
+  return t(['pending', 'processing'].includes(task?.row?.status) ? 'requestSnapshot.preparing' : 'requestSnapshot.notRecorded')
 })
 
 const parameterRows = computed(() => {
@@ -205,23 +216,35 @@ const bodyText = computed(() => {
   }
 })
 
-watch(() => props.open, (open) => {
-  if (open) void load()
-})
-
-async function load() {
-  loading.value = true
-  activeIndex.value = 0
-  try {
-    loaded.value = await Promise.all((props.items || []).map(async (item) => ({
-      ...item,
-      row: await taskAPI.get(item.id).catch(() => null),
-    })))
-  } catch (error) {
-    toastError(error)
-  } finally {
+let loadVersion = 0
+watch(() => [props.open, props.items], ([open]) => {
+  if (open) {
+    activeIndex.value = 0
+    void load()
+  } else {
+    loadVersion++
     loading.value = false
   }
+}, { immediate: true })
+onBeforeUnmount(() => { loadVersion++ })
+
+async function load(force = false) {
+  const version = ++loadVersion
+  const activeId = activeTask.value?.id
+  loading.value = true
+  const rows = await Promise.all((props.items || []).map(async (item) => {
+    try {
+      const row = props.loadTask ? await props.loadTask(item.id, { force }) : await taskAPI.get(item.id)
+      return { ...item, row, error: !row }
+    } catch {
+      return { ...item, row: null, error: true }
+    }
+  }))
+  // 关闭或切换任务后，上一轮返回的结果不能覆盖新的弹窗内容。
+  if (version !== loadVersion || !props.open) return
+  loaded.value = rows
+  activeIndex.value = Math.max(0, rows.findIndex(item => item.id === activeId))
+  loading.value = false
 }
 
 function timeText(iso) {

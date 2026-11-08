@@ -738,6 +738,33 @@
                     />
                     <p class="voice-reference-hint">{{ t('characterVoice.referenceHint') }}</p>
                   </section>
+                  <section class="video-inspector-section video-final-prompt" aria-labelledby="video-final-prompt-title">
+                    <div class="video-inspector-prompt-head video-final-prompt-head">
+                      <span id="video-final-prompt-title" class="video-inspector-label video-inspector-label-hero">{{ t(finalVideoProvider === 'comfyui' ? 'requestSnapshot.finalComfyPrompt' : 'requestSnapshot.finalPrompt') }}</span>
+                      <span class="tag">{{ t('requestSnapshot.readOnly') }}</span>
+                      <button type="button" class="btn btn-sm" :disabled="!finalVideoPrompt" @click="copyFinalVideoPrompt">{{ t('requestSnapshot.copyPrompt') }}</button>
+                    </div>
+                    <p class="video-final-prompt-hint">{{ t('requestSnapshot.finalHint') }}</p>
+                    <div v-if="finalVideoTask" class="video-final-prompt-meta mono">
+                      <span>{{ t('requestSnapshot.taskId') }} #{{ finalVideoTask.id }}</span>
+                      <span>{{ t('requestSnapshot.provider') }}: {{ finalVideoProvider || '—' }}</span>
+                      <span>{{ t('requestSnapshot.snapshotTime') }}: {{ finalVideoSnapshot?.at ? formatSnapshotTime(finalVideoSnapshot.at) : '—' }}</span>
+                      <span v-if="previewHistoryTaskId">{{ t('requestSnapshot.historyPreview') }}</span>
+                      <button type="button" class="btn btn-sm" @click="openTaskRequest(finalVideoTask.id, t('requestSnapshot.taskVideo'))">{{ t('requestSnapshot.open') }}</button>
+                    </div>
+                    <template v-if="finalVideoSnapshot">
+                      <span v-if="finalVideoSnapshot.promptTruncated" class="tag tag-warning">{{ t('requestSnapshot.truncated') }}</span>
+                      <details :key="finalVideoTask.id" class="video-final-prompt-details" open>
+                        <summary>{{ t('requestSnapshot.promptDetails') }}</summary>
+                        <pre class="video-final-prompt-text" tabindex="0">{{ finalVideoPrompt || t('requestSnapshot.emptyPrompt') }}</pre>
+                      </details>
+                    </template>
+                    <div v-else class="video-final-prompt-state" role="status" aria-live="polite">
+                      <Loader2 v-if="finalVideoRequest?.loading" :size="13" class="animate-spin" />
+                      <span>{{ finalVideoRequestState }}</span>
+                      <button v-if="finalVideoTask && (finalVideoRequest?.error || finalVideoRequest?.attempts >= 300)" type="button" class="btn btn-sm" :disabled="finalVideoRequest?.loading" @click="retryFinalVideoRequest">{{ t('common.refresh') }}</button>
+                    </div>
+                  </section>
               </div>
               </div>
 
@@ -811,12 +838,13 @@
               <div class="video-player-history-head">
                 <span>{{ t('episode.vid.history') }}</span>
                 <span class="video-player-history-count">{{ sbVideoHistory.length }}</span>
+                <button v-if="previewHistoryTaskId" type="button" class="btn btn-sm" @click="exitHistoryPreview">{{ t('requestSnapshot.exitHistoryPreview') }}</button>
               </div>
               <div class="video-player-history-list">
                 <div
                   v-for="h in sbVideoHistory"
                   :key="h.id"
-                  :class="['video-history-item', { current: isCurrentVideo(h), viewing: !!previewVideoUrl && previewVideoUrl === taskVideoPath(h) }]"
+                  :class="['video-history-item', { current: isCurrentVideo(h), viewing: previewHistoryTaskId === h.id }]"
                   role="button"
                   tabindex="0"
                   @click="previewHistoryVideo(h)"
@@ -826,6 +854,7 @@
                   <span class="video-history-time">{{ formatHistoryTime(taskCreatedAt(h)) }}</span>
                   <span v-if="isCurrentVideo(h)" class="video-history-badge">{{ t('episode.vid.current') }}</span>
                   <button v-else type="button" class="video-history-del" :title="t('episode.vid.deleteRecord')" @click.stop="removeHistoryVideo(h)">×</button>
+                  <button type="button" class="video-history-request" :title="t('requestSnapshot.open') + ' #' + h.id" :aria-label="t('requestSnapshot.open') + ' #' + h.id" @click.stop="openTaskRequest(h.id, t('requestSnapshot.taskVideo'))" @keydown.enter.stop @keydown.space.stop>{{ t('requestSnapshot.open') }}</button>
                 </div>
               </div>
             </div>
@@ -1150,6 +1179,7 @@
                   </template>
                   <span class="video-task-sep">·</span>
                   <span>#{{ row.id }}</span>
+                  <button v-if="row.kind !== 'merge'" type="button" class="btn btn-sm" @click.stop="openTaskRequest(row.id, genTaskKindLabel(row.kind))">{{ t('requestSnapshot.open') }}</button>
                 </div>
                 <div v-if="row.errorMsg && !isCancelledTask(row)" class="video-task-error" :title="row.errorMsg">
                   {{ mapError(row.errorMsg) }}
@@ -1574,6 +1604,7 @@
       <RequestSnapshotDialog
         :open="requestDialog.open"
         :items="requestDialog.items"
+        :load-task="loadDialogTaskRequest"
         @update:open="(v) => { requestDialog.open = v }"
       />
     </main>
@@ -1598,7 +1629,7 @@ import LocaleSwitcher from '~/components/LocaleSwitcher.vue'
 
 definePageMeta({ layout: 'studio' })
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const route = useRoute()
 const dramaId = Number(route.params.id)
@@ -2173,6 +2204,98 @@ function latestVideoTask(id) {
 }
 // ========== 请求内容（真实发给模型的提示词与参数） ==========
 const requestDialog = ref({ open: false, items: [] })
+// 任务列表不携带快照，按任务 ID 独立缓存，切镜头和刷新列表都不会串用编辑稿。
+const taskRequestCache = reactive({})
+const taskRequestLoads = new Map()
+const taskRequestVersions = new Map()
+let taskRequestsDisposed = false
+onBeforeUnmount(() => { taskRequestsDisposed = true })
+
+function openTaskRequest(id, label) {
+  if (!id) return
+  requestDialog.value = { open: true, items: [{ id, label: `${label} #${id}` }] }
+}
+
+function invalidateTaskRequest(id) {
+  if (!id) return
+  const key = String(id)
+  taskRequestVersions.set(key, (taskRequestVersions.get(key) || 0) + 1)
+  delete taskRequestCache[id]
+  taskRequestLoads.delete(key)
+}
+
+function cacheTaskRequest(id, row) {
+  if (taskRequestsDisposed || !row || (row.id != null && String(row.id) !== String(id))) return
+  const entry = taskRequestCache[id] || (taskRequestCache[id] = { attempts: 0 })
+  const raw = row.requestSnapshot ?? row.request_snapshot
+  let snapshot = null
+  let snapshotError = false
+  if (raw) {
+    try {
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && typeof parsed.prompt === 'string') snapshot = parsed
+      else snapshotError = true
+    } catch {
+      // 快照仅用于诊断展示，损坏记录不能打断成功返回的任务状态与下载轮询。
+      snapshotError = true
+    }
+  }
+  // 后续状态响应没带快照时不能抹掉已经记录的权威文本。
+  if (snapshot) entry.snapshot = snapshot
+  if (snapshotError) delete entry.snapshot
+  entry.fetched = true
+  entry.checkedStatus = row.status
+  entry.fetchedAt = Date.now()
+  entry.error = snapshotError
+}
+
+async function loadTaskRequest(task, { force = false, poll = false } = {}) {
+  const id = task?.id
+  if (!id || taskRequestsDisposed) return null
+  const key = String(id)
+  const version = taskRequestVersions.get(key) || 0
+  if (taskRequestLoads.has(key)) return taskRequestLoads.get(key)
+  const entry = taskRequestCache[id] || (taskRequestCache[id] = { attempts: 0 })
+  if (!force && !poll) {
+    if (entry.snapshot || entry.error) return null
+    // 达到自动检查上限后仍允许状态变化时核对一次，避免完成时漏掉晚写入的快照。
+    if (entry.attempts >= 300 && entry.checkedStatus === task.status) return null
+    const active = ['pending', 'processing'].includes(task.status)
+    if (entry.fetched && !active && entry.checkedStatus === task.status) return null
+    if (entry.fetchedAt && Date.now() - entry.fetchedAt < 3500 && entry.checkedStatus === task.status) return null
+  }
+  if (force) entry.attempts = 0
+  entry.attempts++
+  entry.loading = true
+  entry.error = false
+  const request = (async () => {
+    try {
+      const row = await taskAPI.get(id)
+      if (taskRequestsDisposed || version !== (taskRequestVersions.get(key) || 0)) return null
+      if (!row) throw new Error(t('requestSnapshot.loadFailed'))
+      cacheTaskRequest(id, row)
+      return row
+    } catch (error) {
+      if (taskRequestsDisposed || version !== (taskRequestVersions.get(key) || 0)) return null
+      entry.error = true
+      if (poll) throw error
+      return null
+    } finally {
+      if (version === (taskRequestVersions.get(key) || 0)) {
+        if (!taskRequestsDisposed) entry.loading = false
+        taskRequestLoads.delete(key)
+      }
+    }
+  })()
+  taskRequestLoads.set(key, request)
+  return request
+}
+
+function loadDialogTaskRequest(id, { force = false } = {}) {
+  const entry = taskRequestCache[id]
+  if (!force && entry?.snapshot) return Promise.resolve({ id, requestSnapshot: entry.snapshot, status: entry.checkedStatus })
+  return loadTaskRequest({ id }, { force: true })
+}
 
 /**
  * 一个分镜可能产生多条任务：视频、分镜图（首/尾/合成图）、以及绑定的角色/场景/道具图。
@@ -2261,6 +2384,8 @@ async function recoverTask(taskId, storyboardId) {
   if (storyboardId) pendingVideoIds.value.push(storyboardId)
   try {
     await taskAPI.recover(taskId)
+    invalidateTaskRequest(taskId)
+    void loadTaskRequest({ id: taskId }, { force: true })
     delete failedVideoMessages.value[storyboardId]
     await refresh()
     pollVideoGeneration(taskId, storyboardId)
@@ -2699,7 +2824,7 @@ function stopGenTasksPolling() {
 }
 
 const genTaskActiveCount = computed(() =>
-  genTasks.value.filter(t => t.status === 'processing').length +
+  genTasks.value.filter(t => t.status === 'processing' || t.status === 'pending').length +
   genMerges.value.filter(m => m.status === 'processing' || m.status === 'pending').length
 )
 const genTaskDoneCount = computed(() =>
@@ -3360,17 +3485,14 @@ async function genVideoPrompt(sb) {
   const idx = sbs.value.indexOf(sb) + 1
   const cfg = selectedVideoConfig.value
   const label = cfg ? `${cfg.name} (${cfg.provider})` : '默认'
-  const charNames = getStoryboardCharacters(sb).map(c => c.name).join('、') || '无'
-  const propNames = getStoryboardProps(sb).map(p => p.name).join('、') || '无'
   videoPromptGeneratingIds.value.push(sb.id)
   try {
     await api.post(`/agent/prompt_generator/chat`, {
       storyboard_id: sb.id,
-      message: `请为分镜 #${idx}(ID:${sb.id})生成视频提示词(video_prompt)。视频模型:${label},请遵循本地 ComfyUI 视频提示词契约。
-
-该分镜信息:时长 ${sb.duration || 5}s;场景:${getSceneName(sb) || '未绑定'};角色:${charNames};道具:${propNames}。
-
-先调用 read_storyboard_context 读取 target_storyboard 的 description、atmosphere、duration、绑定素材及 available_image_references，按 MiniMax 官方 Ref2VA 六节结构（subject_definitions / summary / retention_analysis / detailed_description / overall_soundscape / non_diegetic_music）生成，六节正文一律用简体中文、对白放在 <d>[Chinese] 原句</d> 中，节名与关系标记、时间码保持英文原样。summary 用官方任务类型前缀，retention_analysis 用官方关系标记，detailed_description 的 [Shot 1] 不带时间戳，后续镜头用 At MM:SS.mmm。description 的【镜头N】是镜头数唯一来源：有几个镜头就写几个 [Shot N]，不得合并、不得新增；只有 description 本身单镜头时才写单个 Shot。直接复制 image_reference（如 @角色名/@场景名/@道具名）引用实际素材，不手写图片编号。主角与配角均有独立身份和清晰脸部，明确每人位置与动作。原句对白只在对应 Shot 写一次，不新增配音或配乐，无配乐写 N/A。调用 update_storyboard 保存到分镜 ID:${sb.id}，参数仅 storyboard_id 与 video_prompt，不改其他字段，不重新拆分整集。`,
+      message: `请为分镜 #${idx}(ID:${sb.id})生成 video_prompt。视频工作流：${label}。
+先调用 read_storyboard_context，读取 target_storyboard 的 description、duration、atmosphere、已有时间信息与绑定素材；读取 available_image_references 并原样复制 image_reference（@角色名/@场景名/@道具名），音色仅使用 available_voice_references。
+使用已注入的 video-prompt 技能六节英文规则创作；原台词逐字逐标点保留原语言，中文原句写入 <d>[Chinese] 原句</d>，发声角色明确对应 <Subject N> 与稳定的 (Sx)。不新增对白、旁白或其他人声，不改变原 description、duration 或镜头数。
+调用 update_storyboard 保存到 ID:${sb.id}，参数只传 storyboard_id 和 video_prompt，不修改其他业务字段、绑定或重新拆分整集。`,
       drama_id: dramaId,
       episode_id: epId.value,
       model: chatModelOverride() || undefined,
@@ -3615,6 +3737,48 @@ function hasVid(s) { return !!getVideoUrl(s) }
 // ===== 分镜视频历史（一个分镜可能生成多个视频,sys_task 留存全部记录）=====
 const sbVideoHistory = ref([])
 const previewVideoUrl = ref('') // 空表示当前分镜；历史视频可以是本地路径或远程 URL
+const previewHistoryTaskId = ref(null)
+let videoHistoryLoadVersion = 0
+const finalVideoTask = computed(() => {
+  if (!selectedSb.value?.id) return null
+  if (previewHistoryTaskId.value) return sbVideoHistory.value.find(task => task.id === previewHistoryTaskId.value) || null
+  return latestVideoTask(selectedSb.value.id) || null
+})
+const finalVideoRequest = computed(() => finalVideoTask.value ? taskRequestCache[finalVideoTask.value.id] : null)
+const finalVideoSnapshot = computed(() => finalVideoRequest.value?.snapshot || null)
+const finalVideoPrompt = computed(() => finalVideoSnapshot.value?.prompt || '')
+const finalVideoProvider = computed(() => String(finalVideoSnapshot.value?.provider || finalVideoTask.value?.provider || '').toLowerCase())
+const finalVideoRequestState = computed(() => {
+  if (!finalVideoTask.value) return t('requestSnapshot.showAfterGeneration')
+  if (finalVideoRequest.value?.error) return t('requestSnapshot.loadFailed')
+  if (finalVideoRequest.value?.loading || !finalVideoRequest.value?.fetched) return t('requestSnapshot.loading')
+  if (['pending', 'processing'].includes(finalVideoTask.value.status)) {
+    return t(finalVideoRequest.value.attempts >= 300 ? 'requestSnapshot.refreshNeeded' : 'requestSnapshot.preparing')
+  }
+  return t('requestSnapshot.notRecorded')
+})
+// 复用工作台每四秒的列表刷新：有快照就停止额外详情请求；无快照只跟踪当前任务。
+watch(() => [finalVideoTask.value?.id, finalVideoTask.value?.status, genTasks.value], () => {
+  if (finalVideoTask.value) void loadTaskRequest(finalVideoTask.value)
+}, { immediate: true })
+
+function retryFinalVideoRequest() {
+  if (finalVideoTask.value) void loadTaskRequest(finalVideoTask.value, { force: true })
+}
+
+async function copyFinalVideoPrompt() {
+  if (!finalVideoPrompt.value) return
+  try {
+    await navigator.clipboard.writeText(finalVideoPrompt.value)
+    toast.success(t('requestSnapshot.copied'))
+  } catch (error) { toastError(error) }
+}
+
+function formatSnapshotTime(value) {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString(locale.value)
+}
+
 const playerLoadFailed = ref(false)
 function videoSourceUrl(value) {
   if (!value) return ''
@@ -3645,21 +3809,36 @@ function taskVideoPath(t) { return t?.local_path || t?.localPath || t?.result_ur
 function taskCreatedAt(t) { return t?.created_at || t?.createdAt || '' }
 function isCurrentVideo(t) { const p = taskVideoPath(t); return !!p && p === getVideoUrl(selectedSb.value) }
 
-async function loadSbVideoHistory() {
+function exitHistoryPreview() {
   previewVideoUrl.value = ''
-  if (!selectedSb.value?.id) { sbVideoHistory.value = []; return }
+  previewHistoryTaskId.value = null
+}
+
+async function loadSbVideoHistory() {
+  const version = ++videoHistoryLoadVersion
+  const storyboardId = selectedSb.value?.id
+  exitHistoryPreview()
+  sbVideoHistory.value = []
+  if (!storyboardId) return
   try {
-    const rows = await taskAPI.list({ type: 'video', storyboard_id: selectedSb.value.id })
+    const rows = await taskAPI.list({ type: 'video', storyboard_id: storyboardId })
+    // 快速切镜头或视频更新时，过期历史响应不能覆盖当前分镜。
+    if (taskRequestsDisposed || version !== videoHistoryLoadVersion || storyboardId !== selectedSb.value?.id) return
     sbVideoHistory.value = (Array.isArray(rows) ? rows : [])
       .filter(t => t.status === 'completed' && taskVideoPath(t))
       .sort((a, b) => taskCreatedAt(b).localeCompare(taskCreatedAt(a)))
-  } catch { sbVideoHistory.value = [] }
+  } catch {
+    if (!taskRequestsDisposed && version === videoHistoryLoadVersion) sbVideoHistory.value = []
+  }
 }
 
-watch(() => [selectedSb.value?.id, getVideoUrl(selectedSb.value)], () => { loadSbVideoHistory() })
+watch(() => [selectedSb.value?.id, getVideoUrl(selectedSb.value)], () => { void loadSbVideoHistory() }, { flush: 'sync' })
 
-function previewHistoryVideo(t) {
-  previewVideoUrl.value = isCurrentVideo(t) ? '' : taskVideoPath(t)
+function previewHistoryVideo(task) {
+  if (!sbVideoHistory.value.some(item => item.id === task.id)) return
+  // 即便该记录正是主视频，也按本条任务 ID 展示提示词，不偷换成最新任务。
+  previewHistoryTaskId.value = task.id
+  previewVideoUrl.value = taskVideoPath(task)
 }
 
 async function setAsMainVideo() {
@@ -3677,7 +3856,8 @@ async function removeHistoryVideo(t) {
   try {
     await taskAPI.del(t.id)
     sbVideoHistory.value = sbVideoHistory.value.filter(x => x.id !== t.id)
-    if (previewVideoUrl.value === taskVideoPath(t)) previewVideoUrl.value = ''
+    if (previewHistoryTaskId.value === t.id) exitHistoryPreview()
+    delete taskRequestCache[t.id]
     toast.success(t('episode.vid.historyDeleted'))
   } catch (e) { toastError(e, { fallback: 'common.deleteFailed' }) }
 }
@@ -3962,6 +4142,10 @@ async function genVid(sb, opts = {}) {
     if (!isPendingVideo(sb.id)) pendingVideoIds.value.push(sb.id)
     markVideoStart(sb.id)
     const generation = await taskAPI.generate({ type: 'video', ...params, force_new: !!forceNew })
+    if (generation?.id) {
+      invalidateTaskRequest(generation.id)
+      void loadTaskRequest({ id: generation.id }, { force: true })
+    }
     if (!opts.silent) toast.success(t('episode.vid.generating'))
     await refresh()
     pollVideoGeneration(generation?.id, sb.id)
@@ -3992,8 +4176,11 @@ async function pollVideoGeneration(generationId, storyboardId) {
   // 本地引擎单镜头约 10 分钟，窗口给到 20 分钟
   for (let i = 0; i < 300; i++) {
     await sleep(4000)
+    if (taskRequestsDisposed) return
     try {
-      const res = await taskAPI.get(generationId)
+      // 详情轮询与只读面板合并在途请求，顺便保存权威快照。
+      const res = await loadTaskRequest({ id: generationId }, { poll: true })
+      if (taskRequestsDisposed) return
       if (res?.first_pass_ready && res?.first_pass_url) {
         firstPassUrls.value = { ...firstPassUrls.value, [storyboardId]: res.first_pass_url }
       }
@@ -6012,6 +6199,50 @@ button.video-task-metric.on { box-shadow: 0 0 0 2px var(--accent); }
   background: var(--surface-muted);
 }
 .video-inspector-section { display: flex; flex-direction: column; gap: 7px; }
+.video-final-prompt {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+}
+.video-final-prompt-head { flex-wrap: wrap; justify-content: flex-start; }
+.video-final-prompt-head .btn { margin-left: auto; }
+.video-final-prompt-hint { margin: 0; color: var(--text-3); font-size: 11.5px; line-height: 1.6; }
+.video-final-prompt-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; color: var(--text-2); font-size: 11px; }
+.video-final-prompt-details { min-width: 0; }
+.video-final-prompt-details summary { cursor: pointer; color: var(--text-2); font-size: 12px; padding: 4px 0; }
+.video-final-prompt-text {
+  margin: 6px 0 0;
+  padding: 12px;
+  max-height: 280px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-input);
+  color: var(--text-0);
+  font: 12px/1.75 var(--font-body);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.video-final-prompt-state { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; color: var(--text-2); font-size: 12px; }
+.video-history-request {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  max-width: 55px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 3px;
+  background: rgba(0,0,0,0.7);
+  color: #fff;
+  font-size: 9px;
+  cursor: pointer;
+}
+.video-history-request:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .video-inspector-label { color: var(--text-0); font-size: 12px; font-weight: 700; }
 .video-inspector-label-hero {
   color: var(--accent);

@@ -9,17 +9,19 @@ description: Professional rules for storyboard breakdown — splitting a script 
 
 One storyboard = one **storyboard segment** = one video-generation task.
 
-- Local H3 baseline: **4-12 integer seconds, target 5, never exceed 12**; longer dialogue may use 9-12 without padding
-- Default **one continuous shot and one main action**, static camera or one slow movement; only when necessary use at most two shots, each at least 2 seconds
-- Never cross scenes (`scene_id` is segment-level); preserve the entire plot and original speech
-- Two characters should share the focal plane; specify each identity, position, face direction and action. Both faces must remain clear, including supporting characters, without shallow-depth background blur
+- Use content-driven **4-12 integer seconds**, with no 5-second target and no extension to 15 seconds. This is a local stability strategy, not an official capability limit or quality guarantee
+- Default to one continuous shot and one main action, with a static camera or one simple move; necessary narrative cuts use at most two shots, each at least 2 seconds, without padding
+- Keep one scene per segment (`scene_id` is segment-level). Carry camera direction, character positions, doors/windows/furniture and key-light relations into adjacent segments rather than re-establishing the space
+- Prefer one or two characters, on the same focal plane, with distinct identities, positions, distances, face directions and independent actions; preserve recognizable faces and all plot characters
+- Prefer one main speaker per newly generated segment. Allow several lines from the same character when natural delivery fits; start a new segment for a speaker change where possible. This is not an official one-speaker-per-Shot hard limit and never justifies deleting existing dialogue or shots
+- Enter the current action directly at normal speed. Do not pad with repeated establishing shots, head lifts/inhalations, slow motion or end freezes; retain pauses and performance grounded in the original
 
 ## Breakdown Process (Four Steps)
 
-1. Call `read_storyboard_context` to read the script, characters, scenes, props, and existing storyboard summaries
-2. **Identify beats**: split at narrative boundaries. A causal chain can continue across adjacent segments using stable spatial anchors and action continuity; duration and dialogue capacity take priority over keeping the chain in one segment
-3. **Estimate duration**: script character count ÷ 500 × 60 yields only a rough seconds estimate, not a count or ±20% quota. Sum natural speech, actions and pauses; never delete plot to fit an estimate
-4. **Design simple shots**: default one shot; cut only when necessary. Save complete fields in batches of at most 2 segments, one save call per response. Full regeneration uses `replace_existing: true` only in the first batch; subsequent batches append. Explicit incremental updates never clear old shots. Finish only after all required saves
+1. Read the script, characters, scenes, props and existing storyboard summaries with `read_storyboard_context`; use only the save tool's existing schema fields
+2. **Causality and beats**: internally trace prior state → current action / who addresses whom with the exact line → immediate result and the next segment's continuation. Split at narrative turns and speaker changes, carrying positions and actions forward. Do not leak this planning into H3 prose or invent planning fields
+3. **Estimate duration**: use natural delivery, actions, necessary pauses and reasonable overlap, not script-count or segment quotas. Continue beyond 12 seconds in the next segment at a natural semantic/action boundary; omit no lines or plot
+4. **Design and save**: describe visible action and exact speech under `【镜头N】` in description, then generate video_prompt under the authoritative video-prompt skill. Save at most 2 segments per batch, one `save_storyboards` call per response. Full regeneration uses `replace_existing: true` only in the first batch; later batches append. Incremental edits never clear existing storyboards. Finish after all saves succeed
 
 ## Pacing-Tier Durations
 
@@ -27,15 +29,18 @@ Determine duration by the segment's function — do not use one size for all:
 
 | Segment type | Duration | Notes |
 |---|---|---|
-| Transition segment | 4-5 s | Traveling, empty shots, environment establishment, transitions |
-| Narrative segment | 5-8 s | Plot advancement, dialogue |
-| Longer dialogue or slow action | 9-12 s | Natural speech, pauses and one main action; no quota-driven cuts |
+| Short reaction | 4 s | Enter the original reaction and visible state change directly |
+| Ordinary dialogue | 5-8 s | Natural original speech; several lines from one character may fit |
+| Continuous action | 6-10 s | Normal-speed connected action without repeated preparation |
+| Long dialogue | 10-12 s | Preserve original pauses; do not squeeze or pad to 12 |
 
-## Dialogue Capacity
+Treat these as content references, not quotas. Keep new segments at 4-12 integer seconds and preserve the entire plot.
 
-Allow natural speaking time and approximately 2 seconds of performance headroom. Chinese 4.5 characters/second is only a reference; do not impose it as an English speech rate.
+## Natural Speech and Action Timing
 
-Dialogue that does not fit must be moved to the next segment; cramming unperformable dialogue into one segment is not allowed.
+Estimate Chinese dialogue at **4.5-5.5 characters/second**, usually with **0.4-0.8 seconds total buffer**. Account for emotional pauses from the original without adding repeated buffers per sentence or action. Use natural delivery for other languages, not the Chinese character rate.
+
+When speech and action can happen together, estimate their actual overlapping duration; sum them when sequence is required. Do not blindly add all durations or force overlap. Continue overflow beyond 12 seconds in the next segment at a natural semantic/action boundary, preserving every line and action without generic pauses, slow motion or end freezes.
 
 ## Shot Elements
 
@@ -45,10 +50,10 @@ Dialogue that does not fit must be moved to the next segment; cramming unperform
 4. **Shot size**: the dominant shot size of the segment; for multi-size segments write a combination, e.g. "medium shot + close-up"
 5. **Angle**: eye-level / low angle / high angle / side / back
 6. **Camera move**: static / push-in / pull-back / pan / tracking / dolly (different sub-shots within a segment may differ)
-7. **Visual description** `description`: describe sub-shot by sub-shot as `【镜头1】…【镜头2】…` what the audience actually sees and hears — the visuals (who + specific action + body-language details + expression) come first; when a sub-shot has dialogue, write it inside the corresponding `【镜头N】` as "CharacterName says: "line"", and narration as "Narration: content"
-8. **Visual result** `result`: the immediate consequence at the end of the segment + visual details
-9. **Atmosphere** `atmosphere`: lighting + color tone + sound + overall mood
-10. **Duration** `duration`: 4-12 integer seconds, target 5, never exceed 12, with natural speech capacity
+7. **Visual description** `description`: under `【镜头1】…【镜头2】…`, write action as a complete sentence, then separate speech by a full stop or newline using the fixed syntax `角色原名说：「原句」`. Substitute the exact original business character name and complete verbatim line; do not translate names or mix action text into a speaker name. Keep only existing narration as `旁白：「原句」`
+8. **Immediate result and continuity**: write the ending consequence and the next segment's established state in `description`; invent no `result` or causal-planning field
+9. **Atmosphere** `atmosphere`: lighting + color + environment; do not derive new voice or music from mood alone
+10. **Duration** `duration`: 4-12 integer seconds, sufficient for natural speech and action without target-driven padding
 11. **Scene binding**: if it can be matched to an existing scene, `scene_id` must be filled in
 12. **Character binding**: fill in `character_ids`, binding 0 to multiple characters involved in this segment
 13. **Prop binding**: fill in `prop_ids`, binding 0 to multiple key props appearing in this segment
@@ -77,7 +82,8 @@ Dialogue that does not fit must be moved to the next segment; cramming unperform
 
 ## Quality Requirements
 
-- Default to `【镜头1】` with exact positions, faces and actions. Use the official MiniMax Ref2VA six sections for `video_prompt` (subject_definitions / summary / retention_analysis / detailed_description / overall_soundscape / non_diegetic_music) with a Simplified Chinese body (section names and retention markers stay in English), with an independent <Subject N> for every visible character; use @ references only for actual available images
-- Original dialogue appears once in its Shot as <d>[Chinese] ...</d> with a stable (Sx) speaker ID. overall_soundscape contains 1-4 Chinese sentences of ambience and physical sounds only, with no speaker whitelist and no repeated dialogue
-- retention_analysis uses only official markers (fully_preserved / partially_preserved / attribute_transfer / weak_reference); non_diegetic_music is N/A unless music is explicitly requested; do not design sound from atmosphere alone
-- Use only the save tool schema fields. Incremental `update_storyboard` edits never clear the episode
+- Write prior state, each character's action / exact line and addressee, immediate result and continuity under `【镜头N】` in description. Retain only original narration. These markers remain the sole video-shot source; do not add or remove them for the speaker strategy
+- Follow the authoritative video-prompt skill for the official six sections with English explanatory prose and original-language dialogue/lyrics/visible text. Do not duplicate its reference numbering, Subject/Sx, sound or video-style rules here
+- Existing rewrites preserve duration, shot count, all actions and dialogue; bind existing multiple speakers line by line without deleting content for the new stability strategy
+- Before saving check speaker, order, full original wording and occurrence count, along with causal action, actual timing and spatial continuity. Use only existing tool-schema fields; invent no result, image_prompt, bgm_prompt or sound_effect fields
+- Incremental `update_storyboard` edits never clear the episode

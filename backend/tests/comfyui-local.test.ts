@@ -347,7 +347,9 @@ test('H3 音色转换为显式音频引用，编号独立于图片且不重复�
         referenceAudioUrls: JSON.stringify(resolved.audioUrls), generateAudio: true, duration: 5 } as any,
     )
     const graph = (request.body as any).prompt
-    assert.equal(graph['2'].inputs.prompt, '@图片1小明抬头，小明（音色参考@音频1）说：「早上好。」')
+    assert.equal(graph['2'].inputs.prompt, '@图片1小明抬头，小明(voice timbre from @音频1)说：「早上好。」')
+    assert.equal(request.debug?.prompt, graph['2'].inputs.prompt)
+    assert.doesNotMatch(graph['2'].inputs.prompt, /音色参考/)
     assert.deepEqual(JSON.parse(graph['2'].inputs.media_manifest).map((m: any) => m.media_type), ['image', 'audio'])
     assert.equal(graph['2'].inputs.prompt.split('早上好。').length - 1, 1)
   } finally { await mock.close() }
